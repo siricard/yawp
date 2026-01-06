@@ -1,0 +1,5 @@
+.pair/
+.direnv/
+result
+result-*
+.nix-shell-history
