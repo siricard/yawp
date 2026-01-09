@@ -12,7 +12,15 @@ defmodule Mook.MixProject do
       deps: deps(),
       compilers: [:phoenix_live_view] ++ Mix.compilers(),
       listeners: [Phoenix.CodeReloader],
-      consolidate_protocols: Mix.env() != :dev
+      consolidate_protocols: Mix.env() != :dev,
+      usage_rules: usage_rules()
+    ]
+  end
+
+  defp usage_rules do
+    [
+      file: "usage-rules.md",
+      usage_rules: [:usage_rules, :ash, ~r/^ash_/, :phoenix, ~r/^phoenix_/, :igniter, :cinder]
     ]
   end
 
