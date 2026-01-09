@@ -10,21 +10,27 @@
     flake-utils.lib.eachDefaultSystem (system:
       let
         pkgs = import nixpkgs { inherit system; };
-        beam = pkgs.beam.packages.erlang_27;
+        beam = pkgs.beam.packages.erlang_28;
       in {
         devShells.default = pkgs.mkShell {
           packages = with pkgs; [
-            beam.elixir
+            android-tools
+            beam.elixir_1_19
             beam.erlang
-            nodejs_22
-            nodePackages.pnpm
+            cocoapods
             git
             gnumake
+            just
+            nodejs_22
+            pnpm
+            watchman
+            zulu17
           ] ++ pkgs.lib.optionals pkgs.stdenv.isLinux [
             pkgs.inotify-tools
           ];
 
           shellHook = ''
+            export ANDROID_HOME="$HOME/Library/Android/sdk"
             export LANG=en_US.UTF-8
             export ERL_AFLAGS="-kernel shell_history enabled"
             mix local.hex --if-missing >/dev/null 2>&1 || true
