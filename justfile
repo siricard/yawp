@@ -57,7 +57,7 @@ rn-android:
 
 # Run the React Native app on macOS
 rn-macos:
-    nix develop -c bash -c 'cd assets/native && npx react-native run-macos'
+    nix develop -c bash -c 'export DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer; export PATH="/usr/bin:/bin:/usr/sbin:/sbin:$PATH"; cd assets/native && npx react-native run-macos'
 
 # Start the React Native Metro bundler
 rn-metro:
