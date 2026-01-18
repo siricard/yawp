@@ -1,0 +1,32 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  build:
+    name: Compile, test, and typecheck
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@v27
+
+      - name: Fetch Elixir dependencies
+        run: nix develop -c mix deps.get
+
+      - name: Compile with warnings as errors
+        run: nix develop -c mix compile --warnings-as-errors
+
+      - name: Run Elixir tests
+        run: nix develop -c mix test
+
+      - name: Typecheck web assets
+        run: nix develop -c bash -c 'cd assets && npx tsc --noEmit'
+
+      - name: Typecheck React Native assets
+        run: nix develop -c bash -c 'cd assets/native && npx tsc --noEmit'
