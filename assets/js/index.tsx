@@ -1,6 +1,9 @@
 import React, { useEffect } from "react";
 import { createRoot } from "react-dom/client";
 import { initLandingPage } from "./animation";
+import type { ActionConfig } from "./ash_generated";
+
+const ashTypecheckProbe: ActionConfig = {};
 
 function App() {
   useEffect(() => {
@@ -20,6 +23,9 @@ function App() {
           <div>
             <h1 className="text-4xl font-bold">AshTypescript</h1>
             <p className="text-lg opacity-70">End-to-end type safety from Ash to TypeScript</p>
+            <p className="text-sm opacity-50">
+              Generated Ash RPC types loaded: {Object.keys(ashTypecheckProbe).length}
+            </p>
           </div>
         </div>
 

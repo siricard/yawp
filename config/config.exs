@@ -4,7 +4,7 @@ import Config
 config :cinder, default_theme: "daisy_ui"
 
 config :ash_typescript,
-  output_file: "assets/js/ash_rpc.ts",
+  output_file: "assets/js/ash_generated.ts",
   run_endpoint: "/rpc/run",
   validate_endpoint: "/rpc/validate",
   input_field_formatter: :camel_case,
