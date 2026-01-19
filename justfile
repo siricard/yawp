@@ -47,6 +47,15 @@ ash-migrate:
 gen-types:
     nix develop -c mix ash_typescript.codegen
 
+# Regenerate Ash TS types AND sync the RN-consumed copy in one step.
+# Future workers: ALWAYS run this after editing Ash resources — `mix ash.codegen --check`
+# (which AshPhoenix.Plug.CheckCodegenStatus uses) will block HTTP routes with a 500 if
+# the generated artifacts are stale.
+codegen:
+    nix develop -c mix ash_typescript.codegen --output "assets/js/ash_generated.ts"
+    cp assets/js/ash_generated.ts assets/native/src/ash_generated.ts
+    cp assets/js/ash_types.ts assets/native/src/ash_types.ts
+
 # Run the React Native app on iOS
 rn-ios:
     nix develop -c bash -c 'cd assets/native && npx react-native run-ios'

@@ -1,5 +1,6 @@
 
 
+import type { AshRpcError, Binary, InferResult, UnifiedFieldSelection, UserResourceSchema, ValidationResult } from "./ash_types";
 export type * from "./ash_types";
 
 /**
@@ -172,5 +173,76 @@ export async function executeValidationRpcRequest<T>(
   }
 
   return result as T;
+}
+
+export type RegisterWithPubkeyInput = {
+  publicKey?: Binary | null;
+  homeServer?: string | null;
+};
+
+export type RegisterWithPubkeyFields = UnifiedFieldSelection<UserResourceSchema>[];
+
+export type InferRegisterWithPubkeyResult<
+  Fields extends RegisterWithPubkeyFields | undefined,
+> = InferResult<UserResourceSchema, Fields>;
+
+export type RegisterWithPubkeyResult<Fields extends RegisterWithPubkeyFields | undefined = undefined> = | { success: true; data: InferRegisterWithPubkeyResult<Fields>; }
+| { success: false; errors: AshRpcError[]; }
+
+;
+
+/**
+ * Create a new User
+ *
+ * @ashActionType :create
+ */
+export async function registerWithPubkey<Fields extends RegisterWithPubkeyFields | undefined = undefined>(
+  config: {
+  tenant?: string;
+  input?: RegisterWithPubkeyInput;
+  fields?: Fields;
+  headers?: Record<string, string>;
+  fetchOptions?: RequestInit;
+  customFetch?: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
+}
+): Promise<RegisterWithPubkeyResult<Fields extends undefined ? [] : Fields>> {
+  const payload = {
+    action: "register_with_pubkey",
+    ...(config.tenant !== undefined && { tenant: config.tenant }),
+    input: config.input,
+    ...(config.fields !== undefined && { fields: config.fields })
+  };
+
+  return executeActionRpcRequest<RegisterWithPubkeyResult<Fields extends undefined ? [] : Fields>>(
+    payload,
+    config
+  );
+}
+
+/**
+ * Validate: Create a new User
+ *
+ * @ashActionType :create
+ * @validation true
+ */
+export async function validateRegisterWithPubkey(
+  config: {
+  tenant?: string;
+  input?: RegisterWithPubkeyInput;
+  headers?: Record<string, string>;
+  fetchOptions?: RequestInit;
+  customFetch?: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
+}
+): Promise<ValidationResult> {
+  const payload = {
+    action: "register_with_pubkey",
+    ...(config.tenant !== undefined && { tenant: config.tenant }),
+    input: config.input
+  };
+
+  return executeValidationRpcRequest<ValidationResult>(
+    payload,
+    config
+  );
 }
 

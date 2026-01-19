@@ -4,7 +4,7 @@ defmodule Mook.Accounts.User do
     domain: Mook.Accounts,
     data_layer: AshPostgres.DataLayer,
     authorizers: [Ash.Policy.Authorizer],
-    extensions: [AshAuthentication]
+    extensions: [AshAuthentication, AshTypescript.Resource]
 
   authentication do
     add_ons do
@@ -50,6 +50,13 @@ defmodule Mook.Accounts.User do
   postgres do
     table "users"
     repo Mook.Repo
+
+            migration_types recovery_methods: :jsonb
+    migration_defaults recovery_methods: "fragment(\"'[]'::jsonb\")"
+  end
+
+  typescript do
+    type_name "User"
   end
 
   actions do
@@ -122,6 +129,28 @@ defmodule Mook.Accounts.User do
       metadata :token, :string do
         description "A JWT that can be used to authenticate the user."
         allow_nil? false
+      end
+    end
+
+    create :register_with_pubkey do
+      description "Register a new user identified by an Ed25519 public key. Derives DID server-side."
+
+      accept [:public_key, :home_server]
+
+      validate present(:public_key)
+
+      change fn changeset, _ctx ->
+        case Ash.Changeset.get_attribute(changeset, :public_key) do
+          pk when is_binary(pk) ->
+            Ash.Changeset.force_change_attribute(
+              changeset,
+              :did,
+              Mook.Identity.did_from_pubkey(pk)
+            )
+
+          _ ->
+            changeset
+        end
       end
     end
 
@@ -213,19 +242,46 @@ defmodule Mook.Accounts.User do
     uuid_primary_key :id
 
     attribute :email, :ci_string do
-      allow_nil? false
+      allow_nil? true
       public? true
     end
 
     attribute :hashed_password, :string do
-      allow_nil? false
+      allow_nil? true
       sensitive? true
     end
 
     attribute :confirmed_at, :utc_datetime_usec
+
+    attribute :public_key, :binary do
+      allow_nil? true
+      public? true
+      description "Raw Ed25519 public key bytes (32). Set on register_with_pubkey."
+    end
+
+    attribute :did, :string do
+      allow_nil? true
+      public? true
+      description "base58(SHA-256(public_key)). Derived on create."
+    end
+
+    attribute :home_server, :string do
+      allow_nil? true
+      public? true
+      description "Federation reservation."
+    end
+
+    attribute :recovery_methods, {:array, :map} do
+      allow_nil? false
+      default []
+      public? true
+      description "Identity recovery reservation."
+    end
   end
 
   identities do
-    identity :unique_email, [:email]
+    identity :unique_email, [:email], nils_distinct?: true
+    identity :unique_public_key, [:public_key], nils_distinct?: true
+    identity :unique_did, [:did], nils_distinct?: true
   end
 end
