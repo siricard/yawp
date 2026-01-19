@@ -1,0 +1,17 @@
+{
+  "_comment": "TEST VECTOR ONLY — not a real key. Deterministic Ed25519 seed (bytes 0..31) used by Mook server, web, and React Native test suites to assert byte-for-byte agreement on DID derivation and signature bytes. Never use this seed for any live identity.",
+  "did_algorithm": "base58(SHA-256(pk))",
+  "base58_alphabet": "bitcoin",
+  "signature": {
+    "algorithm": "Ed25519",
+    "hash": "SHA-512"
+  },
+  "sk_seed_hex": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+  "sk_seed_base64": "AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8=",
+  "pk_hex": "03a107bff3ce10be1d70dd18e74bc09967e4d6309ba50d5f1ddc8664125531b8",
+  "pk_base64": "A6EHv/POEL4dcN0Y50vAmWfk1jCbpQ1fHdyGZBJVMbg=",
+  "did": "6ooAjytx2tERAi6rpXCqxMKCBr4z6Kw3UoRDbuuAUiGT",
+  "signature_message_utf8": "mook-identity-vector-v1",
+  "signature_hex": "95bfe46830ac2740ac7c36faf857f4fad522bae91d13c662cdedd67a9fdb632c257924e432f2934d60053ede8d4df5a28b85fa684ebf11a4541cadd5987e6e02",
+  "signature_base64": "lb/kaDCsJ0CsfDb6+Ff0+tUiuukdE8Zize3Wep/bYywleSTkMvKTTWAFPt6NTfWii4X6aE6/EaRUHK3VmH5uAg=="
+}
