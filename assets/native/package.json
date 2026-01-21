@@ -13,8 +13,10 @@
     "@noble/ed25519": "^3.1.0",
     "@noble/hashes": "^2.2.0",
     "@react-native/new-app-screen": "0.81.6",
+    "bs58": "^6.0.0",
     "react": "19.1.4",
     "react-native": "0.81.6",
+    "react-native-get-random-values": "^1.11.0",
     "react-native-keychain": "10.0.0",
     "react-native-macos": "0.81.7",
     "react-native-safe-area-context": "^5.5.2"

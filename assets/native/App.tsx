@@ -1,18 +1,22 @@
-import {StatusBar, StyleSheet, Text, useColorScheme, View} from 'react-native';
-import type {ActionConfig} from './src/ash_generated';
+import React, {useState} from 'react';
+import {StatusBar, StyleSheet, useColorScheme, View} from 'react-native';
+import {DidScreen} from './src/screens/DidScreen';
+import {VectorTestScreen} from './src/screens/VectorTestScreen';
 
-const ashTypecheckProbe: ActionConfig = {};
+type Screen = 'home' | 'vector';
 
 function App() {
   const isDarkMode = useColorScheme() === 'dark';
+  const [screen, setScreen] = useState<Screen>('home');
 
   return (
     <View style={styles.container}>
       <StatusBar barStyle={isDarkMode ? 'light-content' : 'dark-content'} />
-      <Text style={styles.title}>Mook</Text>
-      <Text style={styles.subtitle}>
-        Generated Ash RPC types loaded: {Object.keys(ashTypecheckProbe).length}
-      </Text>
+      {screen === 'home' ? (
+        <DidScreen onOpenVectorTest={() => setScreen('vector')} />
+      ) : (
+        <VectorTestScreen onBack={() => setScreen('home')} />
+      )}
     </View>
   );
 }
@@ -20,20 +24,7 @@ function App() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
     backgroundColor: '#0f172a',
-  },
-  title: {
-    color: '#f8fafc',
-    fontSize: 48,
-    fontWeight: '700',
-    letterSpacing: 1,
-  },
-  subtitle: {
-    color: '#cbd5e1',
-    fontSize: 14,
-    marginTop: 12,
   },
 });
 

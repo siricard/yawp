@@ -1749,6 +1749,8 @@ PODS:
     - React-RCTFBReactNativeSpec
     - ReactCommon/turbomodule/core
     - SocketRocket
+  - react-native-get-random-values (1.11.0):
+    - React-Core
   - react-native-safe-area-context (5.7.0):
     - boost
     - DoubleConversion
@@ -2414,6 +2416,7 @@ DEPENDENCIES:
   - React-logger (from `../node_modules/react-native-macos/ReactCommon/logger`)
   - React-Mapbuffer (from `../node_modules/react-native-macos/ReactCommon`)
   - React-microtasksnativemodule (from `../node_modules/react-native-macos/ReactCommon/react/nativemodule/microtasks`)
+  - react-native-get-random-values (from `../node_modules/react-native-get-random-values`)
   - react-native-safe-area-context (from `../node_modules/react-native-safe-area-context`)
   - React-NativeModulesApple (from `../node_modules/react-native-macos/ReactCommon/react/nativemodule/core/platform/ios`)
   - React-oscompat (from `../node_modules/react-native-macos/ReactCommon/oscompat`)
@@ -2535,6 +2538,8 @@ EXTERNAL SOURCES:
     :path: "../node_modules/react-native-macos/ReactCommon"
   React-microtasksnativemodule:
     :path: "../node_modules/react-native-macos/ReactCommon/react/nativemodule/microtasks"
+  react-native-get-random-values:
+    :path: "../node_modules/react-native-get-random-values"
   react-native-safe-area-context:
     :path: "../node_modules/react-native-safe-area-context"
   React-NativeModulesApple:
@@ -2643,6 +2648,7 @@ SPEC CHECKSUMS:
   React-logger: ebf77e4ed4180ada8395150e28b3e0afbce85f7f
   React-Mapbuffer: c44902c0cd34295f9d3d966e6700065d020b959a
   React-microtasksnativemodule: 9d242fc7e563da3fe7ad3709b6f95fa7513e67c2
+  react-native-get-random-values: 21325b2244dfa6b58878f51f9aa42821e7ba3d06
   react-native-safe-area-context: 0f4986a88ec555aff660503b483d6e4bd6980a9a
   React-NativeModulesApple: 69b79d4f3e84383515f2cca1139f36221361fd22
   React-oscompat: b359d251f6ea20fa91e5e0f99fd7b563f50a8af3

@@ -1,0 +1,93 @@
+/**
+ * Unit tests for the RN identity module. We mock `react-native-keychain`
+ * with a tiny in-memory store so we can exercise generate / load / signing
+ * without touching the OS keychain.
+ */
+
+jest.mock('react-native-keychain', () => {
+  const store: Record<string, {username: string; password: string}> = {};
+  return {
+    __store: store,
+    setGenericPassword: jest.fn(
+      async (
+        username: string,
+        password: string,
+        options?: {service?: string},
+      ) => {
+        const service = (options && options.service) || '__default__';
+        store[service] = {username, password};
+        return {service, storage: 'memory'};
+      },
+    ),
+    getGenericPassword: jest.fn(async (options?: {service?: string}) => {
+      const service = (options && options.service) || '__default__';
+      return store[service] || false;
+    }),
+    resetGenericPassword: jest.fn(async (options?: {service?: string}) => {
+      const service = (options && options.service) || '__default__';
+      delete store[service];
+      return true;
+    }),
+  };
+});
+
+import {
+  STORAGE_KEY,
+  PK_FIELD,
+  deriveDid,
+  publicKeyFromSecret,
+  getOrCreateIdentity,
+  clearIdentity,
+  signWithIdentity,
+} from '../identity';
+import vector from '../../../../priv/test_vectors/identity.json';
+
+declare const Buffer: {
+  from: (bytes: Uint8Array) => {toString: (enc: string) => string};
+};
+declare const TextEncoder: {new (): {encode: (s: string) => Uint8Array}};
+
+function hexToBytes(hex: string): Uint8Array {
+  const out = new Uint8Array(hex.length / 2);
+  for (let i = 0; i < out.length; i++) {
+    out[i] = parseInt(hex.substr(i * 2, 2), 16);
+  }
+  return out;
+}
+
+describe('identity', () => {
+  beforeEach(async () => {
+    await clearIdentity();
+  });
+
+  test('deriveDid matches the cross-platform fixture', () => {
+    const seed = hexToBytes(vector.sk_seed_hex);
+    const pk = publicKeyFromSecret(seed);
+    expect(deriveDid(pk)).toBe(vector.did);
+  });
+
+  test('publicKeyFromSecret matches pk_hex byte-for-byte', () => {
+    const seed = hexToBytes(vector.sk_seed_hex);
+    const pk = publicKeyFromSecret(seed);
+    expect(Buffer.from(pk).toString('hex')).toBe(vector.pk_hex);
+  });
+
+  test('getOrCreateIdentity persists across calls (cold-restart proxy)', async () => {
+    const first = await getOrCreateIdentity();
+    const second = await getOrCreateIdentity();
+    expect(second.did).toBe(first.did);
+    expect(Buffer.from(second[PK_FIELD]).toString('hex')).toBe(
+      Buffer.from(first[PK_FIELD]).toString('hex'),
+    );
+  });
+
+  test('signWithIdentity produces a 64-byte Ed25519 signature', async () => {
+    await getOrCreateIdentity();
+    const sig = await signWithIdentity(new TextEncoder().encode('hello'));
+    expect(sig.length).toBe(64);
+  });
+
+  test('STORAGE_KEY is the documented contract', () => {
+    expect(STORAGE_KEY).toBe('mook.identity.sk');
+  });
+});
