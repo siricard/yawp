@@ -30,7 +30,10 @@
     },
     "allowJs": true,
     "noEmit": true,
-    "skipLibCheck": true
+    "skipLibCheck": true,
+    "resolveJsonModule": true,
+    "moduleResolution": "bundler",
+    "module": "esnext"
   },
-  "include": ["js/**/*"]
+  "include": ["js/**/*", "../priv/test_vectors/*.json"]
 }
