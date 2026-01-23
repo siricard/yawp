@@ -1,5 +1,44 @@
 {
   "extends": "@react-native/typescript-config",
-  "include": ["**/*.ts", "**/*.tsx"],
-  "exclude": ["**/node_modules", "**/Pods"]
+  "compilerOptions": {
+    "types": [
+      "jest",
+      "nativewind/types"
+    ],
+    // Mirror Metro's platform-specific resolution: prefer `.native.ts` over
+    // `.ts`. This keeps `import './storage'` (in assets/app/identity/index.ts)
+    // resolving to `storage.native.ts` here while the web tsconfig resolves
+    // it to `storage.web.ts`.
+    "moduleSuffixes": [
+      ".native",
+      ""
+    ],
+    // The shared codebase lives in assets/app/, but its node_modules lookup
+    // walks up from assets/app/ → assets/node_modules/ (not assets/native/
+    // node_modules/). Force RN-only packages used by assets/app/identity/
+    // storage.native.ts and random.native.ts to resolve against the RN
+    // node_modules — those packages only ship under the RN install.
+    "baseUrl": ".",
+    "paths": {
+      "react-native-keychain": [
+        "./node_modules/react-native-keychain"
+      ],
+      "react-native-get-random-values": [
+        "./node_modules/react-native-get-random-values"
+      ]
+    }
+  },
+  "include": [
+    "**/*.ts",
+    "**/*.tsx",
+    "../app/**/*.ts",
+    "../app/**/*.tsx",
+    "nativewind-env.d.ts"
+  ],
+  "exclude": [
+    "**/node_modules",
+    "**/Pods",
+    "../app/**/*.web.ts",
+    "../app/**/*.web.tsx"
+  ]
 }

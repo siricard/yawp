@@ -28,7 +28,8 @@ config :mook, MookWeb.Endpoint,
             ~r"priv/static/(?!uploads/).*\.(js|css|png|jpeg|jpg|gif|svg)$",
             ~r"priv/gettext/.*\.po$",
             ~r"lib/mook_web/router\.ex$",
-      ~r"lib/mook_web/(controllers|live|components)/.*\.(ex|heex)$"
+      ~r"lib/mook_web/(controllers|live|components)/.*\.(ex|heex)$",
+            ~r"assets/app/.*\.(ts|tsx|js|jsx|json)$"
     ]
   ]
 

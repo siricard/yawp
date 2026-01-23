@@ -28,12 +28,20 @@
     "paths": {
       "*": ["../deps/*"]
     },
+    // Match Phoenix esbuild's `--resolve-extensions=.web.tsx,.web.ts,...` so
+    // TypeScript picks `storage.web.ts` over `storage.ts` (and falls back to
+    // the platform-agnostic name when no `.web` variant exists).
+    "moduleSuffixes": [".web", ""],
     "allowJs": true,
     "noEmit": true,
     "skipLibCheck": true,
     "resolveJsonModule": true,
     "moduleResolution": "bundler",
-    "module": "esnext"
+    "module": "esnext",
+    "types": ["nativewind/types"]
   },
-  "include": ["js/**/*", "../priv/test_vectors/*.json"]
+  "include": ["js/**/*", "app/**/*", "../priv/test_vectors/*.json"],
+  // Web tsc should never see the native-only files (react-native-keychain,
+  // get-random-values polyfill) or Jest unit tests (RN bundle owns those).
+  "exclude": ["app/**/*.native.ts", "app/**/__tests__/**", "node_modules"]
 }

@@ -1,11 +1,12 @@
 
 
-@import "tailwindcss" source(none);
+@import "tailwindcss" source(none) important;
 @import "../../deps/cinder/priv/cinder.css";
 @import "../../deps/cinder/priv/themes/daisy_ui.css";
 @source "../../deps/ash_authentication_phoenix";
 @source "../css";
 @source "../js";
+@source "../app";
 @source "../../lib/mook_web";
 
 

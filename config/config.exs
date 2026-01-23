@@ -4,7 +4,7 @@ import Config
 config :cinder, default_theme: "daisy_ui"
 
 config :ash_typescript,
-  output_file: "assets/js/ash_generated.ts",
+  output_file: "assets/app/ash_generated.ts",
   run_endpoint: "/rpc/run",
   validate_endpoint: "/rpc/validate",
   input_field_formatter: :camel_case,
@@ -92,7 +92,7 @@ config :esbuild,
   version: "0.25.4",
   mook: [
     args:
-      ~w(js/index.tsx js/app.js --bundle --target=es2022 --outdir=../priv/static/assets --external:/fonts/* --external:/images/* --alias:@=. --splitting --format=esm),
+      ~w(js/index.tsx js/app.js --bundle --target=es2022 --outdir=../priv/static/assets --external:/fonts/* --external:/images/* --alias:@=. --alias:react-native=react-native-web --alias:react-native-keychain=./js/stubs/keychain.js --alias:react-native-get-random-values=./js/stubs/empty.js --resolve-extensions=.web.tsx,.web.ts,.web.js,.tsx,.ts,.jsx,.js --jsx=automatic --jsx-import-source=nativewind --loader:.js=jsx --splitting --format=esm),
     cd: Path.expand("../assets", __DIR__),
     env: %{
       "NODE_PATH" =>

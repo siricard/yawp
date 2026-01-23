@@ -1,8 +1,9 @@
 
 import {sha256} from '@noble/hashes/sha2.js';
 import bs58 from 'bs58';
+
 import {publicKeyFromSecret, deriveDid} from './identity';
-import vector from '../../../priv/test_vectors/identity.json';
+import vector from '../../priv/test_vectors/identity.json';
 
 function hexToBytes(hex: string): Uint8Array {
   if (hex.length % 2 !== 0) {
@@ -50,8 +51,7 @@ export interface VectorResult {
 /**
  * Derive a pubkey from the fixture's `sk_seed_hex`, derive a DID via
  * base58(SHA-256(pubkey)), and assert byte-exact match with `pk_hex` and
- * string-exact match with `did`. The screen displays PASS only when both
- * match.
+ * string-exact match with `did`.
  */
 export function runIdentityVectorCheck(): VectorResult {
   const seed = hexToBytes(vector.sk_seed_hex);

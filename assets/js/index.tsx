@@ -1,21 +1,24 @@
+
 import React from "react";
-import { createRoot } from "react-dom/client";
-import type { ActionConfig } from "./ash_generated";
-import { IdentityProvider } from "./identity-context";
-import { DidScreen } from "./DidScreen";
+import {createRoot} from "react-dom/client";
+import {AppRegistry} from "react-native";
+
+import App from "../app/App";
+import type {ActionConfig} from "../app/ash_generated";
 
 const _ashTypecheckProbe: ActionConfig = {};
 void _ashTypecheckProbe;
 
-function App() {
-  return (
-    <IdentityProvider>
-      <DidScreen />
-    </IdentityProvider>
-  );
+const APP_NAME = "MookWeb";
+
+AppRegistry.registerComponent(APP_NAME, () => App);
+
+const container = document.getElementById("app");
+if (!container) {
+  throw new Error('Mook web entry: <div id="app"></div> not found');
 }
 
-createRoot(document.getElementById("app")!).render(
+createRoot(container).render(
   <React.StrictMode>
     <App />
   </React.StrictMode>,

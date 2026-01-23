@@ -1,7 +1,12 @@
 /**
- * Unit tests for the RN identity module. We mock `react-native-keychain`
- * with a tiny in-memory store so we can exercise generate / load / signing
- * without touching the OS keychain.
+ * Unit tests for the shared identity module. The native bundler picks the
+ * `react-native-keychain` storage backend; we mock that package with a tiny
+ * in-memory store so we can exercise generate / load / signing without
+ * touching the OS keychain.
+ *
+ * These tests live under assets/app/ so they run from the shared codebase
+ * (same code as production), and Jest is configured in assets/native/ to
+ * pick them up via `roots`.
  */
 
 jest.mock('react-native-keychain', () => {
@@ -40,7 +45,7 @@ import {
   clearIdentity,
   signWithIdentity,
 } from '../identity';
-import vector from '../../../../priv/test_vectors/identity.json';
+import vector from '../../../priv/test_vectors/identity.json';
 
 declare const Buffer: {
   from: (bytes: Uint8Array) => {toString: (enc: string) => string};
