@@ -23,10 +23,14 @@ const repoRoot = path.resolve(__dirname, '../..');
 const sharedAppDir = path.resolve(__dirname, '..', 'app');
 
 const nativeNodeModules = path.join(__dirname, 'node_modules');
-const REACT_DEDUPE = new Set([
+const SINGLETON_DEDUPE = new Set([
   'react',
   'react/jsx-runtime',
   'react/jsx-dev-runtime',
+  'react-native-css-interop',
+  'react-native-css-interop/jsx-runtime',
+  'react-native-css-interop/jsx-dev-runtime',
+  'nativewind',
 ]);
 
 /**
@@ -42,7 +46,7 @@ const config = {
     resolveRequest: reactNativePlatformResolver(
       {macos: 'react-native-macos'},
       (context, moduleName, platform) => {
-        if (REACT_DEDUPE.has(moduleName)) {
+        if (SINGLETON_DEDUPE.has(moduleName)) {
           const resolved = require.resolve(moduleName, {
             paths: [nativeNodeModules],
           });
