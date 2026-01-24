@@ -37,7 +37,7 @@ export function DidScreen({onOpenVectorTest}: Props) {
       ? `Your DID: ${state.identity.did}`
       : state.status === 'loading'
         ? 'Generating identity…'
-        : `Error: ${state.error}`;
+        : 'Identity unavailable — see error below.';
 
   const pkHex =
     state.status === 'ready'
@@ -88,6 +88,23 @@ export function DidScreen({onOpenVectorTest}: Props) {
             style={{fontFamily: monospace}}
             testID="pubkey-hex">
             {pkHex}
+          </Text>
+        </View>
+      ) : null}
+
+      {state.status === 'error' ? (
+        <View
+          className="bg-rose-950 border border-rose-700 rounded-lg p-4 mb-4"
+          testID="identity-error"
+          accessibilityLabel="identity error">
+          <Text className="text-sm font-semibold text-rose-300 mb-1">
+            Identity error
+          </Text>
+          <Text
+            className="text-sm text-rose-100 break-all"
+            style={{fontFamily: monospace}}
+            selectable>
+            {state.error}
           </Text>
         </View>
       ) : null}

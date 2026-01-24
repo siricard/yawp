@@ -11,8 +11,12 @@
 
 jest.mock('react-native-keychain', () => {
   const store: Record<string, {username: string; password: string}> = {};
+  let nextGetError: Error | null = null;
   return {
     __store: store,
+    __failNextGet: (e: Error) => {
+      nextGetError = e;
+    },
     setGenericPassword: jest.fn(
       async (
         username: string,
@@ -25,6 +29,11 @@ jest.mock('react-native-keychain', () => {
       },
     ),
     getGenericPassword: jest.fn(async (options?: {service?: string}) => {
+      if (nextGetError) {
+        const err = nextGetError;
+        nextGetError = null;
+        throw err;
+      }
       const service = (options && options.service) || '__default__';
       return store[service] || false;
     }),
@@ -94,5 +103,23 @@ describe('identity', () => {
 
   test('STORAGE_KEY is the documented contract', () => {
     expect(STORAGE_KEY).toBe('mook.identity.sk');
+  });
+
+  test('getOrCreateIdentity surfaces a keychain read failure instead of silently regenerating', async () => {
+    const initial = await getOrCreateIdentity();
+
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const kc = require('react-native-keychain');
+    const fakeErr = new Error(
+      "internal error when a required entitlement isn't present",
+    );
+    kc.__failNextGet(fakeErr);
+
+    await expect(getOrCreateIdentity()).rejects.toThrow(
+      /Failed to read identity from keychain/,
+    );
+
+    const after = await getOrCreateIdentity();
+    expect(after.did).toBe(initial.did);
   });
 });

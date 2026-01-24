@@ -2,8 +2,32 @@ const path = require('path');
 const { getDefaultConfig, mergeConfig } = require('@react-native/metro-config');
 const { withNativeWind } = require('nativewind/metro');
 
+function reactNativePlatformResolver(platformImplementations, customResolver) {
+  return (context, moduleName, platform) => {
+    let modifiedModuleName = moduleName;
+    if (platform != null && platformImplementations[platform]) {
+      if (moduleName === 'react-native') {
+        modifiedModuleName = platformImplementations[platform];
+      } else if (moduleName.startsWith('react-native/')) {
+        modifiedModuleName = `${platformImplementations[platform]}/${moduleName.slice('react-native/'.length)}`;
+      }
+    }
+    if (customResolver) {
+      return customResolver(context, modifiedModuleName, platform);
+    }
+    return context.resolveRequest(context, modifiedModuleName, platform);
+  };
+}
+
 const repoRoot = path.resolve(__dirname, '../..');
 const sharedAppDir = path.resolve(__dirname, '..', 'app');
+
+const nativeNodeModules = path.join(__dirname, 'node_modules');
+const REACT_DEDUPE = new Set([
+  'react',
+  'react/jsx-runtime',
+  'react/jsx-dev-runtime',
+]);
 
 /**
  * Metro configuration
@@ -14,7 +38,19 @@ const sharedAppDir = path.resolve(__dirname, '..', 'app');
 const config = {
   watchFolders: [repoRoot, sharedAppDir],
   resolver: {
-    nodeModulesPaths: [path.join(__dirname, 'node_modules')],
+    nodeModulesPaths: [nativeNodeModules],
+    resolveRequest: reactNativePlatformResolver(
+      {macos: 'react-native-macos'},
+      (context, moduleName, platform) => {
+        if (REACT_DEDUPE.has(moduleName)) {
+          const resolved = require.resolve(moduleName, {
+            paths: [nativeNodeModules],
+          });
+          return {type: 'sourceFile', filePath: resolved};
+        }
+        return context.resolveRequest(context, moduleName, platform);
+      },
+    ),
   },
 };
 

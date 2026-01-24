@@ -8,5 +8,22 @@
 	<true/>
 	<key>com.apple.security.network.client</key>
 	<true/>
+	<!--
+	  react-native-keychain on macOS calls SecItemAdd/SecItemCopyMatching, which
+	  require the "Keychain Sharing" entitlement (keychain-access-groups) for any
+	  signed-and-sandboxed app — even when sharing isn't actually used. Without at
+	  least one group declared here, getOrCreateIdentity() fails with the cryptic
+	  "internal error when a required entitlement isn't present" (errSecMissing-
+	  Entitlement, -34018), which we hit during F2.4 macOS manual attestation.
+
+	  Using the app's own bundle id as the group keeps the keychain item private
+	  to MookNative.app. `$(AppIdentifierPrefix)` is the team-prefix variable that
+	  Xcode auto-substitutes from the signing team; for ad-hoc / Sign-to-Run-
+	  Locally builds it resolves to empty, which is fine.
+	-->
+	<key>keychain-access-groups</key>
+	<array>
+		<string>$(AppIdentifierPrefix)org.reactjs.native.MookNative</string>
+	</array>
 </dict>
 </plist>
