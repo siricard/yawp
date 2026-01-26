@@ -15,6 +15,7 @@ defmodule Mook.Application do
          Application.fetch_env!(:mook, Oban)
        )},
       {Phoenix.PubSub, name: Mook.PubSub},
+      Mook.Auth.NonceStore,
                         MookWeb.Endpoint,
       {AshAuthentication.Supervisor, [otp_app: :mook]}
     ]
