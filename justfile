@@ -73,6 +73,12 @@ rn-macos:
 rn-metro:
     nix develop -c bash -c 'cd assets/native && npx react-native start --port 8081'
 
+# Verify that singleton-required packages (react, react-native-css-interop,
+# nativewind, …) appear exactly once in each platform's bundle. Guards the
+# Metro `resolveRequest` dedup rules in assets/native/metro.config.js.
+verify-singletons:
+    nix develop -c node assets/native/scripts/verify-singletons.mjs
+
 # Open Phoenix routes
 routes:
     nix develop -c mix phx.routes

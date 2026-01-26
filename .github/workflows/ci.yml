@@ -30,3 +30,25 @@ jobs:
 
       - name: Typecheck React Native assets
         run: nix develop -c bash -c 'cd assets/native && npx tsc --noEmit'
+
+  verify-singletons:
+    name: Verify RN bundle singletons (react, css-interop, …)
+    runs-on: ubuntu-latest
+    needs: build
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@v27
+
+      - name: Install RN dependencies
+        run: nix develop -c bash -c 'cd assets/native && npm ci --no-audit --no-fund'
+
+      # Builds iOS / Android / macOS bundles and asserts that each singleton
+      # package in SINGLETON_DEDUPE resolves to exactly one node_modules
+      # path per platform. Catches future drift between the consolidated
+      # assets/app/ tree and the Metro `resolveRequest` dedup rules.
+      - name: Verify Metro singleton dedup
+        run: nix develop -c just verify-singletons
