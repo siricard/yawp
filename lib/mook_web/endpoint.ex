@@ -12,6 +12,10 @@ defmodule MookWeb.Endpoint do
     websocket: [connect_info: [session: @session_options]],
     longpoll: [connect_info: [session: @session_options]]
 
+  socket "/socket", MookWeb.UserSocket,
+    websocket: true,
+    longpoll: false
+
             plug Plug.Static,
     at: "/",
     from: :mook,
