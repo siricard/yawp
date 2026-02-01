@@ -169,6 +169,61 @@ defmodule MookWeb.AuthChannelTest do
     end
   end
 
+  describe "concurrent first-time registration race" do
+    test "4 parallel authenticates with the same fresh keypair all converge on the same User row" do
+            sk_seed = :crypto.strong_rand_bytes(32)
+      {pubkey, _} = :crypto.generate_key(:eddsa, :ed25519, sk_seed)
+      did = Identity.did_from_pubkey(pubkey)
+
+                                                joined_sockets =
+        for _ <- 1..4 do
+          s = socket(MookWeb.UserSocket, nil, %{})
+
+          {:ok, %{"nonce" => nonce_b64}, joined} =
+            subscribe_and_join(s, MookWeb.AuthChannel, "auth:lobby", %{})
+
+          nonce = Base.decode64!(nonce_b64)
+          signature = :crypto.sign(:eddsa, :sha512, nonce, [sk_seed, :ed25519])
+
+          payload = %{
+            "did" => did,
+            "pk" => Base.encode64(pubkey),
+            "signature" => Base.encode64(signature)
+          }
+
+          {joined, payload}
+        end
+
+                              refs =
+        for {channel_socket, payload} <- joined_sockets do
+          ref = push(channel_socket, "authenticate", payload)
+          {ref, channel_socket}
+        end
+
+      results =
+        Enum.map(refs, fn {ref, _socket} ->
+          receive do
+            %Phoenix.Socket.Reply{ref: ^ref, status: status, payload: payload} ->
+              {status, payload}
+          after
+            5_000 -> {:timeout, nil}
+          end
+        end)
+
+            assert Enum.all?(results, fn {status, _} -> status == :ok end),
+             "expected all 4 authenticates to succeed; got: #{inspect(results)}"
+
+            assert Enum.all?(results, fn {_, p} -> Map.get(p, :did) == did end)
+
+            assert [user] =
+               User
+               |> Ash.Query.filter(public_key == ^pubkey)
+               |> Ash.read!(authorize?: false)
+
+      assert user.did == did
+    end
+  end
+
   describe "auto-registration of brand-new DIDs" do
     test "brand-new DID auto-registers and authenticates in the same join" do
             sk_seed = :crypto.strong_rand_bytes(32)

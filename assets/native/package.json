@@ -15,6 +15,7 @@
     "@react-native/new-app-screen": "0.81.6",
     "bs58": "^6.0.0",
     "nativewind": "^4.2.3",
+    "phoenix": "1.8.7",
     "react": "19.1.4",
     "react-native": "0.81.6",
     "react-native-get-random-values": "^1.11.0",

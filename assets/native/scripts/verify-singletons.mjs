@@ -49,6 +49,7 @@ const SINGLETONS = [
   'react',
   'react-native-css-interop',
   'nativewind',
+  'phoenix',
 ];
 
 const args = new Set(process.argv.slice(2));

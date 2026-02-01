@@ -57,7 +57,12 @@ defmodule MookWeb.AuthChannel do
          :ok <- check_did_matches_pubkey(did, pubkey),
          :ok <- Auth.verify_signature(socket.assigns.pending_nonce, signature, pubkey),
          {:ok, _user} <- ensure_user(pubkey) do
-      {:reply, {:ok, %{did: did}}, assign(socket, :current_did, did)}
+                                          token =
+        Phoenix.Token.sign(MookWeb.Endpoint, MookWeb.UserSocket.token_salt(), did,
+          max_age: MookWeb.UserSocket.token_max_age()
+        )
+
+      {:reply, {:ok, %{did: did, token: token}}, assign(socket, :current_did, did)}
     else
       {:error, reason} ->
         {:reply, {:error, %{reason: reason}}, socket}
@@ -97,24 +102,50 @@ defmodule MookWeb.AuthChannel do
     end
   end
 
-        defp ensure_user(pubkey) do
-    case User
-         |> Ash.Query.filter(public_key == ^pubkey)
-         |> Ash.read_one(authorize?: false) do
-      {:ok, %User{} = user} ->
+                      defp ensure_user(pubkey) do
+    case lookup_user(pubkey) do
+      {:ok, %User{} = user} -> {:ok, user}
+      {:ok, nil} -> register_user(pubkey)
+      {:error, _} -> {:error, :invalid_payload}
+    end
+  end
+
+  defp lookup_user(pubkey) do
+    User
+    |> Ash.Query.filter(public_key == ^pubkey)
+    |> Ash.read_one(authorize?: false)
+  end
+
+  defp register_user(pubkey) do
+    User
+    |> Ash.Changeset.for_create(:register_with_pubkey, %{public_key: pubkey})
+    |> Ash.create()
+    |> case do
+      {:ok, user} ->
         {:ok, user}
 
-      {:ok, nil} ->
-        User
-        |> Ash.Changeset.for_create(:register_with_pubkey, %{public_key: pubkey})
-        |> Ash.create()
-        |> case do
-          {:ok, user} -> {:ok, user}
-          {:error, _} -> {:error, :invalid_payload}
+      {:error, %Ash.Error.Invalid{} = err} ->
+        if unique_constraint_violation?(err) do
+                    case lookup_user(pubkey) do
+            {:ok, %User{} = user} -> {:ok, user}
+            _ -> {:error, :invalid_payload}
+          end
+        else
+          {:error, :invalid_payload}
         end
 
       {:error, _} ->
         {:error, :invalid_payload}
     end
+  end
+
+          defp unique_constraint_violation?(%Ash.Error.Invalid{errors: errors}) do
+    Enum.any?(errors, fn
+      %Ash.Error.Changes.InvalidAttribute{message: msg} when is_binary(msg) ->
+        msg =~ "already been taken"
+
+      _ ->
+        false
+    end)
   end
 end

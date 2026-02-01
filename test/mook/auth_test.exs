@@ -3,38 +3,47 @@ defmodule Mook.AuthTest do
 
   alias Mook.Auth
 
-      @vector_pubkey Base.decode16!(
-                   "03A107BFF3CE10BE1D70DD18E74BC09967E4D6309BA50D5F1DDC8664125531B8",
-                   case: :upper
-                 )
-  @vector_message "mook-identity-vector-v1"
-  @vector_signature Base.decode16!(
-                      "95BFE46830AC2740AC7C36FAF857F4FAD522BAE91D13C662CDEDD67A9FDB632C257924E432F2934D60053EDE8D4DF5A28B85FA684EBF11A4541CADD5987E6E02",
-                      case: :upper
-                    )
+            @fixture_path Path.join([
+                  :code.priv_dir(:mook) |> to_string(),
+                  "test_vectors",
+                  "identity.json"
+                ])
+
+          setup_all do
+    vector = @fixture_path |> File.read!() |> Jason.decode!()
+
+    {:ok,
+     vector_pk: Base.decode16!(vector["pk_hex"], case: :lower),
+     vector_message: vector["signature_message_utf8"],
+     vector_signature: Base.decode16!(vector["signature_hex"], case: :lower)}
+  end
 
   describe "verify_signature/3" do
-    test "returns :ok for a valid Ed25519 signature (cross-platform vector)" do
-      assert Auth.verify_signature(@vector_message, @vector_signature, @vector_pubkey) == :ok
+    test "returns :ok for a valid Ed25519 signature (cross-platform vector)", ctx do
+      assert Auth.verify_signature(
+               ctx.vector_message,
+               ctx.vector_signature,
+               ctx.vector_pk
+             ) == :ok
     end
 
-    test "returns {:error, :invalid_signature} for a tampered signature" do
-      <<first, rest::binary>> = @vector_signature
+    test "returns {:error, :invalid_signature} for a tampered signature", ctx do
+      <<first, rest::binary>> = ctx.vector_signature
       tampered = <<Bitwise.bxor(first, 0x01)>> <> rest
 
-      assert Auth.verify_signature(@vector_message, tampered, @vector_pubkey) ==
+      assert Auth.verify_signature(ctx.vector_message, tampered, ctx.vector_pk) ==
                {:error, :invalid_signature}
     end
 
-    test "returns {:error, :invalid_signature} when the message is tampered" do
-      assert Auth.verify_signature("not-the-message", @vector_signature, @vector_pubkey) ==
+    test "returns {:error, :invalid_signature} when the message is tampered", ctx do
+      assert Auth.verify_signature("not-the-message", ctx.vector_signature, ctx.vector_pk) ==
                {:error, :invalid_signature}
     end
 
-    test "returns {:error, :invalid_signature} when the public key doesn't match" do
-      other_pubkey = :crypto.strong_rand_bytes(32)
+    test "returns {:error, :invalid_signature} when the public key doesn't match", ctx do
+      other_pk = :crypto.strong_rand_bytes(32)
 
-      assert Auth.verify_signature(@vector_message, @vector_signature, other_pubkey) ==
+      assert Auth.verify_signature(ctx.vector_message, ctx.vector_signature, other_pk) ==
                {:error, :invalid_signature}
     end
   end
