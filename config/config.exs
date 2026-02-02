@@ -74,7 +74,7 @@ config :spark,
 config :mook,
   ecto_repos: [Mook.Repo],
   generators: [timestamp_type: :utc_datetime],
-  ash_domains: [Mook.Accounts]
+  ash_domains: [Mook.Accounts, Mook.Chat]
 
 config :mook, MookWeb.Endpoint,
   url: [host: "localhost"],
