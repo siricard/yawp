@@ -36,6 +36,7 @@ defmodule MookWeb.UserSocket do
   def token_max_age, do: @token_max_age
 
   channel "auth:lobby", MookWeb.AuthChannel
+  channel "room:*", MookWeb.RoomChannel
 
   @impl true
   def connect(params, socket, _connect_info) do
