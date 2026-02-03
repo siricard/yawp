@@ -6,6 +6,7 @@ import {signWithIdentity, PK_FIELD} from '../identity';
 import {Socket} from './phoenix-socket';
 import {SOCKET_URL} from './socket-url';
 import {bytesToBase64, base64ToBytes} from './base64';
+import {useSocketState} from './socket-context';
 
 export type AuthState =
   | {status: 'idle'}
@@ -14,14 +15,22 @@ export type AuthState =
   | {status: 'authenticated'; did: string}
   | {status: 'error'; reason: string};
 
-type NoncePayload = {nonce: string};
+type AuthOkReply = {did: string; token: string};
 
-function isNoncePayload(v: unknown): v is NoncePayload {
+function isNoncePayload(v: unknown): v is {nonce: string} {
   return (
     typeof v === 'object' &&
     v !== null &&
     typeof (v as {nonce?: unknown}).nonce === 'string'
   );
+}
+
+function isAuthOkReply(v: unknown): v is AuthOkReply {
+  if (typeof v !== 'object' || v === null) {
+    return false;
+  }
+  const o = v as {did?: unknown; token?: unknown};
+  return typeof o.did === 'string' && typeof o.token === 'string';
 }
 
 function extractReason(v: unknown): string {
@@ -34,22 +43,24 @@ function extractReason(v: unknown): string {
   return 'unknown';
 }
 
-function extractDid(v: unknown): string | null {
-  if (typeof v === 'object' && v !== null) {
-    const d = (v as {did?: unknown}).did;
-    if (typeof d === 'string') {
-      return d;
-    }
-  }
-  return null;
-}
-
 export function useAuthenticatedSocket(): AuthState {
   const identity = useIdentityState();
+  const socketState = useSocketState();
   const [state, setState] = useState<AuthState>({status: 'idle'});
 
   useEffect(() => {
     if (identity.status !== 'ready') {
+      return;
+    }
+    if (!socketState.tokenLoaded) {
+      return;
+    }
+
+    if (socketState.token && socketState.authedSocket) {
+      setState({
+        status: 'authenticated',
+        did: identity.identity.did,
+      });
       return;
     }
 
@@ -78,7 +89,7 @@ export function useAuthenticatedSocket(): AuthState {
         let nonceBytes: Uint8Array;
         try {
           nonceBytes = base64ToBytes(resp.nonce);
-        } catch (e) {
+        } catch {
           setState({status: 'error', reason: 'invalid_nonce_encoding'});
           return;
         }
@@ -98,8 +109,21 @@ export function useAuthenticatedSocket(): AuthState {
                 if (cancelled) {
                   return;
                 }
-                const replyDid = extractDid(okResp) ?? did;
+                if (!isAuthOkReply(okResp)) {
+                  setState({status: 'error', reason: 'invalid_auth_reply'});
+                  return;
+                }
+                const replyDid = okResp.did ?? did;
+                socketState.onAuthenticated(okResp.token);
                 setState({status: 'authenticated', did: replyDid});
+                try {
+                  channel.leave();
+                } catch {
+                                  }
+                try {
+                  socket.disconnect();
+                } catch {
+                                  }
               })
               .receive('error', (errResp: unknown) => {
                 if (cancelled) {
@@ -117,7 +141,7 @@ export function useAuthenticatedSocket(): AuthState {
                 setState({status: 'error', reason: 'timeout'});
               });
           })
-          .catch(e => {
+          .catch((e: unknown) => {
             if (cancelled) {
               return;
             }
@@ -151,7 +175,7 @@ export function useAuthenticatedSocket(): AuthState {
       } catch {
               }
     };
-  }, [identity]);
+  }, [identity, socketState.tokenLoaded, socketState.token, socketState]);
 
   if (identity.status === 'error' && state.status === 'idle') {
     return {status: 'error', reason: `identity_error: ${identity.error}`};

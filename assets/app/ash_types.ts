@@ -47,6 +47,24 @@ export type MessageAttributesOnlySchema = {
   homeServer: string | null;
 };
 
+export type RoomResourceSchema = {
+  __type: "Resource";
+  __primitiveFields: "id" | "name" | "members" | "createdByDid";
+  id: UUID;
+  name: string;
+  members: Array<string>;
+  createdByDid: string;
+};
+
+export type RoomAttributesOnlySchema = {
+  __type: "Resource";
+  __primitiveFields: "id" | "name" | "members" | "createdByDid";
+  id: UUID;
+  name: string;
+  members: Array<string>;
+  createdByDid: string;
+};
+
 export type UserFilterInput = {
   and?: Array<UserFilterInput>;
   or?: Array<UserFilterInput>;
@@ -137,6 +155,36 @@ export type MessageFilterInput = {
   };
 
 };
+export type RoomFilterInput = {
+  and?: Array<RoomFilterInput>;
+  or?: Array<RoomFilterInput>;
+  not?: Array<RoomFilterInput>;
+
+  id?: {
+    eq?: UUID;
+    notEq?: UUID;
+    in?: Array<UUID>;
+  };
+
+  name?: {
+    eq?: string;
+    notEq?: string;
+    in?: Array<string>;
+  };
+
+  members?: {
+    eq?: Array<string>;
+    notEq?: Array<string>;
+    in?: Array<Array<string>>;
+  };
+
+  createdByDid?: {
+    eq?: string;
+    notEq?: string;
+    in?: Array<string>;
+  };
+
+};
 
 export const userFilterFields = ["id", "email", "publicKey", "did", "homeServer", "recoveryMethods"] as const;
 export type UserFilterField = (typeof userFilterFields)[number];
@@ -144,11 +192,17 @@ export type UserFilterField = (typeof userFilterFields)[number];
 export const messageFilterFields = ["id", "roomId", "senderDid", "content", "ciphertextEnvelope", "homeServer"] as const;
 export type MessageFilterField = (typeof messageFilterFields)[number];
 
+export const roomFilterFields = ["id", "name", "members", "createdByDid"] as const;
+export type RoomFilterField = (typeof roomFilterFields)[number];
+
 export const userSortFields = ["id", "email", "publicKey", "did", "homeServer", "recoveryMethods"] as const;
 export type UserSortField = (typeof userSortFields)[number];
 
 export const messageSortFields = ["id", "roomId", "senderDid", "content", "ciphertextEnvelope", "homeServer"] as const;
 export type MessageSortField = (typeof messageSortFields)[number];
+
+export const roomSortFields = ["id", "name", "members", "createdByDid"] as const;
+export type RoomSortField = (typeof roomSortFields)[number];
 
 export type SortString<T extends string> = T | `+${T}` | `-${T}` | `++${T}` | `--${T}`;
 

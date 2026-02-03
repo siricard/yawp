@@ -2,7 +2,8 @@ defmodule Mook.Chat.Room do
   use Ash.Resource,
     otp_app: :mook,
     domain: Mook.Chat,
-    data_layer: AshPostgres.DataLayer
+    data_layer: AshPostgres.DataLayer,
+    extensions: [AshTypescript.Resource]
 
   postgres do
     table "rooms"
@@ -10,6 +11,10 @@ defmodule Mook.Chat.Room do
 
     migration_types members: :jsonb
     migration_defaults members: "fragment(\"'[]'::jsonb\")"
+  end
+
+  typescript do
+    type_name "Room"
   end
 
   actions do
