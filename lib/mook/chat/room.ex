@@ -1,9 +1,34 @@
 defmodule Mook.Chat.Room do
+  @moduledoc """
+  A chat room: a named container with a `members` list of DIDs.
+
+  ## Membership concurrency
+
+  `:join` and `:leave` mutate `members` (a `{:array, :string}` stored as
+  jsonb). Without serialization, two concurrent joins on the same room
+  both read the pre-state, each append their own DID, and the second
+  UPDATE clobbers the first.
+
+  We close that race by:
+
+    * running both actions in a transaction (`transaction? true`), and
+    * issuing `SELECT ... FOR UPDATE` on the target row inside a
+      `before_action` hook so concurrent transactions serialize on the
+      Postgres row lock.
+
+  This intentionally keeps the jsonb `members` column rather than
+  promoting it to a join table rooms are small, the access
+  pattern is bounded, and the cost of the lock is dominated by the
+  channel broadcast that follows. See `docs/`.
+  """
+
   use Ash.Resource,
     otp_app: :mook,
     domain: Mook.Chat,
     data_layer: AshPostgres.DataLayer,
     extensions: [AshTypescript.Resource]
+
+  require Ash.Query
 
   postgres do
     table "rooms"
@@ -41,38 +66,27 @@ defmodule Mook.Chat.Room do
     end
 
     update :join do
-      description "Append a DID to the room's members list (idempotent)."
+      description "Append a DID to the room's members list (idempotent, concurrency-safe)."
 
       require_atomic? false
+      transaction? true
       accept []
 
       argument :did, :string, allow_nil?: false
 
-      change fn changeset, _ctx ->
-        did = Ash.Changeset.get_argument(changeset, :did)
-        members = Ash.Changeset.get_attribute(changeset, :members) || []
-
-        if did in members do
-          changeset
-        else
-          Ash.Changeset.force_change_attribute(changeset, :members, members ++ [did])
-        end
-      end
+                                    change before_action(&Mook.Chat.Room.lock_and_join/2)
     end
 
     update :leave do
-      description "Remove a DID from the room's members list (no-op if absent)."
+      description "Remove a DID from the room's members list (no-op if absent, concurrency-safe)."
 
       require_atomic? false
+      transaction? true
       accept []
 
       argument :did, :string, allow_nil?: false
 
-      change fn changeset, _ctx ->
-        did = Ash.Changeset.get_argument(changeset, :did)
-        members = Ash.Changeset.get_attribute(changeset, :members) || []
-        Ash.Changeset.force_change_attribute(changeset, :members, members -- [did])
-      end
+            change before_action(&Mook.Chat.Room.lock_and_leave/2)
     end
   end
 
@@ -98,5 +112,52 @@ defmodule Mook.Chat.Room do
     end
 
     create_timestamp :created_at
+  end
+
+                    
+  @doc false
+  def lock_and_join(changeset, _context) do
+    did = Ash.Changeset.get_argument(changeset, :did)
+
+    {:ok, locked} =
+      __MODULE__
+      |> Ash.Query.filter(id == ^changeset.data.id)
+      |> Ash.Query.lock(:for_update)
+      |> Ash.read_one(authorize?: false)
+
+    members = locked.members || []
+
+    new_members =
+      if did in members do
+        members
+      else
+        members ++ [did]
+      end
+
+    changeset
+    |> Ash.Changeset.force_change_attribute(:members, new_members)
+    |> reset_data_for_lock(locked)
+  end
+
+  @doc false
+  def lock_and_leave(changeset, _context) do
+    did = Ash.Changeset.get_argument(changeset, :did)
+
+    {:ok, locked} =
+      __MODULE__
+      |> Ash.Query.filter(id == ^changeset.data.id)
+      |> Ash.Query.lock(:for_update)
+      |> Ash.read_one(authorize?: false)
+
+    members = locked.members || []
+    new_members = members -- [did]
+
+    changeset
+    |> Ash.Changeset.force_change_attribute(:members, new_members)
+    |> reset_data_for_lock(locked)
+  end
+
+          defp reset_data_for_lock(changeset, locked) do
+    %{changeset | data: locked}
   end
 end

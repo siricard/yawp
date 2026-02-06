@@ -2,6 +2,7 @@
 
 export type Binary = string;
 export type UUID = string;
+export type UtcDateTimeUsec = string;
 
 export type UserResourceSchema = {
   __type: "Resource";
@@ -27,24 +28,27 @@ export type UserAttributesOnlySchema = {
 
 export type MessageResourceSchema = {
   __type: "Resource";
-  __primitiveFields: "id" | "roomId" | "senderDid" | "content" | "ciphertextEnvelope" | "homeServer";
+  __primitiveFields: "id" | "senderDid" | "content" | "ciphertextEnvelope" | "homeServer" | "insertedAt" | "roomId";
   id: UUID;
-  roomId: UUID;
   senderDid: string;
   content: string;
   ciphertextEnvelope: Record<string, any> | null;
   homeServer: string | null;
+  insertedAt: UtcDateTimeUsec;
+  roomId: UUID;
+  room: { __type: "Relationship"; __resource: RoomResourceSchema; };
 };
 
 export type MessageAttributesOnlySchema = {
   __type: "Resource";
-  __primitiveFields: "id" | "roomId" | "senderDid" | "content" | "ciphertextEnvelope" | "homeServer";
+  __primitiveFields: "id" | "senderDid" | "content" | "ciphertextEnvelope" | "homeServer" | "insertedAt" | "roomId";
   id: UUID;
-  roomId: UUID;
   senderDid: string;
   content: string;
   ciphertextEnvelope: Record<string, any> | null;
   homeServer: string | null;
+  insertedAt: UtcDateTimeUsec;
+  roomId: UUID;
 };
 
 export type RoomResourceSchema = {
@@ -122,12 +126,6 @@ export type MessageFilterInput = {
     in?: Array<UUID>;
   };
 
-  roomId?: {
-    eq?: UUID;
-    notEq?: UUID;
-    in?: Array<UUID>;
-  };
-
   senderDid?: {
     eq?: string;
     notEq?: string;
@@ -153,6 +151,24 @@ export type MessageFilterInput = {
     in?: Array<string>;
     isNil?: boolean;
   };
+
+  insertedAt?: {
+    eq?: UtcDateTimeUsec;
+    notEq?: UtcDateTimeUsec;
+    greaterThan?: UtcDateTimeUsec;
+    greaterThanOrEqual?: UtcDateTimeUsec;
+    lessThan?: UtcDateTimeUsec;
+    lessThanOrEqual?: UtcDateTimeUsec;
+    in?: Array<UtcDateTimeUsec>;
+  };
+
+  roomId?: {
+    eq?: UUID;
+    notEq?: UUID;
+    in?: Array<UUID>;
+  };
+
+  room?: RoomFilterInput;
 
 };
 export type RoomFilterInput = {
@@ -189,7 +205,7 @@ export type RoomFilterInput = {
 export const userFilterFields = ["id", "email", "publicKey", "did", "homeServer", "recoveryMethods"] as const;
 export type UserFilterField = (typeof userFilterFields)[number];
 
-export const messageFilterFields = ["id", "roomId", "senderDid", "content", "ciphertextEnvelope", "homeServer"] as const;
+export const messageFilterFields = ["id", "senderDid", "content", "ciphertextEnvelope", "homeServer", "insertedAt", "roomId", "room"] as const;
 export type MessageFilterField = (typeof messageFilterFields)[number];
 
 export const roomFilterFields = ["id", "name", "members", "createdByDid"] as const;
@@ -198,7 +214,7 @@ export type RoomFilterField = (typeof roomFilterFields)[number];
 export const userSortFields = ["id", "email", "publicKey", "did", "homeServer", "recoveryMethods"] as const;
 export type UserSortField = (typeof userSortFields)[number];
 
-export const messageSortFields = ["id", "roomId", "senderDid", "content", "ciphertextEnvelope", "homeServer"] as const;
+export const messageSortFields = ["id", "senderDid", "content", "ciphertextEnvelope", "homeServer", "insertedAt", "roomId"] as const;
 export type MessageSortField = (typeof messageSortFields)[number];
 
 export const roomSortFields = ["id", "name", "members", "createdByDid"] as const;

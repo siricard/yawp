@@ -6,7 +6,7 @@ import {
   createRoom,
   joinRoom,
 } from '../ash_generated';
-import type {AshRpcError} from '../ash_types';
+import type {AshRpcError, RoomResourceSchema} from '../ash_types';
 
 function csrfHeaders(): Record<string, string> {
   if (typeof document === 'undefined') {
@@ -19,12 +19,10 @@ function csrfHeaders(): Record<string, string> {
   return token ? {'X-CSRF-Token': token} : {};
 }
 
-export type RoomSummary = {
-  id: string;
-  name: string;
-  members: string[];
-  createdByDid: string;
-};
+export type RoomSummary = Pick<
+  RoomResourceSchema,
+  'id' | 'name' | 'members' | 'createdByDid'
+>;
 
 export type RoomListState =
   | {status: 'loading'; rooms: RoomSummary[]; error: null}

@@ -45,6 +45,10 @@ defmodule Mook.Chat.Message do
 
     migration_types ciphertext_envelope: :jsonb
 
+    references do
+                  reference :room, on_delete: :delete, index?: true
+    end
+
             custom_indexes do
       index [:room_id, :inserted_at]
     end
@@ -73,12 +77,6 @@ defmodule Mook.Chat.Message do
   attributes do
     uuid_primary_key :id
 
-    attribute :room_id, :uuid do
-      allow_nil? false
-      public? true
-      description "FK to the room this message belongs to."
-    end
-
     attribute :sender_did, :string do
       allow_nil? false
       public? true
@@ -103,6 +101,15 @@ defmodule Mook.Chat.Message do
       description "Federation reservation. Nullable ."
     end
 
-    create_timestamp :inserted_at
+                create_timestamp :inserted_at, public?: true, writable?: false
+  end
+
+  relationships do
+    belongs_to :room, Mook.Chat.Room do
+      attribute_type :uuid
+      allow_nil? false
+      public? true
+      description "FK to the room this message belongs to."
+    end
   end
 end

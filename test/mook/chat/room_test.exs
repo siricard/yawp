@@ -133,4 +133,46 @@ defmodule Mook.Chat.RoomTest do
       assert updated.members == [@creator_did, @other_did]
     end
   end
+
+  describe "concurrent joins" do
+                @tag :concurrency
+    test "8 concurrent joins by distinct DIDs all end up in members" do
+      {:ok, room} =
+        Room
+        |> Ash.Changeset.for_create(
+          :create,
+          %{name: "race", created_by_did: @creator_did},
+          authorize?: false
+        )
+        |> Ash.create()
+
+                  dids = for i <- 1..8, do: "did:test:concurrent-#{i}"
+
+                        parent = self()
+
+      results =
+        Task.async_stream(
+          dids,
+          fn did ->
+            Ecto.Adapters.SQL.Sandbox.allow(Mook.Repo, parent, self())
+
+            room
+            |> Ash.Changeset.for_update(:join, %{did: did}, authorize?: false)
+            |> Ash.update()
+          end,
+          max_concurrency: 8,
+          ordered: false,
+          timeout: 10_000
+        )
+        |> Enum.to_list()
+
+      assert Enum.all?(results, &match?({:ok, {:ok, _}}, &1))
+
+      {:ok, fresh} = Ash.get(Room, room.id, authorize?: false)
+
+      assert length(fresh.members) == length(dids) + 1
+      assert @creator_did in fresh.members
+      for did <- dids, do: assert(did in fresh.members)
+    end
+  end
 end

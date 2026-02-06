@@ -3,14 +3,12 @@ import {useCallback, useEffect, useRef, useState} from 'react';
 
 import type {Socket, Channel} from '../auth';
 import {useSocketState} from '../auth';
+import type {MessageResourceSchema} from '../ash_types';
 
-export type RoomMessage = {
-  id: string;
-  roomId: string;
-  senderDid: string;
-  content: string;
-  insertedAt: string;
-};
+export type RoomMessage = Pick<
+  MessageResourceSchema,
+  'id' | 'roomId' | 'senderDid' | 'content' | 'insertedAt'
+>;
 
 export type RoomStatus =
   | {status: 'idle'}

@@ -1,6 +1,7 @@
 defmodule Mook.Chat.MessageTest do
   use Mook.DataCase, async: false
 
+  import Ecto.Query, only: [from: 2]
   require Ash.Query
 
   alias Mook.Chat.Message
@@ -98,6 +99,42 @@ defmodule Mook.Chat.MessageTest do
 
       assert msg.ciphertext_envelope == %{"v" => 1, "ct" => "abc"}
       assert msg.home_server == "mook.example"
+    end
+  end
+
+  describe "foreign key constraint" do
+    test "rejects a message whose room_id does not reference an existing room" do
+      bogus_room_id = Ash.UUID.generate()
+
+      assert {:error, %Ash.Error.Invalid{}} =
+               Message
+               |> Ash.Changeset.for_create(
+                 :create,
+                 %{room_id: bogus_room_id, sender_did: @creator_did, content: "hi"},
+                 authorize?: false
+               )
+               |> Ash.create()
+    end
+
+    test "deleting a room cascades and removes its messages (on_delete: :delete_all)" do
+      room = create_room!()
+
+      {:ok, _msg} =
+        Message
+        |> Ash.Changeset.for_create(
+          :create,
+          %{room_id: room.id, sender_did: @creator_did, content: "doomed"},
+          authorize?: false
+        )
+        |> Ash.create()
+
+                        Mook.Repo.delete_all(
+        from(r in "rooms", where: r.id == type(^room.id, :binary_id))
+      )
+
+      assert Message
+             |> Ash.Query.filter(room_id == ^room.id)
+             |> Ash.read!(authorize?: false) == []
     end
   end
 

@@ -1,6 +1,10 @@
 export {useAuthenticatedSocket, type AuthState} from './useAuthenticatedSocket';
 export {SOCKET_URL} from './socket-url';
-export {SocketProvider, useSocketState} from './socket-context';
+export {
+  SocketProvider,
+  useSocketState,
+  type TokenStatus,
+} from './socket-context';
 export {
   getStoredToken,
   setStoredToken,

@@ -11,6 +11,7 @@ import {useSocketState} from './socket-context';
 export type AuthState =
   | {status: 'idle'}
   | {status: 'connecting'}
+  | {status: 'reauthenticating'}
   | {status: 'authenticating'}
   | {status: 'authenticated'; did: string}
   | {status: 'error'; reason: string};
@@ -56,11 +57,24 @@ export function useAuthenticatedSocket(): AuthState {
       return;
     }
 
-    if (socketState.token && socketState.authedSocket) {
+    if (
+      socketState.token &&
+      socketState.authedSocket &&
+      socketState.tokenStatus === 'valid'
+    ) {
       setState({
         status: 'authenticated',
         did: identity.identity.did,
       });
+      return;
+    }
+
+    if (socketState.tokenStatus === 'unchecked' && socketState.token) {
+      setState({status: 'connecting'});
+      return;
+    }
+    if (socketState.tokenStatus === 'validating') {
+      setState({status: 'reauthenticating'});
       return;
     }
 
@@ -175,7 +189,14 @@ export function useAuthenticatedSocket(): AuthState {
       } catch {
               }
     };
-  }, [identity, socketState.tokenLoaded, socketState.token, socketState]);
+  }, [
+    identity,
+    socketState.tokenLoaded,
+    socketState.token,
+    socketState.tokenStatus,
+    socketState.authedSocket,
+    socketState,
+  ]);
 
   if (identity.status === 'error' && state.status === 'idle') {
     return {status: 'error', reason: `identity_error: ${identity.error}`};

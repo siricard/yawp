@@ -26,6 +26,10 @@ export function AuthScreen({onBack}: Props) {
       statusText = 'Connecting...';
       statusColor = 'text-slate-300';
       break;
+    case 'reauthenticating':
+      statusText = 'Reauthenticating...';
+      statusColor = 'text-amber-300';
+      break;
     case 'authenticating':
       statusText = 'Authenticating...';
       statusColor = 'text-amber-300';
