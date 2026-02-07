@@ -16,6 +16,7 @@ defmodule Mook.Application do
        )},
       {Phoenix.PubSub, name: Mook.PubSub},
       Mook.Auth.NonceStore,
+      Mook.Call.SessionSupervisor,
                         MookWeb.Endpoint,
       {AshAuthentication.Supervisor, [otp_app: :mook]}
     ]
