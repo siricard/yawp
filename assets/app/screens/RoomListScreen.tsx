@@ -151,7 +151,9 @@ export function RoomListScreen({onBack, onOpenRoom}: Props) {
               accessibilityRole="button"
               testID={`room-item-${room.id}`}
               nativeID={`room-item-${room.id}`}
-              {...({'data-room-id': room.id} as Record<string, string>)}
+              {...({dataSet: {roomId: room.id}} as {
+                dataSet: {roomId: string};
+              })}
               className="bg-slate-800 rounded-lg p-3 mb-2 active:bg-slate-700">
               <Text className="text-base font-semibold text-slate-50">
                 {room.name}
