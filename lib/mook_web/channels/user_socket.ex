@@ -38,6 +38,7 @@ defmodule MookWeb.UserSocket do
   channel "auth:lobby", MookWeb.AuthChannel
   channel "whoami", MookWeb.WhoamiChannel
   channel "room:*", MookWeb.RoomChannel
+  channel "call:*", MookWeb.CallChannel
 
   @impl true
   def connect(params, socket, _connect_info) do
