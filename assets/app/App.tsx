@@ -9,13 +9,17 @@ import {VectorTestScreen} from './screens/VectorTestScreen';
 import {AuthScreen} from './screens/AuthScreen';
 import {RoomListScreen} from './screens/RoomListScreen';
 import {RoomScreen} from './screens/RoomScreen';
+import {CallLauncherScreen} from './screens/CallLauncherScreen';
+import {CallScreen} from './screens/CallScreen';
 
 type Screen =
   | {kind: 'home'}
   | {kind: 'vector'}
   | {kind: 'auth'}
   | {kind: 'roomList'}
-  | {kind: 'room'; roomId: string};
+  | {kind: 'room'; roomId: string}
+  | {kind: 'callLauncher'}
+  | {kind: 'call'; peerDid: string};
 
 export default function App() {
   const [screen, setScreen] = useState<Screen>({kind: 'home'});
@@ -28,6 +32,7 @@ export default function App() {
           onOpenVectorTest={() => setScreen({kind: 'vector'})}
           onOpenAuth={() => setScreen({kind: 'auth'})}
           onOpenRooms={() => setScreen({kind: 'roomList'})}
+          onOpenCall={() => setScreen({kind: 'callLauncher'})}
         />
       );
       break;
@@ -53,6 +58,22 @@ export default function App() {
         />
       );
       break;
+    case 'callLauncher':
+      body = (
+        <CallLauncherScreen
+          onBack={() => setScreen({kind: 'home'})}
+          onStartCall={peerDid => setScreen({kind: 'call', peerDid})}
+        />
+      );
+      break;
+    case 'call':
+      body = (
+        <CallScreen
+          peerDid={screen.peerDid}
+          onHangUp={() => setScreen({kind: 'home'})}
+        />
+      );
+      break;
   }
 
   return (
@@ -71,15 +92,17 @@ function DidScreenWithNav({
   onOpenVectorTest,
   onOpenAuth,
   onOpenRooms,
+  onOpenCall,
 }: {
   onOpenVectorTest: () => void;
   onOpenAuth: () => void;
   onOpenRooms: () => void;
+  onOpenCall: () => void;
 }) {
   return (
     <View className="flex-1 bg-slate-900">
       <DidScreen onOpenVectorTest={onOpenVectorTest} />
-      <View className="px-6 pb-6 flex-row gap-2">
+      <View className="px-6 pb-6 flex-row gap-2 flex-wrap">
         <Pressable
           accessibilityRole="button"
           onPress={onOpenAuth}
@@ -97,6 +120,14 @@ function DidScreenWithNav({
           nativeID="open-rooms-screen"
           className="bg-emerald-600 rounded-lg py-2 px-4 active:bg-emerald-500">
           <Text className="text-sm font-semibold text-white">Rooms</Text>
+        </Pressable>
+        <Pressable
+          accessibilityRole="button"
+          onPress={onOpenCall}
+          testID="open-call-screen"
+          nativeID="open-call-screen"
+          className="bg-indigo-600 rounded-lg py-2 px-4 active:bg-indigo-500">
+          <Text className="text-sm font-semibold text-white">Call</Text>
         </Pressable>
       </View>
     </View>

@@ -28,10 +28,16 @@ defmodule MookWeb.CallChannel do
   | in/out | `offer` | RTCSessionDescription | broadcast `offer` with `{from, payload}` |
   | in/out | `answer`| RTCSessionDescription | broadcast `answer` with `{from, payload}` |
   | in/out | `ice` | RTCIceCandidateInit | broadcast `ice` with `{from, payload}` |
+  | in/out | `bye` | (empty map) | broadcast `bye` with `{from}` |
 
   Each broadcast carries `from: socket.assigns.current_did` so peers can
   tell whose candidate / offer they received without trusting the
   client-side payload.
+
+  `bye` is a hang-up signal so the remote peer can tear down its
+  `RTCPeerConnection` deterministically without relying on ICE consent
+  freshness timing out. The leaving client emits `bye` and then leaves
+  the channel.
   """
 
   use MookWeb, :channel
@@ -65,5 +71,10 @@ defmodule MookWeb.CallChannel do
       _ ->
         {:reply, {:error, %{reason: :invalid_payload}}, socket}
     end
+  end
+
+  def handle_in("bye", _payload, socket) do
+    broadcast!(socket, "bye", %{from: socket.assigns.current_did})
+    {:reply, :ok, socket}
   end
 end
