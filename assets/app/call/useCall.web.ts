@@ -3,6 +3,8 @@ import {useCallback, useEffect, useRef, useState} from 'react';
 
 import {useSocketState, type Channel} from '../auth';
 import {useIdentityState} from '../identity-context';
+import {cleanupCallResources} from './call-cleanup';
+import {drainIceQueue, enqueueOrApplyIce} from './ice-queue';
 import type {CallApi, CallStatus} from './types';
 
 const STUN_URL = 'stun:stun.l.google.com:19302';
@@ -33,6 +35,7 @@ export function useCall(
   const pcRef = useRef<RTCPeerConnection | null>(null);
   const localStreamRef = useRef<MediaStream | null>(null);
   const channelRef = useRef<Channel | null>(null);
+  const pendingIceCandidatesRef = useRef<RTCIceCandidateInit[]>([]);
   const onRemoteStreamRef = useRef(onRemoteStream);
   onRemoteStreamRef.current = onRemoteStream;
 
@@ -46,31 +49,15 @@ export function useCall(
       } catch {
               }
     }
-    const pc = pcRef.current;
-    if (pc) {
-      try {
-        pc.close();
-      } catch {
-              }
-      pcRef.current = null;
-    }
-    const local = localStreamRef.current;
-    if (local) {
-      local.getTracks().forEach(t => {
-        try {
-          t.stop();
-        } catch {
-                  }
-      });
-      localStreamRef.current = null;
-    }
-    if (channel) {
-      try {
-        channel.leave();
-      } catch {
-              }
-      channelRef.current = null;
-    }
+    cleanupCallResources({
+      pc: pcRef.current,
+      localStream: localStreamRef.current,
+      channel,
+    });
+    pcRef.current = null;
+    localStreamRef.current = null;
+    channelRef.current = null;
+    pendingIceCandidatesRef.current = [];
     setStatus(prev => (prev.status === 'closed' ? prev : {status: 'closed'}));
   }, []);
 
@@ -152,6 +139,7 @@ export function useCall(
       (async () => {
         try {
           await pc.setRemoteDescription(remoteDesc);
+          await drainIceQueue(pc, pendingIceCandidatesRef.current);
           const answer = await pc.createAnswer();
           await pc.setLocalDescription(answer);
           channel.push('answer', {type: answer.type, sdp: answer.sdp});
@@ -178,14 +166,16 @@ export function useCall(
       if (!remoteDesc) {
         return;
       }
-      pc.setRemoteDescription(remoteDesc).catch(err => {
-        if (!cancelled) {
-          setStatus({
-            status: 'error',
-            reason: `apply_answer_failed:${(err as Error).message}`,
-          });
-        }
-      });
+      pc.setRemoteDescription(remoteDesc)
+        .then(() => drainIceQueue(pc, pendingIceCandidatesRef.current))
+        .catch(err => {
+          if (!cancelled) {
+            setStatus({
+              status: 'error',
+              reason: `apply_answer_failed:${(err as Error).message}`,
+            });
+          }
+        });
     });
 
     channel.on('ice', (raw: unknown) => {
@@ -200,8 +190,7 @@ export function useCall(
       if (!cand) {
         return;
       }
-      pc.addIceCandidate(cand).catch(() => {
-              });
+      enqueueOrApplyIce(pc, cand, pendingIceCandidatesRef.current);
     });
 
     channel.on('bye', (raw: unknown) => {
@@ -262,6 +251,15 @@ export function useCall(
         return;
       }
       if (!joined.ok) {
+        cleanupCallResources({
+          pc: pcRef.current,
+          localStream: localStreamRef.current,
+          channel: channelRef.current,
+        });
+        pcRef.current = null;
+        localStreamRef.current = null;
+        channelRef.current = null;
+        pendingIceCandidatesRef.current = [];
         setStatus({status: 'error', reason: joined.reason});
         return;
       }
@@ -286,32 +284,15 @@ export function useCall(
 
     return () => {
       cancelled = true;
-      const currentPc = pcRef.current;
-      if (currentPc) {
-        try {
-          currentPc.close();
-        } catch {
-                  }
-        pcRef.current = null;
-      }
-      const currentLocal = localStreamRef.current;
-      if (currentLocal) {
-        currentLocal.getTracks().forEach(t => {
-          try {
-            t.stop();
-          } catch {
-                      }
-        });
-        localStreamRef.current = null;
-      }
-      const currentChannel = channelRef.current;
-      if (currentChannel) {
-        try {
-          currentChannel.leave();
-        } catch {
-                  }
-        channelRef.current = null;
-      }
+      cleanupCallResources({
+        pc: pcRef.current,
+        localStream: localStreamRef.current,
+        channel: channelRef.current,
+      });
+      pcRef.current = null;
+      localStreamRef.current = null;
+      channelRef.current = null;
+      pendingIceCandidatesRef.current = [];
     };
   }, [peerDid, authedSocket, tokenLoaded, token, ourDid]);
 
