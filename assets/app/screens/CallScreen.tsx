@@ -1,5 +1,5 @@
 
-import React, {useState} from 'react';
+import React, {useEffect, useRef, useState} from 'react';
 import {Platform, Pressable, Text, View} from 'react-native';
 
 import {useCall, RemoteAudio} from '../call';
@@ -8,6 +8,8 @@ type Props = {
   peerDid: string;
   onHangUp: () => void;
 };
+
+const POST_CALL_NAV_DELAY_MS = 800;
 
 const monospace = Platform.select({
   ios: 'Menlo',
@@ -29,7 +31,7 @@ function statusToText(status: ReturnType<typeof useCall>['status']): string {
     case 'connected':
       return 'Connected';
     case 'closed':
-      return 'Closed';
+      return 'Call ended';
     case 'error':
       return `Error: ${status.reason}`;
     case 'unsupported':
@@ -45,10 +47,25 @@ export function CallScreen({peerDid, onHangUp}: Props) {
 
   const isWeb = Platform.OS === 'web';
 
+  const navigatedRef = useRef(false);
+  useEffect(() => {
+    if (status.status !== 'closed' || navigatedRef.current) {
+      return;
+    }
+    navigatedRef.current = true;
+    const handle = setTimeout(() => {
+      setRemoteStream(null);
+      onHangUp();
+    }, POST_CALL_NAV_DELAY_MS);
+    return () => clearTimeout(handle);
+  }, [status.status, onHangUp]);
+
   function handleHangUp() {
+    if (status.status === 'unsupported') {
+      onHangUp();
+      return;
+    }
     hangUp();
-    setRemoteStream(null);
-    onHangUp();
   }
 
   const statusText = statusToText(status);
