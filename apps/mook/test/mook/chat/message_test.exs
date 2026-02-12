@@ -128,9 +128,7 @@ defmodule Mook.Chat.MessageTest do
         )
         |> Ash.create()
 
-                        Mook.Repo.delete_all(
-        from(r in "rooms", where: r.id == type(^room.id, :binary_id))
-      )
+                        Mook.Repo.delete_all(from(r in "rooms", where: r.id == type(^room.id, :binary_id)))
 
       assert Message
              |> Ash.Query.filter(room_id == ^room.id)

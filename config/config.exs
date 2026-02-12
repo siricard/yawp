@@ -93,7 +93,7 @@ config :esbuild,
   mook: [
     args:
       ~w(js/index.tsx js/app.js --bundle --target=es2022 --outdir=../priv/static/assets --external:/fonts/* --external:/images/* --alias:@=. --alias:react-native=react-native-web --alias:react-native-keychain=./js/stubs/keychain.js --alias:react-native-get-random-values=./js/stubs/empty.js --resolve-extensions=.web.tsx,.web.ts,.web.js,.tsx,.ts,.jsx,.js --jsx=automatic --jsx-import-source=nativewind --loader:.js=jsx --splitting --format=esm),
-    cd: Path.expand("../assets", __DIR__),
+    cd: Path.expand("../apps/mook/assets", __DIR__),
     env: %{
       "NODE_PATH" =>
         Enum.join(
@@ -114,7 +114,7 @@ config :tailwind,
       --input=assets/css/app.css
       --output=priv/static/assets/css/app.css
     ),
-    cd: Path.expand("..", __DIR__)
+    cd: Path.expand("../apps/mook", __DIR__)
   ]
 
 config :logger, :default_formatter,

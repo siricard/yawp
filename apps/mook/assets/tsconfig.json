@@ -26,7 +26,7 @@
     "ignoreDeprecations": "6.0",
     "baseUrl": ".",
     "paths": {
-      "*": ["../deps/*"]
+      "*": ["../../../deps/*"]
     },
     // Match Phoenix esbuild's `--resolve-extensions=.web.tsx,.web.ts,...` so
     // TypeScript picks `storage.web.ts` over `storage.ts` (and falls back to

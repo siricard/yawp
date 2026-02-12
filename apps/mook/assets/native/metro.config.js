@@ -19,7 +19,7 @@ function reactNativePlatformResolver(platformImplementations, customResolver) {
   };
 }
 
-const repoRoot = path.resolve(__dirname, '../..');
+const repoRoot = path.resolve(__dirname, '../../../..');
 const sharedAppDir = path.resolve(__dirname, '..', 'app');
 
 const nativeNodeModules = path.join(__dirname, 'node_modules');

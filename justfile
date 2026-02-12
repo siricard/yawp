@@ -2,13 +2,16 @@
 default:
     @just --list
 
-# Start Phoenix dev server (web + API)
+# Start Phoenix dev server (web + API).
+# Runs `mix phx.server` from the umbrella `:mook` app directory so that
+# `Mix.Project.config()[:app]` resolves to `:mook` for the runtime
+# `AshPhoenix.Plug.CheckCodegenStatus` codegen check.
 dev:
-    nix develop -c mix phx.server
+    nix develop -c bash -c 'cd apps/mook && mix phx.server'
 
 # Open IEx shell with the app loaded
 iex:
-    nix develop -c iex -S mix phx.server
+    nix develop -c bash -c 'cd apps/mook && iex -S mix phx.server'
 
 # One-time setup: install deps, create DB, run migrations
 setup:
@@ -52,32 +55,32 @@ gen-types:
 # (which AshPhoenix.Plug.CheckCodegenStatus uses) will block HTTP routes with a 500 if
 # the generated artifacts are stale.
 #
-# The shared output at assets/app/ash_generated.ts is consumed directly by
+# The shared output at apps/mook/assets/app/ash_generated.ts is consumed directly by
 # both the web bundle (Phoenix esbuild) and the React Native bundle (Metro).
 codegen:
-    nix develop -c mix ash_typescript.codegen --output "assets/app/ash_generated.ts"
+    nix develop -c bash -c 'cd apps/mook && mix ash_typescript.codegen --output "assets/app/ash_generated.ts"'
 
 # Run the React Native app on iOS
 rn-ios:
-    nix develop -c bash -c 'cd assets/native && npx react-native run-ios'
+    nix develop -c bash -c 'cd apps/mook/assets/native && npx react-native run-ios'
 
 # Run the React Native app on Android
 rn-android:
-    nix develop -c bash -c 'cd assets/native && npx react-native run-android'
+    nix develop -c bash -c 'cd apps/mook/assets/native && npx react-native run-android'
 
 # Run the React Native app on macOS
 rn-macos:
-    nix develop -c bash -c 'export DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer; export PATH="/usr/bin:/bin:/usr/sbin:/sbin:$PATH"; cd assets/native && npx react-native run-macos'
+    nix develop -c bash -c 'export DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer; export PATH="/usr/bin:/bin:/usr/sbin:/sbin:$PATH"; cd apps/mook/assets/native && npx react-native run-macos'
 
 # Start the React Native Metro bundler
 rn-metro:
-    nix develop -c bash -c 'cd assets/native && npx react-native start --port 8081'
+    nix develop -c bash -c 'cd apps/mook/assets/native && npx react-native start --port 8081'
 
 # Verify that singleton-required packages (react, react-native-css-interop,
 # nativewind, …) appear exactly once in each platform's bundle. Guards the
-# Metro `resolveRequest` dedup rules in assets/native/metro.config.js.
+# Metro `resolveRequest` dedup rules in apps/mook/assets/native/metro.config.js.
 verify-singletons:
-    nix develop -c node assets/native/scripts/verify-singletons.mjs
+    nix develop -c node apps/mook/assets/native/scripts/verify-singletons.mjs
 
 # Open Phoenix routes
 routes:

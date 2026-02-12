@@ -20,7 +20,8 @@ defmodule Mook.Call.SessionSupervisorTest do
       caller_did = "did_caller_#{System.unique_integer([:positive])}"
       peer_did = "did_peer_#{System.unique_integer([:positive])}"
 
-      assert {:ok, pid} = SessionSupervisor.start_session(%{caller_did: caller_did, peer_did: peer_did})
+      assert {:ok, pid} =
+               SessionSupervisor.start_session(%{caller_did: caller_did, peer_did: peer_did})
 
       assert is_pid(pid)
       assert Process.alive?(pid)
