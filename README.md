@@ -46,6 +46,20 @@ just rn-macos
 
 `just rn-metro` **must be running before** `just rn-ios`, `just rn-android`, or `just rn-macos` is invoked. If Metro is not already listening on port 8081, the launched React Native app can show the redbox error `No script URL provided`.
 
+## Contributing
+
+Contributions to the AGPL-3.0 core (`apps/yawp/`) are welcome. Before opening
+a PR, please read:
+
+* [`CONTRIBUTING.md`](CONTRIBUTING.md) — fork → branch → PR flow, the DCO
+  sign-off requirement, and the Contributor License Agreement.
+* [`CODE_OF_CONDUCT.md`](CODE_OF_CONDUCT.md) — community standards, based on
+  the Contributor Covenant.
+* [`SECURITY.md`](SECURITY.md) — responsible disclosure for vulnerabilities.
+
+The proprietary premium tier (`apps/yawp_premium/`) does not accept external
+contributions.
+
 ## Learn more
 
 * Official website: https://www.phoenixframework.org/
