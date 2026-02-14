@@ -19,11 +19,11 @@ config :ash_typescript,
 
 config :ash_oban, pro?: false
 
-config :mook, Oban,
+config :yawp, Oban,
   engine: Oban.Engines.Basic,
   notifier: Oban.Notifiers.Postgres,
   queues: [default: 10],
-  repo: Mook.Repo,
+  repo: Yawp.Repo,
   plugins: [{Oban.Plugins.Cron, []}]
 
 config :ash,
@@ -71,29 +71,29 @@ config :spark,
     ]
   ]
 
-config :mook,
-  ecto_repos: [Mook.Repo],
+config :yawp,
+  ecto_repos: [Yawp.Repo],
   generators: [timestamp_type: :utc_datetime],
-  ash_domains: [Mook.Accounts, Mook.Chat]
+  ash_domains: [Yawp.Accounts, Yawp.Chat]
 
-config :mook, MookWeb.Endpoint,
+config :yawp, YawpWeb.Endpoint,
   url: [host: "localhost"],
   adapter: Bandit.PhoenixAdapter,
   render_errors: [
-    formats: [html: MookWeb.ErrorHTML, json: MookWeb.ErrorJSON],
+    formats: [html: YawpWeb.ErrorHTML, json: YawpWeb.ErrorJSON],
     layout: false
   ],
-  pubsub_server: Mook.PubSub,
+  pubsub_server: Yawp.PubSub,
   live_view: [signing_salt: "LGagITuW"]
 
-config :mook, Mook.Mailer, adapter: Swoosh.Adapters.Local
+config :yawp, Yawp.Mailer, adapter: Swoosh.Adapters.Local
 
 config :esbuild,
   version: "0.25.4",
-  mook: [
+  yawp: [
     args:
       ~w(js/index.tsx js/app.js --bundle --target=es2022 --outdir=../priv/static/assets --external:/fonts/* --external:/images/* --alias:@=. --alias:react-native=react-native-web --alias:react-native-keychain=./js/stubs/keychain.js --alias:react-native-get-random-values=./js/stubs/empty.js --resolve-extensions=.web.tsx,.web.ts,.web.js,.tsx,.ts,.jsx,.js --jsx=automatic --jsx-import-source=nativewind --loader:.js=jsx --splitting --format=esm),
-    cd: Path.expand("../apps/mook/assets", __DIR__),
+    cd: Path.expand("../apps/yawp/assets", __DIR__),
     env: %{
       "NODE_PATH" =>
         Enum.join(
@@ -109,12 +109,12 @@ config :esbuild,
 
 config :tailwind,
   version: "4.1.12",
-  mook: [
+  yawp: [
     args: ~w(
       --input=assets/css/app.css
       --output=priv/static/assets/css/app.css
     ),
-    cd: Path.expand("../apps/mook", __DIR__)
+    cd: Path.expand("../apps/yawp", __DIR__)
   ]
 
 config :logger, :default_formatter,

@@ -1,8 +1,8 @@
 import Config
 
-config :mook, MookWeb.Endpoint, cache_static_manifest: "priv/static/cache_manifest.json"
+config :yawp, YawpWeb.Endpoint, cache_static_manifest: "priv/static/cache_manifest.json"
 
-config :mook, MookWeb.Endpoint,
+config :yawp, YawpWeb.Endpoint,
   force_ssl: [
     rewrite_on: [:x_forwarded_proto],
     exclude: [

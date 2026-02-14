@@ -1,5 +1,5 @@
 {
-  description = "Mook dev shell — Phoenix + Ash + React/React Native";
+  description = "Yawp dev shell — Phoenix + Ash + React/React Native";
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-unstable";

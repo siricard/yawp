@@ -1,4 +1,4 @@
-# Mook
+# Yawp
 
 A decentralized, end-to-end encrypted communication platform — Phoenix + Ash + React + React Native, identity via cryptographic key pairs, self-hostable on a VPS.
 
@@ -13,6 +13,6 @@ Issues live in PaiR (`.pair/pair.db`). See `.pair/AGENTS.md` for the workflow pr
 Reference documents live in `docs/`:
 
 - [`docs/tech-stack.md`](docs/tech-stack.md) — Authoritative tech stack: Elixir/Phoenix/Ash backend, React + React Native clients, ex_webrtc for voice, VPS self-hosting model, and open decisions (E2EE, federation, identity recovery).
-- [`docs/cryptography-glossary.md`](docs/cryptography-glossary.md) — Plain-English glossary of every cryptographic and identity-related term used in Mook (DID, Ed25519, BIP-39, challenge-response, etc.). Read this before designing or changing anything in the identity, auth, or E2EE layers.
+- [`docs/cryptography-glossary.md`](docs/cryptography-glossary.md) — Plain-English glossary of every cryptographic and identity-related term used in Yawp (DID, Ed25519, BIP-39, challenge-response, etc.). Read this before designing or changing anything in the identity, auth, or E2EE layers.
 
 When the user discusses crypto/identity concepts, the glossary is the source of truth for terminology.

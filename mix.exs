@@ -1,4 +1,4 @@
-defmodule Mook.Umbrella.MixProject do
+defmodule Yawp.Umbrella.MixProject do
   use Mix.Project
 
   def project do

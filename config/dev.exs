@@ -1,39 +1,39 @@
 import Config
 config :ash, policies: [show_policy_breakdowns?: true]
 
-config :mook, Mook.Repo,
+config :yawp, Yawp.Repo,
   username: "postgres",
   password: "postgres",
   hostname: "localhost",
-  database: "mook_dev",
+  database: "yawp_dev",
   stacktrace: true,
   show_sensitive_data_on_connection_error: true,
   pool_size: 10
 
-config :mook, MookWeb.Endpoint,
+config :yawp, YawpWeb.Endpoint,
       http: [ip: {127, 0, 0, 1}],
   check_origin: false,
   code_reloader: true,
   debug_errors: true,
   secret_key_base: "hpqf7zWrfnzoqUOuxxhij7/1WGDakcC31WvD06M+5YBF4uD4RQBCxXkOswfe32dV",
   watchers: [
-    esbuild: {Esbuild, :install_and_run, [:mook, ~w(--sourcemap=inline --watch)]},
-    tailwind: {Tailwind, :install_and_run, [:mook, ~w(--watch)]}
+    esbuild: {Esbuild, :install_and_run, [:yawp, ~w(--sourcemap=inline --watch)]},
+    tailwind: {Tailwind, :install_and_run, [:yawp, ~w(--watch)]}
   ]
 
-config :mook, MookWeb.Endpoint,
+config :yawp, YawpWeb.Endpoint,
   live_reload: [
     web_console_logger: true,
     patterns: [
             ~r"priv/static/(?!uploads/).*\.(js|css|png|jpeg|jpg|gif|svg)$",
             ~r"priv/gettext/.*\.po$",
-            ~r"(apps/mook/)?lib/mook_web/router\.ex$",
-      ~r"(apps/mook/)?lib/mook_web/(controllers|live|components)/.*\.(ex|heex)$",
-            ~r"(apps/mook/)?assets/app/.*\.(ts|tsx|js|jsx|json)$"
+            ~r"(apps/yawp/)?lib/yawp_web/router\.ex$",
+      ~r"(apps/yawp/)?lib/yawp_web/(controllers|live|components)/.*\.(ex|heex)$",
+            ~r"(apps/yawp/)?assets/app/.*\.(ts|tsx|js|jsx|json)$"
     ]
   ]
 
-config :mook, dev_routes: true, token_signing_secret: "E+o+Ldp6XJ9VsEqkTk8+UombPEhZoiCJ"
+config :yawp, dev_routes: true, token_signing_secret: "E+o+Ldp6XJ9VsEqkTk8+UombPEhZoiCJ"
 
 config :logger, :default_formatter, format: "[$level] $message\n"
 
