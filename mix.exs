@@ -8,6 +8,7 @@ defmodule Yawp.Umbrella.MixProject do
       start_permanent: Mix.env() == :prod,
       deps: deps(),
       aliases: aliases(),
+      releases: releases(),
                                     listeners: [Phoenix.CodeReloader]
     ]
   end
@@ -26,6 +27,18 @@ defmodule Yawp.Umbrella.MixProject do
     [
             setup: ["cmd mix setup"],
                   precommit: ["compile --warnings-as-errors", "deps.unlock --unused", "format", "test"]
+    ]
+  end
+
+          defp releases do
+    [
+      yawp: [
+        include_executables_for: [:unix],
+        applications: [
+          yawp: :permanent,
+          yawp_premium: :permanent
+        ]
+      ]
     ]
   end
 end

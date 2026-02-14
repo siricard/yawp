@@ -1,0 +1,15 @@
+#!/bin/sh
+# Boot the Phoenix release with the HTTP server enabled.
+# `mix phx.gen.release` ships an equivalent script; we author it directly
+# so the umbrella release picks it up without requiring `mix phx.gen.release`
+# to mutate the repo.
+#
+# Runs pending Ecto migrations BEFORE starting the BEAM so a fresh deploy
+# against an empty database (the M6 self-hosting flow) bootstraps cleanly.
+set -eu
+
+cd -P -- "$(dirname -- "$0")"
+
+./yawp eval 'Yawp.Release.migrate()'
+
+PHX_SERVER=true exec ./yawp start

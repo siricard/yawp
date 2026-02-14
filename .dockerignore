@@ -1,0 +1,45 @@
+# Mission/tooling state — irrelevant to the server release and would balloon
+# the build context (hundreds of MB).
+.git
+.github
+.factory
+.hamster
+.claude
+.pair
+.direnv
+.elixir_ls
+.designkit
+.envrc
+.nix-shell-history
+result
+result-*
+
+# Local build artifacts.
+_build
+deps
+cover
+doc
+*.ez
+erl_crash.dump
+tmp/
+
+# Native React Native targets — server release has no use for them.
+apps/yawp/assets/native
+apps/yawp/assets/node_modules
+apps/yawp/assets/app/__tests__
+
+# Generated web assets (rebuilt inside the image).
+apps/yawp/priv/static/assets
+apps/yawp/priv/static/cache_manifest.json
+
+# Editor noise.
+.vscode
+.idea
+*.swp
+*.swo
+
+# Docker artifacts (no recursive references).
+Dockerfile
+docker-compose.yml
+.dockerignore
+.env

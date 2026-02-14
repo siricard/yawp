@@ -1,0 +1,9 @@
+#!/bin/sh
+# Apply pending Ecto migrations from a built release.
+# Invoked by the docker-compose `phoenix` service at boot time, before the
+# main `bin/server` process starts.
+set -eu
+
+cd -P -- "$(dirname -- "$0")"
+
+exec ./yawp eval 'Yawp.Release.migrate()'
