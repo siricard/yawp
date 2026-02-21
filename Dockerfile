@@ -13,6 +13,13 @@ FROM hexpm/elixir:${ELIXIR_VERSION}-erlang-${ERLANG_VERSION}-debian-${DEBIAN_REL
 
 ARG NODE_MAJOR
 ARG MIX_ENV=prod
+# Build provenance — pass via `--build-arg` from CI (release.yml fills these
+# from the git tag, the resolved commit SHA, and the build start time). They
+# are baked into the runtime stage as ENV so the OTP release sees them at
+# boot (config/runtime.exs → :yawp, :build_info → /version controller).
+ARG YAWP_VERSION=unknown
+ARG YAWP_COMMIT=unknown
+ARG YAWP_BUILT_AT=unknown
 ENV MIX_ENV=${MIX_ENV} \
     LANG=C.UTF-8 \
     LC_ALL=C.UTF-8
@@ -79,11 +86,18 @@ RUN mix assets.deploy \
 # bundled into the release, so no Erlang install is required here.
 FROM debian:bookworm-slim AS runtime
 
+ARG YAWP_VERSION=unknown
+ARG YAWP_COMMIT=unknown
+ARG YAWP_BUILT_AT=unknown
+
 ENV LANG=C.UTF-8 \
     LC_ALL=C.UTF-8 \
     MIX_ENV=prod \
     PHX_SERVER=true \
-    HOME=/app
+    HOME=/app \
+    YAWP_VERSION=${YAWP_VERSION} \
+    YAWP_COMMIT=${YAWP_COMMIT} \
+    YAWP_BUILT_AT=${YAWP_BUILT_AT}
 
 RUN apt-get update -y \
  && apt-get install -y --no-install-recommends \

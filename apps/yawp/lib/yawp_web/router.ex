@@ -34,6 +34,12 @@ defmodule YawpWeb.Router do
   end
 
   scope "/", YawpWeb do
+    pipe_through :api
+
+    get "/version", VersionController, :show
+  end
+
+  scope "/", YawpWeb do
     pipe_through :browser
 
     get "/", PageController, :home
