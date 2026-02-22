@@ -1,0 +1,69 @@
+name: Release
+
+# Tag-driven release: pushing a `v*` tag (e.g. `v0.1.0`) builds the Dockerfile
+# and publishes the resulting image to GHCR under both the tag version and
+# `:latest`. Authentication uses only the workflow's built-in `GITHUB_TOKEN`
+# (scoped `packages: write` below) — no extra secrets required to self-host
+# the release pipeline.
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: read
+  packages: write
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: siricard/yawp
+
+jobs:
+  build-and-push:
+    name: Build and push image to GHCR
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # Derive the version string from the tag (strip the leading `v`) so the
+      # /version endpoint reports `0.1.0` rather than `v0.1.0`.
+      - name: Resolve build provenance
+        id: provenance
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          built_at="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          echo "version=${version}" >> "$GITHUB_OUTPUT"
+          echo "commit=${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
+          echo "built_at=${built_at}" >> "$GITHUB_OUTPUT"
+
+      - name: Build and push image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.provenance.outputs.version }}
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+          build-args: |
+            YAWP_VERSION=${{ steps.provenance.outputs.version }}
+            YAWP_COMMIT=${{ steps.provenance.outputs.commit }}
+            YAWP_BUILT_AT=${{ steps.provenance.outputs.built_at }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
