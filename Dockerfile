@@ -65,10 +65,10 @@ RUN mix deps.get --only ${MIX_ENV} \
 #    references Phoenix JS via `file:../../../deps/<pkg>` — those paths
 #    resolve into /app/deps populated by `mix deps.get` above.
 #
-#    `npm install` (not `npm ci`) because the host lock file references the
-#    pre-umbrella layout; the file: links are reproducible regardless.
+#    `npm ci` for reproducible installs; the lockfile is kept in sync with
+#    the umbrella layout (see F6.5 housekeeping).
 COPY apps/yawp/assets/package.json apps/yawp/assets/package-lock.json apps/yawp/assets/
-RUN cd apps/yawp/assets && npm install --no-audit --no-fund --omit=optional
+RUN cd apps/yawp/assets && npm ci --no-audit --no-fund --omit=optional
 
 # 3. Application source. Native (RN iOS/Android/macOS) is excluded via
 #    .dockerignore — it bloats the context with no benefit to the server build.
