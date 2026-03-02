@@ -143,7 +143,7 @@ Verify both services are healthy:
 
 ```bash
 docker compose ps          # both services should show "healthy"
-curl -sf http://localhost:4000/version | jq
+curl -sS http://127.0.0.1:4000/version
 ```
 
 The `/version` endpoint returns `{version, commit, built_at}` baked in at

@@ -58,8 +58,12 @@ jobs:
           context: .
           file: ./Dockerfile
           push: true
+          # Publish under the literal v-prefixed git tag (e.g. `v0.1.0`) so
+          # the GHCR tag matches the release tag exactly, plus `:latest` for
+          # the rolling pointer. The stripped, semver-only `version` is still
+          # threaded through as a build-arg so `/version` reports `0.1.0`.
           tags: |
-            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.provenance.outputs.version }}
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.ref_name }}
             ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
           build-args: |
             YAWP_VERSION=${{ steps.provenance.outputs.version }}

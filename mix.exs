@@ -25,7 +25,11 @@ defmodule Yawp.Umbrella.MixProject do
 
   defp aliases do
     [
-            setup: ["cmd mix setup"],
+                        setup: ["cmd --app yawp mix setup"],
+                        "assets.build": ["cmd --app yawp mix assets.build"],
+      "assets.deploy": ["cmd --app yawp mix assets.deploy"],
+      "ecto.setup": ["cmd --app yawp mix ecto.setup"],
+      "ecto.reset": ["cmd --app yawp mix ecto.reset"],
                   precommit: ["compile --warnings-as-errors", "deps.unlock --unused", "format", "test"]
     ]
   end

@@ -95,6 +95,24 @@ nix develop -c just rn-metro  # start the React Native Metro bundler
 
 See [`AGENTS.md`](AGENTS.md) and [`README.md`](README.md) for more detail.
 
+## GitHub-side setup (repository owner)
+
+Some pieces of the contribution workflow rely on a GitHub App being installed
+on the repository. These are **one-time owner actions** — contributors do not
+need to perform them, but they must be in place for the contributor flow
+above to work end to end:
+
+1. Install the [CLA Assistant GitHub App](https://github.com/apps/cla-assistant)
+   on the `yawp` repository.
+2. Grant the app access to `.github/CLA.md` and `.github/cla-signatures.json`
+   so it can read the CLA text and record signatures.
+3. Confirm the workflow `.github/workflows/cla.yml` is enabled in
+   **Settings → Actions**.
+
+Once these are in place, the CLA Assistant bot will automatically comment on
+every new external PR with a sign-off link, and the workflow will block merge
+until the contributor signs.
+
 ## Reporting security issues
 
 Do **not** open a public GitHub issue for security vulnerabilities. See
