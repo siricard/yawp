@@ -6,8 +6,15 @@ default:
 # Runs `mix phx.server` from the umbrella `:yawp` app directory so that
 # `Mix.Project.config()[:app]` resolves to `:yawp` for the runtime
 # `AshPhoenix.Plug.CheckCodegenStatus` codegen check.
+# Anchor A: PORT=4000, DATABASE=yawp_dev (defaults). For Anchor B see `just dev-anchor-b`.
 dev:
     nix develop -c bash -c 'cd apps/yawp && mix phx.server'
+
+# Start a second Phoenix dev server (Anchor B) bound to :4100 against the
+# yawp_anchor_b_dev database. Used for cross-anchor federation work (M7.4+).
+# Creates the DB on first run; `mix ecto.create` is idempotent.
+dev-anchor-b:
+    nix develop -c bash -c 'cd apps/yawp && DATABASE=yawp_anchor_b_dev mix ecto.create && PORT=4100 DATABASE=yawp_anchor_b_dev mix phx.server'
 
 # Open IEx shell with the app loaded
 iex:

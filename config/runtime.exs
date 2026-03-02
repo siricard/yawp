@@ -6,6 +6,19 @@ end
 
 config :yawp, YawpWeb.Endpoint, http: [port: String.to_integer(System.get_env("PORT", "4000"))]
 
+if config_env() == :dev do
+  cond do
+    url = System.get_env("DATABASE_URL") ->
+      config :yawp, Yawp.Repo, url: url
+
+    db = System.get_env("DATABASE") ->
+      config :yawp, Yawp.Repo, database: db
+
+    true ->
+      :ok
+  end
+end
+
 config :yawp, :build_info,
   version: System.get_env("YAWP_VERSION", "unknown"),
   commit: System.get_env("YAWP_COMMIT", "unknown"),
