@@ -7,8 +7,6 @@ import {SocketProvider} from './auth';
 import {DidScreen} from './screens/DidScreen';
 import {VectorTestScreen} from './screens/VectorTestScreen';
 import {AuthScreen} from './screens/AuthScreen';
-import {RoomListScreen} from './screens/RoomListScreen';
-import {RoomScreen} from './screens/RoomScreen';
 import {CallLauncherScreen} from './screens/CallLauncherScreen';
 import {CallScreen} from './screens/CallScreen';
 
@@ -16,8 +14,6 @@ type Screen =
   | {kind: 'home'}
   | {kind: 'vector'}
   | {kind: 'auth'}
-  | {kind: 'roomList'}
-  | {kind: 'room'; roomId: string}
   | {kind: 'callLauncher'}
   | {kind: 'call'; peerDid: string};
 
@@ -31,7 +27,6 @@ export default function App() {
         <DidScreenWithNav
           onOpenVectorTest={() => setScreen({kind: 'vector'})}
           onOpenAuth={() => setScreen({kind: 'auth'})}
-          onOpenRooms={() => setScreen({kind: 'roomList'})}
           onOpenCall={() => setScreen({kind: 'callLauncher'})}
         />
       );
@@ -41,22 +36,6 @@ export default function App() {
       break;
     case 'auth':
       body = <AuthScreen onBack={() => setScreen({kind: 'home'})} />;
-      break;
-    case 'roomList':
-      body = (
-        <RoomListScreen
-          onBack={() => setScreen({kind: 'home'})}
-          onOpenRoom={roomId => setScreen({kind: 'room', roomId})}
-        />
-      );
-      break;
-    case 'room':
-      body = (
-        <RoomScreen
-          roomId={screen.roomId}
-          onBack={() => setScreen({kind: 'roomList'})}
-        />
-      );
       break;
     case 'callLauncher':
       body = (
@@ -91,12 +70,10 @@ export default function App() {
 function DidScreenWithNav({
   onOpenVectorTest,
   onOpenAuth,
-  onOpenRooms,
   onOpenCall,
 }: {
   onOpenVectorTest: () => void;
   onOpenAuth: () => void;
-  onOpenRooms: () => void;
   onOpenCall: () => void;
 }) {
   return (
@@ -112,14 +89,6 @@ function DidScreenWithNav({
           <Text className="text-sm font-semibold text-slate-50">
             Authenticate
           </Text>
-        </Pressable>
-        <Pressable
-          accessibilityRole="button"
-          onPress={onOpenRooms}
-          testID="open-rooms-screen"
-          nativeID="open-rooms-screen"
-          className="bg-emerald-600 rounded-lg py-2 px-4 active:bg-emerald-500">
-          <Text className="text-sm font-semibold text-white">Rooms</Text>
         </Pressable>
         <Pressable
           accessibilityRole="button"

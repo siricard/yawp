@@ -37,7 +37,6 @@ defmodule YawpWeb.UserSocket do
 
   channel "auth:lobby", YawpWeb.AuthChannel
   channel "whoami", YawpWeb.WhoamiChannel
-  channel "room:*", YawpWeb.RoomChannel
   channel "call:*", YawpWeb.CallChannel
 
   @impl true

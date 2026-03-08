@@ -3,7 +3,7 @@ defmodule YawpWeb.AuthChannelTest do
 
   require Ash.Query
 
-  alias Yawp.Accounts.User
+  alias Yawp.Admin.Account, as: User
   alias Yawp.Identity
 
     @pubkey Base.decode16!(

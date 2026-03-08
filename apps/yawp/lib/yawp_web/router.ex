@@ -43,7 +43,7 @@ defmodule YawpWeb.Router do
     pipe_through :browser
 
     get "/", PageController, :home
-    auth_routes AuthController, Yawp.Accounts.User, path: "/auth"
+    auth_routes AuthController, Yawp.Admin.Account, path: "/auth"
     sign_out_route AuthController
 
         sign_in_route register_path: "/register",
@@ -61,11 +61,11 @@ defmodule YawpWeb.Router do
                   Elixir.AshAuthentication.Phoenix.Overrides.DaisyUI
                 ]
 
-        confirm_route Yawp.Accounts.User, :confirm_new_user,
+        confirm_route Yawp.Admin.Account, :confirm_new_user,
       auth_routes_prefix: "/auth",
       overrides: [YawpWeb.AuthOverrides, Elixir.AshAuthentication.Phoenix.Overrides.DaisyUI]
 
-        magic_sign_in_route(Yawp.Accounts.User, :magic_link,
+        magic_sign_in_route(Yawp.Admin.Account, :magic_link,
       auth_routes_prefix: "/auth",
       overrides: [YawpWeb.AuthOverrides, Elixir.AshAuthentication.Phoenix.Overrides.DaisyUI]
     )

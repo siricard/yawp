@@ -21,19 +21,7 @@
       "references": null,
       "scale": null,
       "size": null,
-      "source": "room_id",
-      "type": "uuid"
-    },
-    {
-      "allow_nil?": false,
-      "default": "nil",
-      "generated?": false,
-      "precision": null,
-      "primary_key?": false,
-      "references": null,
-      "scale": null,
-      "size": null,
-      "source": "sender_did",
+      "source": "did",
       "type": "text"
     },
     {
@@ -45,32 +33,8 @@
       "references": null,
       "scale": null,
       "size": null,
-      "source": "content",
-      "type": "text"
-    },
-    {
-      "allow_nil?": true,
-      "default": "nil",
-      "generated?": false,
-      "precision": null,
-      "primary_key?": false,
-      "references": null,
-      "scale": null,
-      "size": null,
-      "source": "ciphertext_envelope",
-      "type": "jsonb"
-    },
-    {
-      "allow_nil?": true,
-      "default": "nil",
-      "generated?": false,
-      "precision": null,
-      "primary_key?": false,
-      "references": null,
-      "scale": null,
-      "size": null,
-      "source": "home_server",
-      "type": "text"
+      "source": "master_public_key",
+      "type": "binary"
     },
     {
       "allow_nil?": false,
@@ -83,44 +47,57 @@
       "size": null,
       "source": "inserted_at",
       "type": "utc_datetime_usec"
+    },
+    {
+      "allow_nil?": false,
+      "default": "fragment(\"(now() AT TIME ZONE 'utc')\")",
+      "generated?": false,
+      "precision": null,
+      "primary_key?": false,
+      "references": null,
+      "scale": null,
+      "size": null,
+      "source": "updated_at",
+      "type": "utc_datetime_usec"
     }
   ],
   "base_filter": null,
   "check_constraints": [],
   "create_table_options": null,
-  "custom_indexes": [
+  "custom_indexes": [],
+  "custom_statements": [],
+  "has_create_action": false,
+  "hash": "21DDC3E4E49633BA346D7EBB9438788F777C69DAD652442F161DABC9F2DF739E",
+  "identities": [
     {
       "all_tenants?": false,
-      "concurrently": false,
-      "error_fields": [
-        "room_id",
-        "inserted_at"
-      ],
-      "fields": [
+      "base_filter": null,
+      "index_name": "identities_unique_did_index",
+      "keys": [
         {
           "type": "atom",
-          "value": "room_id"
-        },
-        {
-          "type": "atom",
-          "value": "inserted_at"
+          "value": "did"
         }
       ],
-      "include": null,
-      "message": null,
-      "name": null,
-      "nulls_distinct": true,
-      "prefix": null,
-      "table": null,
-      "unique": false,
-      "using": null,
+      "name": "unique_did",
+      "nils_distinct?": true,
+      "where": null
+    },
+    {
+      "all_tenants?": false,
+      "base_filter": null,
+      "index_name": "identities_unique_master_public_key_index",
+      "keys": [
+        {
+          "type": "atom",
+          "value": "master_public_key"
+        }
+      ],
+      "name": "unique_master_public_key",
+      "nils_distinct?": true,
       "where": null
     }
   ],
-  "custom_statements": [],
-  "has_create_action": true,
-  "hash": "E09503E3DF65AF6CFCC6CD334DC3D6FD1ABDEC0A2F5BFD662802A1A166D4D6D3",
-  "identities": [],
   "multitenancy": {
     "attribute": null,
     "global": null,
@@ -128,5 +105,5 @@
   },
   "repo": "Elixir.Yawp.Repo",
   "schema": null,
-  "table": "messages"
+  "table": "identities"
 }

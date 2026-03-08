@@ -1,6 +1,9 @@
 defmodule Yawp.Identity do
   @moduledoc """
-  Client identity primitives shared across the Yawp server and clients.
+  Client identity primitives shared across the Yawp server and clients,
+  and the Ash domain hosting identity-bearing resources.
+
+  ## DID derivation
 
   A user's decentralized identifier (DID) is derived deterministically from
   their Ed25519 public key:
@@ -10,7 +13,20 @@ defmodule Yawp.Identity do
   The same derivation is implemented on web (`@noble/ed25519` + `@noble/hashes`
   + `bs58`) and React Native. The canonical test vector lives at
   `priv/test_vectors/identity.json` and is consumed by tests on every platform.
+
+  ## Domain
+
+  This module also serves as the Ash domain hosting the
+  identity-bearing resources (PPE bundle, private blob, device subkeys,
+  etc.). only adds the bare `Yawp.Identity.Identity` resource
+  stub; richer behavior lands+. See ADRs 005–007.
   """
+
+  use Ash.Domain, otp_app: :yawp
+
+  resources do
+    resource Yawp.Identity.Identity
+  end
 
   @base58_alphabet ~c"123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"
 

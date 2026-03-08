@@ -23,7 +23,7 @@ defmodule YawpWeb.AuthChannel do
         5. Verifies the Ed25519 signature over the raw nonce bytes
            (`:invalid_signature`).
         6. Looks up the user by `pubkey`; if missing, auto-registers via
-           `Yawp.Accounts.User.:register_with_pubkey`. The Ash policy on
+           `Yawp.Admin.Account.:register_with_pubkey`. The Ash policy on
            that action is scoped to permit only unauthenticated callers
            through this path.
         7. Stores `current_did` in `socket.assigns` and replies
@@ -37,7 +37,7 @@ defmodule YawpWeb.AuthChannel do
 
   require Ash.Query
 
-  alias Yawp.Accounts.User
+  alias Yawp.Admin.Account, as: User
   alias Yawp.Auth
   alias Yawp.Auth.NonceStore
   alias Yawp.Identity

@@ -1,6 +1,6 @@
 
 
-import type { AshRpcError, Binary, ConditionalPaginatedResultMixed, InferResult, RoomFilterInput, RoomResourceSchema, RoomSortField, SortString, UUID, UnifiedFieldSelection, UserResourceSchema, ValidationResult } from "./ash_types";
+import type { AshRpcError, Binary, InferResult, UnifiedFieldSelection, UserResourceSchema, ValidationResult } from "./ash_types";
 export type * from "./ash_types";
 
 /**
@@ -192,7 +192,7 @@ export type RegisterWithPubkeyResult<Fields extends RegisterWithPubkeyFields | u
 ;
 
 /**
- * Create a new User
+ * Create a new Account
  *
  * @ashActionType :create
  */
@@ -220,7 +220,7 @@ export async function registerWithPubkey<Fields extends RegisterWithPubkeyFields
 }
 
 /**
- * Validate: Create a new User
+ * Validate: Create a new Account
  *
  * @ashActionType :create
  * @validation true
@@ -238,249 +238,6 @@ export async function validateRegisterWithPubkey(
     action: "register_with_pubkey",
     ...(config.tenant !== undefined && { tenant: config.tenant }),
     input: config.input
-  };
-
-  return executeValidationRpcRequest<ValidationResult>(
-    payload,
-    config
-  );
-}
-
-export type CreateRoomInput = {
-  name: string;
-  createdByDid: string;
-};
-
-export type CreateRoomFields = UnifiedFieldSelection<RoomResourceSchema>[];
-
-export type InferCreateRoomResult<
-  Fields extends CreateRoomFields | undefined,
-> = InferResult<RoomResourceSchema, Fields>;
-
-export type CreateRoomResult<Fields extends CreateRoomFields | undefined = undefined> = | { success: true; data: InferCreateRoomResult<Fields>; }
-| { success: false; errors: AshRpcError[]; }
-
-;
-
-/**
- * Create a new Room
- *
- * @ashActionType :create
- */
-export async function createRoom<Fields extends CreateRoomFields | undefined = undefined>(
-  config: {
-  tenant?: string;
-  input: CreateRoomInput;
-  fields?: Fields;
-  headers?: Record<string, string>;
-  fetchOptions?: RequestInit;
-  customFetch?: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
-}
-): Promise<CreateRoomResult<Fields extends undefined ? [] : Fields>> {
-  const payload = {
-    action: "create_room",
-    ...(config.tenant !== undefined && { tenant: config.tenant }),
-    input: config.input,
-    ...(config.fields !== undefined && { fields: config.fields })
-  };
-
-  return executeActionRpcRequest<CreateRoomResult<Fields extends undefined ? [] : Fields>>(
-    payload,
-    config
-  );
-}
-
-/**
- * Validate: Create a new Room
- *
- * @ashActionType :create
- * @validation true
- */
-export async function validateCreateRoom(
-  config: {
-  tenant?: string;
-  input: CreateRoomInput;
-  headers?: Record<string, string>;
-  fetchOptions?: RequestInit;
-  customFetch?: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
-}
-): Promise<ValidationResult> {
-  const payload = {
-    action: "create_room",
-    ...(config.tenant !== undefined && { tenant: config.tenant }),
-    input: config.input
-  };
-
-  return executeValidationRpcRequest<ValidationResult>(
-    payload,
-    config
-  );
-}
-
-export type JoinRoomInput = {
-  did: string;
-};
-
-export type JoinRoomFields = UnifiedFieldSelection<RoomResourceSchema>[];
-
-export type InferJoinRoomResult<
-  Fields extends JoinRoomFields | undefined,
-> = InferResult<RoomResourceSchema, Fields>;
-
-export type JoinRoomResult<Fields extends JoinRoomFields | undefined = undefined> = | { success: true; data: InferJoinRoomResult<Fields>; }
-| { success: false; errors: AshRpcError[]; }
-
-;
-
-/**
- * Update an existing Room
- *
- * @ashActionType :update
- */
-export async function joinRoom<Fields extends JoinRoomFields | undefined = undefined>(
-  config: {
-  tenant?: string;
-  identity: UUID;
-  input: JoinRoomInput;
-  fields?: Fields;
-  headers?: Record<string, string>;
-  fetchOptions?: RequestInit;
-  customFetch?: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
-}
-): Promise<JoinRoomResult<Fields extends undefined ? [] : Fields>> {
-  const payload = {
-    action: "join_room",
-    ...(config.tenant !== undefined && { tenant: config.tenant }),
-    identity: config.identity,
-    input: config.input,
-    ...(config.fields !== undefined && { fields: config.fields })
-  };
-
-  return executeActionRpcRequest<JoinRoomResult<Fields extends undefined ? [] : Fields>>(
-    payload,
-    config
-  );
-}
-
-/**
- * Validate: Update an existing Room
- *
- * @ashActionType :update
- * @validation true
- */
-export async function validateJoinRoom(
-  config: {
-  tenant?: string;
-  identity: UUID | string;
-  input: JoinRoomInput;
-  headers?: Record<string, string>;
-  fetchOptions?: RequestInit;
-  customFetch?: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
-}
-): Promise<ValidationResult> {
-  const payload = {
-    action: "join_room",
-    ...(config.tenant !== undefined && { tenant: config.tenant }),
-    identity: config.identity,
-    input: config.input
-  };
-
-  return executeValidationRpcRequest<ValidationResult>(
-    payload,
-    config
-  );
-}
-
-export type ListRoomsFields = UnifiedFieldSelection<RoomResourceSchema>[];
-
-export type InferListRoomsResult<
-  Fields extends ListRoomsFields | undefined,
-  Page extends ListRoomsConfig["page"] = undefined
-> = ConditionalPaginatedResultMixed<Page, Array<InferResult<RoomResourceSchema, Fields>>, {
-  results: Array<InferResult<RoomResourceSchema, Fields>>;
-  hasMore: boolean;
-  limit: number;
-  offset: number;
-  count?: number | null;
-  type: "offset";
-}, {
-  results: Array<InferResult<RoomResourceSchema, Fields>>;
-  hasMore: boolean;
-  limit: number;
-  after: string | null;
-  before: string | null;
-  previousPage: string;
-  nextPage: string;
-  count?: number | null;
-  type: "keyset";
-}>;
-
-export type ListRoomsConfig = {
-  tenant?: string;
-  fields: ListRoomsFields;
-  filter?: RoomFilterInput;
-  sort?: SortString<RoomSortField> | SortString<RoomSortField>[];
-  page?: (
-    {
-      limit?: number;
-      offset?: number;
-      count?: boolean;
-    } | {
-      limit?: number;
-      after?: string;
-      before?: string;
-    }
-  );
-  headers?: Record<string, string>;
-  fetchOptions?: RequestInit;
-  customFetch?: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
-};
-
-export type ListRoomsResult<Fields extends ListRoomsFields, Page extends ListRoomsConfig["page"] = undefined> = | { success: true; data: InferListRoomsResult<Fields, Page>; }
-| { success: false; errors: AshRpcError[]; }
-
-;
-
-/**
- * Read Room records
- *
- * @ashActionType :read
- */
-export async function listRooms<Fields extends ListRoomsFields, Config extends ListRoomsConfig = ListRoomsConfig>(
-  config: Config & { fields: Fields }
-): Promise<ListRoomsResult<Fields, Config["page"]>> {
-  const payload = {
-    action: "list_rooms",
-    ...(config.tenant !== undefined && { tenant: config.tenant }),
-    ...(config.fields !== undefined && { fields: config.fields }),
-    ...(config.filter && { filter: config.filter }),
-    ...(config.sort && { sort: Array.isArray(config.sort) ? config.sort.join(",") : config.sort }),
-    ...(config.page && { page: config.page })
-  };
-
-  return executeActionRpcRequest<ListRoomsResult<Fields, Config["page"]>>(
-    payload,
-    config
-  );
-}
-
-/**
- * Validate: Read Room records
- *
- * @ashActionType :read
- * @validation true
- */
-export async function validateListRooms(
-  config: {
-  tenant?: string;
-  headers?: Record<string, string>;
-  fetchOptions?: RequestInit;
-  customFetch?: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
-}
-): Promise<ValidationResult> {
-  const payload = {
-    action: "list_rooms",
-    ...(config.tenant !== undefined && { tenant: config.tenant })
   };
 
   return executeValidationRpcRequest<ValidationResult>(

@@ -1,7 +1,7 @@
-defmodule Yawp.Accounts.UserTest do
+defmodule Yawp.Admin.AccountTest do
   use Yawp.DataCase, async: false
 
-  alias Yawp.Accounts.User
+  alias Yawp.Admin.Account, as: User
 
   @pubkey_hex "03a107bff3ce10be1d70dd18e74bc09967e4d6309ba50d5f1ddc8664125531b8"
   @expected_did "6ooAjytx2tERAi6rpXCqxMKCBr4z6Kw3UoRDbuuAUiGT"

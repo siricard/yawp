@@ -2,7 +2,6 @@
 
 export type Binary = string;
 export type UUID = string;
-export type UtcDateTimeUsec = string;
 
 export type UserResourceSchema = {
   __type: "Resource";
@@ -24,49 +23,6 @@ export type UserAttributesOnlySchema = {
   did: string | null;
   homeServer: string | null;
   recoveryMethods: Array<Record<string, any>>;
-};
-
-export type MessageResourceSchema = {
-  __type: "Resource";
-  __primitiveFields: "id" | "senderDid" | "content" | "ciphertextEnvelope" | "homeServer" | "insertedAt" | "roomId";
-  id: UUID;
-  senderDid: string;
-  content: string;
-  ciphertextEnvelope: Record<string, any> | null;
-  homeServer: string | null;
-  insertedAt: UtcDateTimeUsec;
-  roomId: UUID;
-  room: { __type: "Relationship"; __resource: RoomResourceSchema; };
-};
-
-export type MessageAttributesOnlySchema = {
-  __type: "Resource";
-  __primitiveFields: "id" | "senderDid" | "content" | "ciphertextEnvelope" | "homeServer" | "insertedAt" | "roomId";
-  id: UUID;
-  senderDid: string;
-  content: string;
-  ciphertextEnvelope: Record<string, any> | null;
-  homeServer: string | null;
-  insertedAt: UtcDateTimeUsec;
-  roomId: UUID;
-};
-
-export type RoomResourceSchema = {
-  __type: "Resource";
-  __primitiveFields: "id" | "name" | "members" | "createdByDid";
-  id: UUID;
-  name: string;
-  members: Array<string>;
-  createdByDid: string;
-};
-
-export type RoomAttributesOnlySchema = {
-  __type: "Resource";
-  __primitiveFields: "id" | "name" | "members" | "createdByDid";
-  id: UUID;
-  name: string;
-  members: Array<string>;
-  createdByDid: string;
 };
 
 export type UserFilterInput = {
@@ -115,110 +71,12 @@ export type UserFilterInput = {
   };
 
 };
-export type MessageFilterInput = {
-  and?: Array<MessageFilterInput>;
-  or?: Array<MessageFilterInput>;
-  not?: Array<MessageFilterInput>;
-
-  id?: {
-    eq?: UUID;
-    notEq?: UUID;
-    in?: Array<UUID>;
-  };
-
-  senderDid?: {
-    eq?: string;
-    notEq?: string;
-    in?: Array<string>;
-  };
-
-  content?: {
-    eq?: string;
-    notEq?: string;
-    in?: Array<string>;
-  };
-
-  ciphertextEnvelope?: {
-    eq?: Record<string, any>;
-    notEq?: Record<string, any>;
-    in?: Array<Record<string, any>>;
-    isNil?: boolean;
-  };
-
-  homeServer?: {
-    eq?: string;
-    notEq?: string;
-    in?: Array<string>;
-    isNil?: boolean;
-  };
-
-  insertedAt?: {
-    eq?: UtcDateTimeUsec;
-    notEq?: UtcDateTimeUsec;
-    greaterThan?: UtcDateTimeUsec;
-    greaterThanOrEqual?: UtcDateTimeUsec;
-    lessThan?: UtcDateTimeUsec;
-    lessThanOrEqual?: UtcDateTimeUsec;
-    in?: Array<UtcDateTimeUsec>;
-  };
-
-  roomId?: {
-    eq?: UUID;
-    notEq?: UUID;
-    in?: Array<UUID>;
-  };
-
-  room?: RoomFilterInput;
-
-};
-export type RoomFilterInput = {
-  and?: Array<RoomFilterInput>;
-  or?: Array<RoomFilterInput>;
-  not?: Array<RoomFilterInput>;
-
-  id?: {
-    eq?: UUID;
-    notEq?: UUID;
-    in?: Array<UUID>;
-  };
-
-  name?: {
-    eq?: string;
-    notEq?: string;
-    in?: Array<string>;
-  };
-
-  members?: {
-    eq?: Array<string>;
-    notEq?: Array<string>;
-    in?: Array<Array<string>>;
-  };
-
-  createdByDid?: {
-    eq?: string;
-    notEq?: string;
-    in?: Array<string>;
-  };
-
-};
 
 export const userFilterFields = ["id", "email", "publicKey", "did", "homeServer", "recoveryMethods"] as const;
 export type UserFilterField = (typeof userFilterFields)[number];
 
-export const messageFilterFields = ["id", "senderDid", "content", "ciphertextEnvelope", "homeServer", "insertedAt", "roomId", "room"] as const;
-export type MessageFilterField = (typeof messageFilterFields)[number];
-
-export const roomFilterFields = ["id", "name", "members", "createdByDid"] as const;
-export type RoomFilterField = (typeof roomFilterFields)[number];
-
 export const userSortFields = ["id", "email", "publicKey", "did", "homeServer", "recoveryMethods"] as const;
 export type UserSortField = (typeof userSortFields)[number];
-
-export const messageSortFields = ["id", "senderDid", "content", "ciphertextEnvelope", "homeServer", "insertedAt", "roomId"] as const;
-export type MessageSortField = (typeof messageSortFields)[number];
-
-export const roomSortFields = ["id", "name", "members", "createdByDid"] as const;
-export type RoomSortField = (typeof roomSortFields)[number];
 
 export type SortString<T extends string> = T | `+${T}` | `-${T}` | `++${T}` | `--${T}`;
 

@@ -19,7 +19,7 @@ defmodule YawpWeb.UserSocketTest do
 
   use YawpWeb.ChannelCase, async: false
 
-  alias Yawp.Accounts.User
+  alias Yawp.Admin.Account, as: User
   alias YawpWeb.AuthChannel
   alias YawpWeb.TestChannel
   alias YawpWeb.UserSocket
