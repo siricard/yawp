@@ -92,10 +92,10 @@ defmodule YawpWeb.Router do
   if Application.compile_env(:yawp, :dev_routes) do
     import AshAdmin.Router
 
-    scope "/admin" do
+    scope "/dev" do
       pipe_through :browser
 
-      ash_admin "/"
+      ash_admin "/ash-admin"
     end
   end
 end

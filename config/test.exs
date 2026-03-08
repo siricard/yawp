@@ -1,6 +1,7 @@
 import Config
 config :yawp, Oban, testing: :manual
-config :yawp, token_signing_secret: "4bgPM4LgjgCv2c4r5szVIhdCaG5ArVxi"
+config :yawp, token_signing_secret: "********************************"
+config :yawp, dev_routes: true
 config :bcrypt_elixir, log_rounds: 1
 config :ash, policies: [show_policy_breakdowns?: true], disable_async?: true
 
