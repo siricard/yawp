@@ -1,0 +1,176 @@
+{
+  "_comment": "RFC 8785 (JSON Canonicalization Scheme) test vectors. Each entry: `input` is parsed via JSON.parse / Jason.decode, then re-encoded with the canonical encoder; the result MUST equal `output` byte-for-byte. Shared across Yawp Elixir + TypeScript clients (F7.0.5).",
+  "spec": "RFC 8785",
+  "vectors": [
+    {
+      "name": "null",
+      "input": null,
+      "output": "null"
+    },
+    {
+      "name": "true",
+      "input": true,
+      "output": "true"
+    },
+    {
+      "name": "false",
+      "input": false,
+      "output": "false"
+    },
+    {
+      "name": "empty string",
+      "input": "",
+      "output": "\"\""
+    },
+    {
+      "name": "empty object",
+      "input": {},
+      "output": "{}"
+    },
+    {
+      "name": "empty array",
+      "input": [],
+      "output": "[]"
+    },
+    {
+      "name": "integer zero",
+      "input": 0,
+      "output": "0"
+    },
+    {
+      "name": "negative zero float (parses as -0 in JS / -0.0 in Erlang, must serialize as 0)",
+      "input": -0.0,
+      "output": "0"
+    },
+    {
+      "name": "small integer",
+      "input": 42,
+      "output": "42"
+    },
+    {
+      "name": "negative integer",
+      "input": -17,
+      "output": "-17"
+    },
+    {
+      "name": "large safe integer (2^53 - 1)",
+      "input": 9007199254740991,
+      "output": "9007199254740991"
+    },
+    {
+      "name": "simple float",
+      "input": 1.5,
+      "output": "1.5"
+    },
+    {
+      "name": "float with integer value (1.0 → '1')",
+      "input": 1.0,
+      "output": "1"
+    },
+    {
+      "name": "small positive float in fixed-decimal range (1e-6)",
+      "input": 0.000001,
+      "output": "0.000001"
+    },
+    {
+      "name": "small positive float in exponential range (1e-7)",
+      "input": 1e-7,
+      "output": "1e-7"
+    },
+    {
+      "name": "negative scientific exponent with fraction",
+      "input": 1.5e-10,
+      "output": "1.5e-10"
+    },
+    {
+      "name": "boundary 1e21 → exponential",
+      "input": 1e21,
+      "output": "1e+21"
+    },
+    {
+      "name": "below 1e21 stays decimal",
+      "input": 1e20,
+      "output": "100000000000000000000"
+    },
+    {
+      "name": "ascii string",
+      "input": "hello",
+      "output": "\"hello\""
+    },
+    {
+      "name": "string with quote and backslash",
+      "input": "a\"b\\c",
+      "output": "\"a\\\"b\\\\c\""
+    },
+    {
+      "name": "string with named control escapes",
+      "input": "\b\t\n\f\r",
+      "output": "\"\\b\\t\\n\\f\\r\""
+    },
+    {
+      "name": "string with low control char (0x01) → \\u0001",
+      "input": "\u0001",
+      "output": "\"\\u0001\""
+    },
+    {
+      "name": "string with control char 0x1f",
+      "input": "\u001f",
+      "output": "\"\\u001f\""
+    },
+    {
+      "name": "unicode BMP char above ASCII (é)",
+      "input": "é",
+      "output": "\"é\""
+    },
+    {
+      "name": "string with surrogate pair (😀, U+1F600)",
+      "input": "😀",
+      "output": "\"😀\""
+    },
+    {
+      "name": "forward slash is NOT escaped",
+      "input": "a/b",
+      "output": "\"a/b\""
+    },
+    {
+      "name": "array of mixed scalars",
+      "input": [1, "two", true, null, 3.5],
+      "output": "[1,\"two\",true,null,3.5]"
+    },
+    {
+      "name": "object with sorted keys",
+      "input": {"b": 1, "a": 2, "c": 3},
+      "output": "{\"a\":2,\"b\":1,\"c\":3}"
+    },
+    {
+      "name": "object with numeric-looking keys sorted lexicographically",
+      "input": {"10": "x", "2": "y", "1": "z"},
+      "output": "{\"1\":\"z\",\"10\":\"x\",\"2\":\"y\"}"
+    },
+    {
+      "name": "nested object",
+      "input": {"outer": {"z": 1, "a": {"y": 2, "b": 3}}},
+      "output": "{\"outer\":{\"a\":{\"b\":3,\"y\":2},\"z\":1}}"
+    },
+    {
+      "name": "object keys with unicode (UTF-16 code-unit order)",
+      "input": {"é": 1, "a": 2},
+      "output": "{\"a\":2,\"é\":1}"
+    },
+    {
+      "name": "RFC 8785 sample (numbers + literals + sorted keys)",
+      "input": {"numbers": [333333333.33333329, 1E30, 4.50, 2e-3, 0.000000000000000000000000001], "literals": [null, true, false]},
+      "output": "{\"literals\":[null,true,false],\"numbers\":[333333333.3333333,1e+30,4.5,0.002,1e-27]}"
+    },
+    {
+      "name": "0x7f DEL is NOT escaped (only 0x00–0x1f are)",
+      "input": "a\u007fb",
+      "output": "\"a\u007fb\""
+    },
+    {
+      "name": "negative float small",
+      "input": -2.5,
+      "output": "-2.5"
+    }
+  ]
+}
