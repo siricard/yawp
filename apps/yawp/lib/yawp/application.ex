@@ -16,13 +16,34 @@ defmodule Yawp.Application do
        )},
       {Phoenix.PubSub, name: Yawp.PubSub},
       Yawp.Auth.NonceStore,
+      Yawp.Vault,
       Yawp.Call.SessionSupervisor,
                         YawpWeb.Endpoint,
       {AshAuthentication.Supervisor, [otp_app: :yawp]}
     ]
 
             opts = [strategy: :one_for_one, name: Yawp.Supervisor]
-    Supervisor.start_link(children, opts)
+
+    case Supervisor.start_link(children, opts) do
+      {:ok, _pid} = ok ->
+        ensure_active_server_key()
+        ok
+
+      other ->
+        other
+    end
+  end
+
+        defp ensure_active_server_key do
+    if Application.get_env(:yawp, :ensure_server_key_on_boot, true) do
+      try do
+        Yawp.Federation.ensure_active_server_key!()
+      rescue
+        error ->
+          require Logger
+          Logger.warning("Failed to ensure active federation server key: #{inspect(error)}")
+      end
+    end
   end
 
       @impl true

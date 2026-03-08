@@ -39,6 +39,16 @@ defmodule YawpWeb.Router do
     get "/version", VersionController, :show
   end
 
+  pipeline :well_known do
+    plug :accepts, ["json"]
+  end
+
+  scope "/.well-known/yawp", YawpWeb do
+    pipe_through :well_known
+
+    get "/server-key.json", ServerKeyController, :show
+  end
+
   scope "/", YawpWeb do
     pipe_through :browser
 
