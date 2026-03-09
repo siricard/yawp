@@ -2,6 +2,7 @@ const path = require('path');
 
 module.exports = {
   preset: 'react-native',
+  setupFiles: [path.join(__dirname, 'jest.setup.js')],
   roots: ['<rootDir>', '<rootDir>/../app'],
   moduleDirectories: [
     'node_modules',
