@@ -7,7 +7,11 @@ import ReactTestRenderer from 'react-test-renderer';
 import App from '../App';
 
 test('renders correctly', async () => {
-  await ReactTestRenderer.act(() => {
+  await ReactTestRenderer.act(async () => {
     ReactTestRenderer.create(<App />);
+    await Promise.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
   });
 });
