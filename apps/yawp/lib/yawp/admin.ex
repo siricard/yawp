@@ -5,10 +5,9 @@ defmodule Yawp.Admin do
   settings. See `docs/` for the
   operator-vs-chat-owner split.
 
-   only hosts the renamed `Yawp.Admin.Account` (formerly
-  `Yawp.Accounts.User`) and `Yawp.Admin.Token` (formerly
-  `Yawp.Accounts.Token`). Claim tokens and the audit log resource land in
-  .
+   only hosts the renamed `Yawp.Admin.Account` and `Yawp.Admin.Token`
+  (renamed from the legacy Accounts namespace). Claim tokens and the audit
+  log resource land .
   """
 
   use Ash.Domain, otp_app: :yawp, extensions: [AshAdmin.Domain, AshTypescript.Rpc]
@@ -18,9 +17,7 @@ defmodule Yawp.Admin do
   end
 
   typescript_rpc do
-    resource Yawp.Admin.Account do
-      rpc_action :register_with_pubkey, :register_with_pubkey
-    end
+    resource Yawp.Admin.Account
   end
 
   resources do

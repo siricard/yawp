@@ -23,7 +23,6 @@ defmodule Yawp.Identity.Identity do
   end
 
   actions do
-    defaults [:read]
   end
 
   attributes do

@@ -15,9 +15,7 @@ defmodule Yawp.Application do
          Application.fetch_env!(:yawp, Oban)
        )},
       {Phoenix.PubSub, name: Yawp.PubSub},
-      Yawp.Auth.NonceStore,
       Yawp.Vault,
-      Yawp.Call.SessionSupervisor,
                         YawpWeb.Endpoint,
       {AshAuthentication.Supervisor, [otp_app: :yawp]}
     ]

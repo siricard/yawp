@@ -1,28 +1,19 @@
 
 
-export type Binary = string;
 export type UUID = string;
 
 export type UserResourceSchema = {
   __type: "Resource";
-  __primitiveFields: "id" | "email" | "publicKey" | "did" | "homeServer" | "recoveryMethods";
+  __primitiveFields: "id" | "email";
   id: UUID;
   email: string | null;
-  publicKey: Binary | null;
-  did: string | null;
-  homeServer: string | null;
-  recoveryMethods: Array<Record<string, any>>;
 };
 
 export type UserAttributesOnlySchema = {
   __type: "Resource";
-  __primitiveFields: "id" | "email" | "publicKey" | "did" | "homeServer" | "recoveryMethods";
+  __primitiveFields: "id" | "email";
   id: UUID;
   email: string | null;
-  publicKey: Binary | null;
-  did: string | null;
-  homeServer: string | null;
-  recoveryMethods: Array<Record<string, any>>;
 };
 
 export type UserFilterInput = {
@@ -43,39 +34,12 @@ export type UserFilterInput = {
     isNil?: boolean;
   };
 
-  publicKey?: {
-    eq?: Binary;
-    notEq?: Binary;
-    in?: Array<Binary>;
-    isNil?: boolean;
-  };
-
-  did?: {
-    eq?: string;
-    notEq?: string;
-    in?: Array<string>;
-    isNil?: boolean;
-  };
-
-  homeServer?: {
-    eq?: string;
-    notEq?: string;
-    in?: Array<string>;
-    isNil?: boolean;
-  };
-
-  recoveryMethods?: {
-    eq?: Array<Record<string, any>>;
-    notEq?: Array<Record<string, any>>;
-    in?: Array<Array<Record<string, any>>>;
-  };
-
 };
 
-export const userFilterFields = ["id", "email", "publicKey", "did", "homeServer", "recoveryMethods"] as const;
+export const userFilterFields = ["id", "email"] as const;
 export type UserFilterField = (typeof userFilterFields)[number];
 
-export const userSortFields = ["id", "email", "publicKey", "did", "homeServer", "recoveryMethods"] as const;
+export const userSortFields = ["id", "email"] as const;
 export type UserSortField = (typeof userSortFields)[number];
 
 export type SortString<T extends string> = T | `+${T}` | `-${T}` | `++${T}` | `--${T}`;
