@@ -80,6 +80,7 @@ cookies (`SECRET_KEY_BASE`), the other signs AshAuthentication tokens
 ```bash
 openssl rand -base64 64 | tr -d '\n'   # paste into SECRET_KEY_BASE
 openssl rand -base64 64 | tr -d '\n'   # paste into TOKEN_SIGNING_SECRET
+openssl rand -base64 32 | tr -d '\n'   # paste into CLOAK_KEY
 ```
 
 Run the command twice — never reuse the same value for both. Store the
@@ -100,6 +101,7 @@ The required variables are:
 * `PHX_HOST` — the public hostname clients will reach (no scheme, no port).
 * `SECRET_KEY_BASE` — from step 1.
 * `TOKEN_SIGNING_SECRET` — from step 1.
+* `CLOAK_KEY` — base64-encoded 32-byte key that encrypts at-rest secrets (federation server private key, etc.) via ash_cloak. Required in production — the server fails to boot without it. Generate with `mix yawp.gen.cloak_key` (or `openssl rand -base64 32`). See [docs/self-hosting.md](docs/self-hosting.md) for full guidance.
 * `POSTGRES_PASSWORD` — pick a strong password for the bundled Postgres.
 * `DATABASE_URL` — Ecto connection string. The hostname `postgres` refers to
   the sibling compose service. The literal format is shown inside the fenced
