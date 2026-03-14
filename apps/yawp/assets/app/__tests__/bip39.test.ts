@@ -24,6 +24,15 @@ interface YawpVector extends OfficialVector {
   bundle_derived_hex: string;
 }
 
+interface JapaneseVector {
+  description: string;
+  language: string;
+  entropy_hex: string;
+  mnemonic: string;
+  passphrase: string;
+  seed_hex: string;
+}
+
 function hexToBytes(hex: string): Uint8Array {
   const out = new Uint8Array(hex.length / 2);
   for (let i = 0; i < out.length; i++) {
@@ -75,6 +84,16 @@ describe('Yawp-specific HKDF derivation vectors', () => {
         32,
       );
       expect(bytesToHex(bundle)).toBe(v.bundle_derived_hex);
+    });
+  }
+});
+
+describe('BIP-39 Japanese vectors (NFKD code-path)', () => {
+  for (const v of fixture.japanese_vectors as JapaneseVector[]) {
+    test(v.description, () => {
+      const words = v.mnemonic.split('\u3000');
+      const seed = mnemonicToSeed(words, v.passphrase);
+      expect(bytesToHex(seed)).toBe(v.seed_hex);
     });
   }
 });

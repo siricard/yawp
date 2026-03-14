@@ -245,6 +245,33 @@
       "bundle_derived_hex": "2e18cff8fbbc38472e49e64c6333b57b5b3ff090b2e9f3ec961ec207f14acac1"
     }
   ],
+  "japanese_vectors_comment": "Official BIP-39 Japanese vectors from https://github.com/bip32JP/bip32JP.github.io/blob/master/test_JP_BIP39.json. Mnemonics use U+3000 (ideographic space) between words and the passphrase contains CJK-Compatibility characters (e.g. ㍍ U+339D → NFKD → メートル). They exercise the NFKD code path in mnemonic_to_seed; we do NOT call validate_mnemonic on them because Yawp ships only the English wordlist.",
+  "japanese_vectors": [
+    {
+      "description": "BIP-39 JP vector 0 — exercises NFKD (U+3000 separators + CJK-compat passphrase)",
+      "language": "japanese",
+      "entropy_hex": "00000000000000000000000000000000",
+      "mnemonic": "あいこくしん　あいこくしん　あいこくしん　あいこくしん　あいこくしん　あいこくしん　あいこくしん　あいこくしん　あいこくしん　あいこくしん　あいこくしん　あおぞら",
+      "passphrase": "㍍ガバヴァぱばぐゞちぢ十人十色",
+      "seed_hex": "a262d6fb6122ecf45be09c50492b31f92e9beb7d9a845987a02cefda57a15f9c467a17872029a9e92299b5cbdf306e3a0ee620245cbd508959b6cb7ca637bd55"
+    },
+    {
+      "description": "BIP-39 JP vector 1 — exercises NFKD",
+      "language": "japanese",
+      "entropy_hex": "7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f",
+      "mnemonic": "そつう　れきだい　ほんやく　わかす　りくつ　ばいか　ろせん　やちん　そつう　れきだい　ほんやく　わかめ",
+      "passphrase": "㍍ガバヴァぱばぐゞちぢ十人十色",
+      "seed_hex": "aee025cbe6ca256862f889e48110a6a382365142f7d16f2b9545285b3af64e542143a577e9c144e101a6bdca18f8d97ec3366ebf5b088b1c1af9bc31346e60d9"
+    },
+    {
+      "description": "BIP-39 JP vector 12 — exercises NFKD",
+      "language": "japanese",
+      "entropy_hex": "77c2b00716cec7213839159e404db50d",
+      "mnemonic": "せまい　うちがわ　あずき　かろう　めずらしい　だんち　ますく　おさめる　ていぼう　あたる　すあな　えしゃく",
+      "passphrase": "㍍ガバヴァぱばぐゞちぢ十人十色",
+      "seed_hex": "344cef9efc37d0cb36d89def03d09144dd51167923487eec42c487f7428908546fa31a3c26b7391a2b3afe7db81b9f8c5007336b58e269ea0bd10749a87e0193"
+    }
+  ],
   "hkdf_paths": {
     "master_seed": {
       "salt": "yawp-master-v1",

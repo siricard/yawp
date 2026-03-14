@@ -12,6 +12,7 @@ defmodule Yawp.Bip39Test do
   @fixture @fixture_path |> File.read!() |> Jason.decode!()
   @official_vectors @fixture["official_vectors"]
   @yawp_vectors @fixture["yawp_vectors"]
+  @japanese_vectors @fixture["japanese_vectors"]
 
   describe "official BIP-39 English vectors" do
     for {v, idx} <- Enum.with_index(@official_vectors) do
@@ -47,6 +48,18 @@ defmodule Yawp.Bip39Test do
 
         bundle = Hkdf.derive(seed, "yawp-bundle-v1", "chacha20-poly1305", 32)
         assert Base.encode16(bundle, case: :lower) == @v["bundle_derived_hex"]
+      end
+    end
+  end
+
+            describe "BIP-39 Japanese vectors (NFKD code-path)" do
+    for {v, idx} <- Enum.with_index(@japanese_vectors) do
+      @v v
+      @idx idx
+      test "##{@idx} #{@v["description"]}" do
+        words = String.split(@v["mnemonic"], "\u3000")
+        seed = Bip39.mnemonic_to_seed(words, @v["passphrase"])
+        assert Base.encode16(seed, case: :lower) == @v["seed_hex"]
       end
     end
   end

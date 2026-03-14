@@ -52,16 +52,14 @@ defmodule Yawp.Bip39 do
   Derive the 64-byte BIP-39 seed from a mnemonic + optional passphrase via
   PBKDF2-HMAC-SHA512, 2048 iterations, salt = "mnemonic" + passphrase.
 
-  We rely on the caller passing UTF-8 strings; the BIP-39 spec mandates
-  NFKD normalisation but for the English wordlist all words are ASCII and
-  the `mnemonic` salt prefix is ASCII, so NFKD is a no-op on every input
-  Yawp ever produces. If a caller passes a non-ASCII passphrase, they are
-  responsible for normalising it; see `bip39.ts` for the JS-side note.
+  Per the BIP-39 spec, both the mnemonic and the `"mnemonic" + passphrase`
+  salt are NFKD-normalised before being fed to PBKDF2. The TypeScript side
+  performs the same normalisation in `bip39.ts`.
   """
   @spec mnemonic_to_seed([String.t()], String.t()) :: binary()
   def mnemonic_to_seed(words, passphrase \\ "") when is_list(words) and is_binary(passphrase) do
-    mnemonic = Enum.join(words, " ")
-    salt = "mnemonic" <> passphrase
+    mnemonic = words |> Enum.join(" ") |> :unicode.characters_to_nfkd_binary()
+    salt = :unicode.characters_to_nfkd_binary("mnemonic" <> passphrase)
 
     :crypto.pbkdf2_hmac(:sha512, mnemonic, salt, 2048, 64)
   end
