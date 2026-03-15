@@ -1,11 +1,11 @@
-defmodule Yawp.Bip39Test do
+defmodule Yawp.TestSupport.Bip39Test do
           use ExUnit.Case, async: true
 
-  alias Yawp.Bip39
-  alias Yawp.Hkdf
+  alias Yawp.TestSupport.Bip39
+  alias Yawp.TestSupport.Hkdf
 
   @fixture_path Path.expand(
-                  "../../priv/test_vectors/bip39.json",
+                  "../../../priv/test_vectors/bip39.json",
                   __DIR__
                 )
 

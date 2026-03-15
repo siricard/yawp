@@ -1,9 +1,12 @@
-defmodule Yawp.Bip39 do
+
+defmodule Yawp.TestSupport.Bip39 do
   @moduledoc """
   BIP-39 — English wordlist only. Byte-for-byte equivalent to the
   TypeScript implementation at `apps/yawp/assets/app/identity/bip39.ts`;
   both sides are tested against the shared fixture at
   `apps/yawp/priv/test_vectors/bip39.json`.
+
+  Test-only oracle — the production server never derives BIP-39 seeds.
 
   Yawp only mints 12-word (128-bit-entropy) mnemonics. `validate_mnemonic/1`
   accepts the full BIP-39 word-count set (12/15/18/21/24).
@@ -112,5 +115,41 @@ defmodule Yawp.Bip39 do
       :crypto.hash(:sha256, entropy_bytes)
 
     if expected == checksum, do: :ok, else: {:error, :bad_checksum}
+  end
+end
+
+defmodule Yawp.TestSupport.Hkdf do
+  @moduledoc """
+  RFC 5869 — HKDF with SHA-256. Byte-for-byte equivalent to the TypeScript
+  implementation at `apps/yawp/assets/app/identity/hkdf.ts`.
+
+  Test-only oracle — the production server never performs HKDF derivations.
+  """
+
+  @hash :sha256
+  @hash_len 32
+
+  @spec derive(binary(), binary(), binary(), pos_integer()) :: binary()
+  def derive(ikm, salt, info, length)
+      when is_binary(ikm) and is_binary(salt) and is_binary(info) and
+             is_integer(length) and length > 0 do
+    if length > 255 * @hash_len do
+      raise ArgumentError, "HKDF: cannot derive more than 255 * HashLen bytes"
+    end
+
+    prk = :crypto.mac(:hmac, @hash, salt, ikm)
+    expand(prk, info, length)
+  end
+
+  defp expand(prk, info, length) do
+    n = div(length + @hash_len - 1, @hash_len)
+
+    {acc, _last} =
+      Enum.reduce(1..n, {<<>>, <<>>}, fn i, {acc, prev} ->
+        t = :crypto.mac(:hmac, @hash, prk, prev <> info <> <<i::8>>)
+        {acc <> t, t}
+      end)
+
+    binary_part(acc, 0, length)
   end
 end
