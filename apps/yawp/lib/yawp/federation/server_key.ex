@@ -10,8 +10,18 @@ defmodule Yawp.Federation.ServerKey do
 
   Keys carry an explicit validity window (`not_before` /
   `not_after`) so operators can roll a fresh key without a flag day
-  and `revoked_at` for compromise. `active/0` returns the currently
-  in-window, non-revoked key with the latest `not_before`.
+  and `revoked_at` for compromise.
+
+  All operations are exposed as Ash actions and reached through the
+  domain `code_interface`: `Yawp.Federation.generate_server_key/1`,
+  `Yawp.Federation.get_active_server_key/0`,
+  `Yawp.Federation.list_published_server_keys/0`,
+  `Yawp.Federation.revoke_server_key/1`.
+
+  TODO: once an admin actor concept is wired in, layer a
+  policies block authorizing `:generate` for any actor (boot has no
+  actor) and restricting `:revoke` to operator/system actors. Holding
+  off here to keep this refactor scoped.
   """
 
   use Ash.Resource,
@@ -19,8 +29,6 @@ defmodule Yawp.Federation.ServerKey do
     domain: Yawp.Federation,
     data_layer: AshPostgres.DataLayer,
     extensions: [AshCloak]
-
-  require Ash.Query
 
   postgres do
     table "federation_server_keys"
@@ -36,7 +44,19 @@ defmodule Yawp.Federation.ServerKey do
   actions do
     defaults [:read]
 
+    create :generate do
+      description "Generates a fresh Ed25519 server keypair within an optional validity window. Used at boot to bootstrap an anchor's first key and later for rotation."
+      accept []
+
+      argument :key_id, :string, allow_nil?: true
+      argument :not_before, :utc_datetime_usec, allow_nil?: true
+      argument :not_after, :utc_datetime_usec, allow_nil?: true
+
+      change Yawp.Federation.ServerKey.Changes.GenerateKeypair
+    end
+
     create :create do
+      description "Persists a server key with explicit public/private bytes — used only by tests and fixtures. Production paths use :generate."
       primary? true
       accept [:key_id, :public_key, :private_key, :not_before, :not_after]
     end
@@ -46,15 +66,24 @@ defmodule Yawp.Federation.ServerKey do
       change set_attribute(:revoked_at, &DateTime.utc_now/0)
     end
 
+    read :get_active do
+      description "Returns the active (in-window, non-revoked) key with the latest not_before, or nil."
+      get? true
+      filter expr(is_nil(revoked_at) and not_before <= now() and not_after >= now())
+      prepare build(sort: [not_before: :desc], limit: 1, load: [:private_key])
+    end
+
+                
     read :list_active do
+      description "All in-window, non-revoked keys, newest first."
       filter expr(is_nil(revoked_at) and not_before <= now() and not_after >= now())
       prepare build(sort: [not_before: :desc])
     end
 
-    read :get_active do
-      get? true
-      filter expr(is_nil(revoked_at) and not_before <= now() and not_after >= now())
-      prepare build(sort: [not_before: :desc], limit: 1)
+    read :list_published do
+      description "All non-revoked keys (regardless of window) — what the well-known endpoint publishes."
+      filter expr(is_nil(revoked_at))
+      prepare build(sort: [not_before: :desc])
     end
   end
 
@@ -100,91 +129,6 @@ defmodule Yawp.Federation.ServerKey do
 
   identities do
     identity :unique_key_id, [:key_id]
-  end
-
-          
-  @default_window_days 365
-
-  @doc """
-  Generates a fresh Ed25519 keypair, persists it (private key
-  encrypted via Yawp.Vault), and returns the loaded record with the
-  decrypted `private_key` calculation populated.
-
-  Accepts `:not_before` and `:not_after` overrides for tests; default
-  window is `now()` → `now() + 1 year`.
-  """
-  @spec generate(keyword()) :: {:ok, t()} | {:error, term()}
-  def generate(opts \\ []) do
-    {:ok, {public_key, private_key}} = generate_ed25519_keypair()
-    now = DateTime.utc_now()
-    not_before = Keyword.get(opts, :not_before, now)
-
-    not_after =
-      Keyword.get(opts, :not_after, DateTime.add(now, @default_window_days * 86_400, :second))
-
-    key_id = Keyword.get_lazy(opts, :key_id, fn -> derive_key_id(public_key) end)
-
-    __MODULE__
-    |> Ash.Changeset.for_create(:create, %{
-      key_id: key_id,
-      public_key: public_key,
-      private_key: private_key,
-      not_before: not_before,
-      not_after: not_after
-    })
-    |> Ash.create(load: [:private_key])
-  end
-
-  @doc """
-  Returns the active (in-window, non-revoked) server key with the
-  decrypted `private_key` loaded, or `{:error, :no_active_key}` if
-  none exists.
-  """
-  @spec active() :: {:ok, t()} | {:error, :no_active_key}
-  def active do
-    case __MODULE__ |> Ash.Query.for_read(:get_active) |> Ash.read_one(load: [:private_key]) do
-      {:ok, nil} -> {:error, :no_active_key}
-      {:ok, record} -> {:ok, record}
-      {:error, _} = err -> err
-    end
-  end
-
-  @doc """
-  Returns all non-revoked keys (regardless of window — for the
-  well-known endpoint).
-  """
-  @spec list_published() :: [t()]
-  def list_published do
-    __MODULE__
-    |> Ash.Query.filter(is_nil(revoked_at))
-    |> Ash.Query.sort(not_before: :desc)
-    |> Ash.read!()
-  end
-
-  @doc """
-  Marks the given key revoked.
-  """
-  @spec revoke(t()) :: {:ok, t()} | {:error, term()}
-  def revoke(key) do
-    key
-    |> Ash.Changeset.for_update(:revoke, %{})
-    |> Ash.update()
-  end
-
-  @doc false
-  @spec generate_ed25519_keypair() :: {:ok, {binary(), binary()}}
-  def generate_ed25519_keypair do
-    {public_key, private_key} = :crypto.generate_key(:eddsa, :ed25519)
-    {:ok, {public_key, private_key}}
-  end
-
-  defp derive_key_id(public_key) do
-    short_hash =
-      :crypto.hash(:sha256, public_key)
-      |> binary_part(0, 6)
-      |> Base.encode16(case: :lower)
-
-    "k-#{Date.to_iso8601(Date.utc_today())}-#{short_hash}"
   end
 
   @type t :: %__MODULE__{}

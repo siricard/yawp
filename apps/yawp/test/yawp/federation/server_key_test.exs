@@ -11,15 +11,19 @@ defmodule Yawp.Federation.ServerKeyTest do
   generating against the dev DB, then truncating the table to
   simulate a fresh Anchor B logical database, and confirming the
   re-bootstrapped key is different.
+
+  Post-: all operations reach the resource through the
+  domain `code_interface` (`Yawp.Federation.generate_server_key/1`,
+  `get_active_server_key/0`, `revoke_server_key/1`) instead of the
+  retired plain-Elixir helpers.
   """
   use Yawp.DataCase, async: false
 
   alias Yawp.Federation
-  alias Yawp.Federation.ServerKey
 
   describe "ServerKey resource" do
-    test "create persists key_id, public_key, validity window and encrypts private_key" do
-      {:ok, key} = ServerKey.generate()
+    test "generate persists key_id, public_key, validity window and encrypts private_key" do
+      {:ok, key} = Federation.generate_server_key()
 
       assert is_binary(key.key_id)
       assert byte_size(key.public_key) == 32
@@ -39,39 +43,39 @@ defmodule Yawp.Federation.ServerKeyTest do
       refute String.contains?(ciphertext, key.public_key)
     end
 
-    test "active/0 returns the currently-valid, non-revoked key" do
-      {:ok, key} = ServerKey.generate()
-      {:ok, active} = ServerKey.active()
+    test "get_active_server_key/0 returns the currently-valid, non-revoked key" do
+      {:ok, key} = Federation.generate_server_key()
+      {:ok, active} = Federation.get_active_server_key()
 
       assert active.id == key.id
             assert byte_size(active.private_key) == 32
     end
 
-    test "active/0 returns {:error, :no_active_key} when nothing is generated" do
-      assert {:error, :no_active_key} = ServerKey.active()
+    test "get_active_server_key/0 returns {:ok, nil} when nothing is generated" do
+      assert {:ok, nil} = Federation.get_active_server_key()
     end
 
-    test "active/0 ignores revoked and out-of-window keys" do
+    test "get_active_server_key/0 ignores revoked and out-of-window keys" do
       {:ok, expired} =
-        ServerKey.generate(
+        Federation.generate_server_key(%{
           not_before: DateTime.add(DateTime.utc_now(), -10 * 86_400, :second),
           not_after: DateTime.add(DateTime.utc_now(), -86_400, :second)
-        )
+        })
 
-      {:ok, _revoked} = ServerKey.generate()
-      {:ok, revoked} = ServerKey.revoke(expired)
+      {:ok, _other} = Federation.generate_server_key()
+      {:ok, revoked} = Federation.revoke_server_key(expired)
       assert revoked.revoked_at != nil
 
-            {:ok, valid} = ServerKey.generate()
+            {:ok, valid} = Federation.generate_server_key()
 
-      {:ok, active} = ServerKey.active()
+      {:ok, active} = Federation.get_active_server_key()
       assert active.id == valid.id
     end
   end
 
-  describe "ensure_active!/0" do
+  describe "ensure_active_server_key!/0" do
     test "is a no-op when an active key exists" do
-      {:ok, key} = ServerKey.generate()
+      {:ok, key} = Federation.generate_server_key()
       :ok = Federation.ensure_active_server_key!()
 
       keys = Yawp.Repo.all(Yawp.Federation.ServerKey)
@@ -81,11 +85,11 @@ defmodule Yawp.Federation.ServerKeyTest do
 
     test "generates a fresh key when none exists; second logical DB yields a different key" do
       :ok = Federation.ensure_active_server_key!()
-      {:ok, key_a} = ServerKey.active()
+      {:ok, key_a} = Federation.get_active_server_key()
 
                   Yawp.Repo.query!("truncate table federation_server_keys")
       :ok = Federation.ensure_active_server_key!()
-      {:ok, key_b} = ServerKey.active()
+      {:ok, key_b} = Federation.get_active_server_key()
 
       refute key_a.key_id == key_b.key_id
       refute key_a.public_key == key_b.public_key
@@ -95,7 +99,7 @@ defmodule Yawp.Federation.ServerKeyTest do
 
   describe "Federation.sign/2" do
     test "signs an RFC-8785-canonicalised payload with the active key and verifies" do
-      {:ok, _} = ServerKey.generate()
+      {:ok, _} = Federation.generate_server_key()
 
       payload = %{"b" => 2, "a" => [1, 2, 3]}
       {:ok, sig, key_id} = Federation.sign(payload)
@@ -104,7 +108,7 @@ defmodule Yawp.Federation.ServerKeyTest do
       assert byte_size(sig) == 64
       assert is_binary(key_id)
 
-            {:ok, active} = ServerKey.active()
+            {:ok, active} = Federation.get_active_server_key()
       assert active.key_id == key_id
 
       canonical = Yawp.CanonicalJson.encode(payload)

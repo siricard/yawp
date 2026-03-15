@@ -4,10 +4,10 @@ defmodule YawpWeb.ServerKeyControllerTest do
   """
   use YawpWeb.ConnCase, async: false
 
-  alias Yawp.Federation.ServerKey
+  alias Yawp.Federation
 
   setup do
-    {:ok, key} = ServerKey.generate()
+    {:ok, key} = Federation.generate_server_key()
     %{key: key}
   end
 
@@ -31,8 +31,8 @@ defmodule YawpWeb.ServerKeyControllerTest do
   end
 
   test "omits revoked keys", %{conn: conn, key: key} do
-    {:ok, _} = ServerKey.revoke(key)
-    {:ok, fresh} = ServerKey.generate()
+    {:ok, _} = Federation.revoke_server_key(key)
+    {:ok, fresh} = Federation.generate_server_key()
 
     body = conn |> get("/.well-known/yawp/server-key.json") |> json_response(200)
 

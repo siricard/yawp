@@ -14,10 +14,13 @@ defmodule Yawp.Federation do
   use Ash.Domain, otp_app: :yawp
 
   resources do
-    resource Yawp.Federation.ServerKey
+    resource Yawp.Federation.ServerKey do
+      define :generate_server_key, action: :generate, args: []
+      define :get_active_server_key, action: :get_active, not_found_error?: false
+      define :list_published_server_keys, action: :list_published
+      define :revoke_server_key, action: :revoke
+    end
   end
-
-  alias Yawp.Federation.ServerKey
 
   @doc """
   Ensures an active server key exists. Called on application boot
@@ -27,12 +30,12 @@ defmodule Yawp.Federation do
   """
   @spec ensure_active_server_key!() :: :ok
   def ensure_active_server_key! do
-    case ServerKey.active() do
-      {:ok, _} ->
+    case get_active_server_key() do
+      {:ok, %Yawp.Federation.ServerKey{}} ->
         :ok
 
-      {:error, :no_active_key} ->
-        {:ok, key} = ServerKey.generate()
+      {:ok, nil} ->
+        {:ok, key} = generate_server_key()
         require Logger
         Logger.info("Generated federation server key #{key.key_id}")
         :ok
@@ -49,14 +52,14 @@ defmodule Yawp.Federation do
   """
   @spec sign(term(), keyword()) :: {:ok, binary(), String.t()} | {:error, :no_active_key}
   def sign(payload, _opts \\ []) do
-    case ServerKey.active() do
-      {:ok, key} ->
+    case get_active_server_key() do
+      {:ok, %Yawp.Federation.ServerKey{} = key} ->
         canonical = Yawp.CanonicalJson.encode(payload)
         signature = :crypto.sign(:eddsa, :none, canonical, [key.private_key, :ed25519])
         {:ok, signature, key.key_id}
 
-      {:error, :no_active_key} = err ->
-        err
+      {:ok, nil} ->
+        {:error, :no_active_key}
     end
   end
 end

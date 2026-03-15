@@ -8,10 +8,9 @@ defmodule YawpWeb.ServerKeyController do
 
   use YawpWeb, :controller
 
-  alias Yawp.Federation.ServerKey
-
   def show(conn, _params) do
-    keys = Enum.map(ServerKey.list_published(), &serialize_key/1)
+    {:ok, published} = Yawp.Federation.list_published_server_keys()
+    keys = Enum.map(published, &serialize_key/1)
     json(conn, %{"keys" => keys})
   end
 
