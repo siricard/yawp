@@ -1,25 +1,28 @@
 
 
 export type UUID = string;
+export type UtcDateTimeUsec = string;
 
-export type UserResourceSchema = {
+export type AdminAccountResourceSchema = {
   __type: "Resource";
-  __primitiveFields: "id" | "email";
+  __primitiveFields: "id" | "email" | "lastLoginAt";
   id: UUID;
-  email: string | null;
+  email: string;
+  lastLoginAt: UtcDateTimeUsec | null;
 };
 
-export type UserAttributesOnlySchema = {
+export type AdminAccountAttributesOnlySchema = {
   __type: "Resource";
-  __primitiveFields: "id" | "email";
+  __primitiveFields: "id" | "email" | "lastLoginAt";
   id: UUID;
-  email: string | null;
+  email: string;
+  lastLoginAt: UtcDateTimeUsec | null;
 };
 
-export type UserFilterInput = {
-  and?: Array<UserFilterInput>;
-  or?: Array<UserFilterInput>;
-  not?: Array<UserFilterInput>;
+export type AdminAccountFilterInput = {
+  and?: Array<AdminAccountFilterInput>;
+  or?: Array<AdminAccountFilterInput>;
+  not?: Array<AdminAccountFilterInput>;
 
   id?: {
     eq?: UUID;
@@ -31,16 +34,26 @@ export type UserFilterInput = {
     eq?: string;
     notEq?: string;
     in?: Array<string>;
+  };
+
+  lastLoginAt?: {
+    eq?: UtcDateTimeUsec;
+    notEq?: UtcDateTimeUsec;
+    greaterThan?: UtcDateTimeUsec;
+    greaterThanOrEqual?: UtcDateTimeUsec;
+    lessThan?: UtcDateTimeUsec;
+    lessThanOrEqual?: UtcDateTimeUsec;
+    in?: Array<UtcDateTimeUsec>;
     isNil?: boolean;
   };
 
 };
 
-export const userFilterFields = ["id", "email"] as const;
-export type UserFilterField = (typeof userFilterFields)[number];
+export const adminAccountFilterFields = ["id", "email", "lastLoginAt"] as const;
+export type AdminAccountFilterField = (typeof adminAccountFilterFields)[number];
 
-export const userSortFields = ["id", "email"] as const;
-export type UserSortField = (typeof userSortFields)[number];
+export const adminAccountSortFields = ["id", "email", "lastLoginAt"] as const;
+export type AdminAccountSortField = (typeof adminAccountSortFields)[number];
 
 export type SortString<T extends string> = T | `+${T}` | `-${T}` | `++${T}` | `--${T}`;
 

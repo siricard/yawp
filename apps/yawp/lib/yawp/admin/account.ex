@@ -2,14 +2,17 @@ defmodule Yawp.Admin.Account do
   @moduledoc """
   Password-bearing operator account.
 
-  Renamed from the legacy Accounts.User as part — for
-  the rationale (operator accounts and chat-owner identities are
-  distinct entities). The AshAuthentication wiring is preserved
-  verbatim so the existing `/auth/*` routes continue to work redesigns them.
+   trimmed the AshAuthentication surface to email +
+  password with Argon2id hashing via `argon2_elixir`. There is no
+  magic-link, no email confirmation, and no operator-facing password
+  reset flow — operator recovery is out-of-band (SSH + Mix task),.
 
-  The underlying Postgres table is still `users`. Renaming the table is
-  out of scope ; the table rename can land alongside the
-   admin-panel work if desired.
+  Token issuance and storage are still wired through
+  `Yawp.Admin.Token` so the sign-in path can mint a JWT and the
+  `/admin/login` LiveView can exchange it.
+
+  The first-boot setup endpoint reaches this resource via the
+  domain code interface `Yawp.Admin.create_account/2`.
   """
 
   use Ash.Resource,
@@ -20,22 +23,6 @@ defmodule Yawp.Admin.Account do
     extensions: [AshAuthentication, AshTypescript.Resource]
 
   authentication do
-    add_ons do
-      log_out_everywhere do
-        apply_on_password_change? true
-      end
-
-      confirmation :confirm_new_user do
-        monitor_fields [:email]
-        confirm_on_create? true
-        confirm_on_update? false
-        require_interaction? true
-        confirmed_at_field :confirmed_at
-        auto_confirm_actions [:sign_in_with_magic_link, :reset_password_with_token]
-        sender Yawp.Admin.Account.Senders.SendNewUserConfirmationEmail
-      end
-    end
-
     tokens do
       enabled? true
       token_resource Yawp.Admin.Token
@@ -47,16 +34,9 @@ defmodule Yawp.Admin.Account do
     strategies do
       password :password do
         identity_field :email
-        hash_provider AshAuthentication.BcryptProvider
-
-        resettable do
-          sender Yawp.Admin.Account.Senders.SendPasswordResetEmail
-                    password_reset_action_name :reset_password_with_token
-          request_password_reset_action_name :request_password_reset_token
-        end
+        hash_provider AshAuthentication.Argon2Provider
+                        registration_enabled? false
       end
-
-      remember_me :remember_me
     end
   end
 
@@ -66,162 +46,91 @@ defmodule Yawp.Admin.Account do
   end
 
   typescript do
-    type_name "User"
+    type_name "AdminAccount"
   end
 
   actions do
     defaults [:read]
 
     read :get_by_subject do
-      description "Get a user by the subject claim in a JWT"
+      description "Get an admin account by the subject claim in a JWT"
       argument :subject, :string, allow_nil?: false
       get? true
       prepare AshAuthentication.Preparations.FilterBySubject
     end
 
-    update :change_password do
-            
-      require_atomic? false
-      accept []
-      argument :current_password, :string, sensitive?: true, allow_nil?: false
-
-      argument :password, :string,
-        sensitive?: true,
-        allow_nil?: false,
-        constraints: [min_length: 8]
-
-      argument :password_confirmation, :string, sensitive?: true, allow_nil?: false
-
-      validate confirm(:password, :password_confirmation)
-
-      validate {AshAuthentication.Strategy.Password.PasswordValidation,
-                strategy_name: :password, password_argument: :current_password}
-
-      change {AshAuthentication.Strategy.Password.HashPasswordChange, strategy_name: :password}
-    end
-
-    read :sign_in_with_password do
-      description "Attempt to sign in using a email and password."
-      get? true
-
-      argument :email, :ci_string do
-        description "The email to use for retrieving the user."
-        allow_nil? false
-      end
-
-      argument :password, :string do
-        description "The password to check for the matching user."
-        allow_nil? false
-        sensitive? true
-      end
-
-            prepare AshAuthentication.Strategy.Password.SignInPreparation
-
-      metadata :token, :string do
-        description "A JWT that can be used to authenticate the user."
-        allow_nil? false
-      end
-    end
-
-    read :sign_in_with_token do
-                                          
-      description "Attempt to sign in using a short-lived sign in token."
-      get? true
-
-      argument :token, :string do
-        description "The short-lived sign in token."
-        allow_nil? false
-        sensitive? true
-      end
-
-            prepare AshAuthentication.Strategy.Password.SignInWithTokenPreparation
-
-      metadata :token, :string do
-        description "A JWT that can be used to authenticate the user."
-        allow_nil? false
-      end
-    end
-
-    create :register_with_password do
-      description "Register a new user with a email and password."
-
-      argument :email, :ci_string do
-        allow_nil? false
-      end
-
-      argument :password, :string do
-        description "The proposed password for the user, in plain text."
-        allow_nil? false
-        constraints min_length: 8
-        sensitive? true
-      end
-
-      argument :password_confirmation, :string do
-        description "The proposed password for the user (again), in plain text."
-        allow_nil? false
-        sensitive? true
-      end
-
-            change set_attribute(:email, arg(:email))
-
-            change AshAuthentication.Strategy.Password.HashPasswordChange
-
-            change AshAuthentication.GenerateTokenChange
-
-            validate AshAuthentication.Strategy.Password.PasswordConfirmationValidation
-
-      metadata :token, :string do
-        description "A JWT that can be used to authenticate the user."
-        allow_nil? false
-      end
-    end
-
-    action :request_password_reset_token do
-      description "Send password reset instructions to a user if they exist."
-
-      argument :email, :ci_string do
-        allow_nil? false
-      end
-
-            run {AshAuthentication.Strategy.Password.RequestPasswordReset, action: :get_by_email}
-    end
-
     read :get_by_email do
-      description "Looks up a user by their email"
+      description "Look up an admin account by email"
       get_by :email
     end
 
-    update :reset_password_with_token do
-      argument :reset_token, :string do
+    read :sign_in_with_password do
+      description "Sign in using email + password"
+      get? true
+
+      argument :email, :ci_string do
         allow_nil? false
-        sensitive? true
       end
 
       argument :password, :string do
-        description "The proposed password for the user, in plain text."
         allow_nil? false
-        constraints min_length: 8
         sensitive? true
+      end
+
+      prepare AshAuthentication.Strategy.Password.SignInPreparation
+
+      metadata :token, :string do
+        description "A JWT that can be used to authenticate the account."
+        allow_nil? false
+      end
+    end
+
+    create :create_account do
+      description """
+      Creates an operator account. Used by the first-boot setup
+      endpoint and by the admin dashboard if the operator
+      adds another sysadmin handoff account.
+      """
+
+      argument :email, :ci_string do
+        allow_nil? false
+      end
+
+      argument :password, :string do
+        allow_nil? false
+        sensitive? true
+        constraints min_length: 8
       end
 
       argument :password_confirmation, :string do
-        description "The proposed password for the user (again), in plain text."
         allow_nil? false
         sensitive? true
       end
 
-            validate AshAuthentication.Strategy.Password.ResetTokenValidation
+      change set_attribute(:email, arg(:email))
+      change set_context(%{strategy_name: :password})
 
-            validate AshAuthentication.Strategy.Password.PasswordConfirmationValidation
+      validate AshAuthentication.Strategy.Password.PasswordConfirmationValidation
+      change AshAuthentication.Strategy.Password.HashPasswordChange
+    end
 
-            change AshAuthentication.Strategy.Password.HashPasswordChange
-
-            change AshAuthentication.GenerateTokenChange
+    update :touch_last_login do
+      description "Stamps last_login_at = now() after a successful sign-in."
+      accept []
+      change set_attribute(:last_login_at, &DateTime.utc_now/0)
     end
   end
 
   policies do
     bypass AshAuthentication.Checks.AshAuthenticationInteraction do
+      authorize_if always()
+    end
+
+                        policy action(:create_account) do
+      authorize_if always()
+    end
+
+    policy action(:touch_last_login) do
       authorize_if always()
     end
   end
@@ -230,19 +139,24 @@ defmodule Yawp.Admin.Account do
     uuid_primary_key :id
 
     attribute :email, :ci_string do
-      allow_nil? true
+      allow_nil? false
       public? true
     end
 
     attribute :hashed_password, :string do
-      allow_nil? true
+      allow_nil? false
       sensitive? true
     end
 
-    attribute :confirmed_at, :utc_datetime_usec
+    attribute :last_login_at, :utc_datetime_usec do
+      allow_nil? true
+      public? true
+    end
+
+    create_timestamp :inserted_at
   end
 
   identities do
-    identity :unique_email, [:email], nils_distinct?: true
+    identity :unique_email, [:email]
   end
 end

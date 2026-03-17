@@ -22,6 +22,11 @@ defmodule Yawp.Admin do
 
   resources do
     resource Yawp.Admin.Token
-    resource Yawp.Admin.Account
+
+    resource Yawp.Admin.Account do
+      define :create_account, action: :create_account
+      define :touch_last_login, action: :touch_last_login
+      define :get_admin_account_by_email, action: :get_by_email, args: [:email]
+    end
   end
 end

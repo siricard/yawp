@@ -47,6 +47,7 @@ defmodule Yawp.MixProject do
         defp deps do
     [
       {:bcrypt_elixir, "~> 3.0"},
+      {:argon2_elixir, "~> 4.0"},
       {:picosat_elixir, "~> 0.2"},
       {:sourceror, "~> 1.8", only: [:dev, :test]},
       {:oban, "~> 2.0"},
