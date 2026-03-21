@@ -23,7 +23,7 @@ defmodule YawpWeb.AdminRoutesTest do
       routes = YawpWeb.Router.__routes__()
       paths = Enum.map(routes, & &1.path)
 
-                        allowed = ~w(/admin/login /admin/sign-out)
+                        allowed = ~w(/admin/login /admin/sign-out /admin/setup)
 
       unexpected =
         paths

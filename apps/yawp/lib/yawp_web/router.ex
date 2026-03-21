@@ -57,6 +57,9 @@ defmodule YawpWeb.Router do
                 auth_routes AuthController, Yawp.Admin.Account, path: "/auth"
     sign_out_route AuthController, "/admin/sign-out"
 
+                    get "/admin/setup", AdminSetupController, :new
+    post "/admin/setup", AdminSetupController, :create
+
     sign_in_route path: "/admin/login",
                   auth_routes_prefix: "/auth",
                   on_mount: [{YawpWeb.LiveUserAuth, :live_no_user}],
