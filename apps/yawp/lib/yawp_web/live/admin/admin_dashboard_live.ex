@@ -21,12 +21,13 @@ defmodule YawpWeb.AdminDashboardLive do
   @impl true
   def mount(_params, _session, socket) do
     {:ok, active_key} = Yawp.Federation.get_active_server_key()
+    {:ok, recent_entries} = Yawp.Admin.list_recent_audit_entries()
 
     {:ok,
      socket
      |> assign(:page_title, "Admin")
      |> assign(:active_server_key, active_key)
-     |> stream(:audit_log, [])}
+     |> stream(:audit_log, recent_entries)}
   end
 
   @impl true

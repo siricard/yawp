@@ -28,5 +28,27 @@ defmodule Yawp.Admin do
       define :touch_last_login, action: :touch_last_login
       define :get_admin_account_by_email, action: :get_by_email, args: [:email]
     end
+
+    resource Yawp.Admin.AuditLogEntry do
+      define :create_audit_entry, action: :create
+      define :list_recent_audit_entries, action: :list_recent
+    end
+  end
+
+  @doc """
+  Records an operator audit-log event.
+
+  `account_id` may be `nil` when the action has no authenticated
+  operator (e.g. a failed login attempt). `payload` is stored as
+  JSONB and round-trips through Postgres with string keys.
+
+  Raises if the insert fails — audit events must be recorded.
+  """
+  @spec audit!(binary() | nil, String.t(), map()) :: Yawp.Admin.AuditLogEntry.t()
+  def audit!(account_id, action, payload \\ %{})
+      when (is_binary(account_id) or is_nil(account_id)) and is_binary(action) and is_map(payload) do
+    create_audit_entry!(%{account_id: account_id, action: action, payload: payload},
+      authorize?: false
+    )
   end
 end
