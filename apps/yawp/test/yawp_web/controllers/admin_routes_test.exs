@@ -2,16 +2,15 @@ defmodule YawpWeb.AdminRoutesTest do
   use YawpWeb.ConnCase, async: true
 
   describe "AshAdmin mount location" do
-    test "GET /admin does not hit AshAdmin (returns 404)", %{conn: conn} do
-                  conn = get(conn, "/admin")
-      assert conn.status == 404
+    test "GET /admin no longer hits AshAdmin (redirects to /admin/login or renders dashboard)",
+         %{conn: conn} do
+                        conn = get(conn, "/admin")
+      assert conn.status in [200, 302]
       refute conn.resp_body =~ "AshAdmin"
-    end
 
-    test "GET /admin/ does not hit AshAdmin (returns 404)", %{conn: conn} do
-      conn = get(conn, "/admin/")
-      assert conn.status == 404
-      refute conn.resp_body =~ "AshAdmin"
+      if conn.status == 302 do
+        assert redirected_to(conn) == "/admin/login"
+      end
     end
 
     test "GET /dev/ash-admin hits AshAdmin", %{conn: conn} do
@@ -23,7 +22,7 @@ defmodule YawpWeb.AdminRoutesTest do
       routes = YawpWeb.Router.__routes__()
       paths = Enum.map(routes, & &1.path)
 
-                        allowed = ~w(/admin/login /admin/sign-out /admin/setup)
+                              allowed = ~w(/admin /admin/login /admin/logout /admin/setup)
 
       unexpected =
         paths

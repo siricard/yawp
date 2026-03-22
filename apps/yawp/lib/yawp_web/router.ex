@@ -25,8 +25,9 @@ defmodule YawpWeb.Router do
   scope "/", YawpWeb do
     pipe_through :browser
 
-    ash_authentication_live_session :authenticated_routes do
-                                                                end
+    ash_authentication_live_session :admin_authenticated do
+      live "/admin", AdminDashboardLive, :index
+    end
 
     post "/rpc/run", AshTypescriptRpcController, :run
     post "/rpc/validate", AshTypescriptRpcController, :validate
@@ -55,7 +56,9 @@ defmodule YawpWeb.Router do
     get "/", PageController, :home
 
                 auth_routes AuthController, Yawp.Admin.Account, path: "/auth"
-    sign_out_route AuthController, "/admin/sign-out"
+
+                get "/admin/logout", AuthController, :logout
+    delete "/admin/logout", AuthController, :logout
 
                     get "/admin/setup", AdminSetupController, :new
     post "/admin/setup", AdminSetupController, :create

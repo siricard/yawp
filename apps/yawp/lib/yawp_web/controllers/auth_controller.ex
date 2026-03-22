@@ -3,14 +3,12 @@ defmodule YawpWeb.AuthController do
   use AshAuthentication.Phoenix.Controller
 
   def success(conn, _activity, user, _token) do
-    return_to = get_session(conn, :return_to) || ~p"/"
-
-    conn
+                conn
     |> delete_session(:return_to)
     |> store_in_session(user)
-    |> assign(:current_user, user)
+    |> assign(:current_account, user)
     |> put_flash(:info, "You are now signed in")
-    |> redirect(to: return_to)
+    |> redirect(to: ~p"/admin")
   end
 
   def failure(conn, _activity, _reason) do
@@ -19,12 +17,16 @@ defmodule YawpWeb.AuthController do
     |> redirect(to: ~p"/admin/login")
   end
 
-  def sign_out(conn, _params) do
-    return_to = get_session(conn, :return_to) || ~p"/"
-
+  @doc """
+  `/admin/logout` clears the session cookie and bounces the
+  operator back to the login screen.
+  """
+  def logout(conn, _params) do
     conn
     |> clear_session(:yawp)
     |> put_flash(:info, "You are now signed out")
-    |> redirect(to: return_to)
+    |> redirect(to: ~p"/admin/login")
   end
+
+        def sign_out(conn, params), do: logout(conn, params)
 end
