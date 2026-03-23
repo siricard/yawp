@@ -26,6 +26,7 @@ defmodule Yawp.Application do
     case Supervisor.start_link(children, opts) do
       {:ok, _pid} = ok ->
         ensure_active_server_key()
+        maybe_run_servers_seeder()
         maybe_announce_setup_token()
         ok
 
@@ -84,6 +85,18 @@ defmodule Yawp.Application do
         error ->
           require Logger
           Logger.warning("Failed to ensure active federation server key: #{inspect(error)}")
+      end
+    end
+  end
+
+              defp maybe_run_servers_seeder do
+    if Application.get_env(:yawp, :run_servers_seeder_on_boot, true) do
+      try do
+        Yawp.Servers.Seeder.run()
+      rescue
+        error ->
+          require Logger
+          Logger.warning("Yawp.Servers.Seeder: skipping seed due to error: #{inspect(error)}")
       end
     end
   end
