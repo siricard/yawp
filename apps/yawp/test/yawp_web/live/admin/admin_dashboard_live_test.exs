@@ -95,6 +95,60 @@ defmodule YawpWeb.AdminDashboardLiveTest do
     end
   end
 
+  describe "chat-owner-management claim-token UI" do
+    setup ctx, do: sign_in!(ctx)
+
+    test "renders the Generate claim token button when no active token", %{conn: conn} do
+      {:ok, view, _html} = live(conn, "/admin")
+      assert has_element?(view, "#claim-token-generate-btn")
+      refute has_element?(view, "#claim-token-revoke-btn")
+    end
+
+    test "clicking Generate renders the token + Revoke control", %{conn: conn} do
+      {:ok, view, _html} = live(conn, "/admin")
+
+      view
+      |> element("#claim-token-generate-btn")
+      |> render_click()
+
+      assert has_element?(view, "#claim-token-value")
+      assert has_element?(view, "#claim-token-revoke-btn")
+      refute has_element?(view, "#claim-token-generate-btn")
+    end
+
+    test "Generate writes a claim_token.generate audit entry", %{conn: conn} do
+      {:ok, view, _html} = live(conn, "/admin")
+
+      view
+      |> element("#claim-token-generate-btn")
+      |> render_click()
+
+      {:ok, entries} = Yawp.Admin.list_recent_audit_entries()
+      actions = Enum.map(entries, & &1.action)
+      assert "claim_token.generate" in actions
+    end
+
+    test "Revoke clears the active token and writes a claim_token.revoke audit entry",
+         %{conn: conn} do
+      {:ok, view, _html} = live(conn, "/admin")
+
+      view
+      |> element("#claim-token-generate-btn")
+      |> render_click()
+
+      view
+      |> element("#claim-token-revoke-btn")
+      |> render_click()
+
+      assert has_element?(view, "#claim-token-generate-btn")
+      refute has_element?(view, "#claim-token-revoke-btn")
+
+      {:ok, entries} = Yawp.Admin.list_recent_audit_entries()
+      actions = Enum.map(entries, & &1.action)
+      assert "claim_token.revoke" in actions
+    end
+  end
+
   describe "/admin/logout" do
     setup ctx, do: sign_in!(ctx)
 

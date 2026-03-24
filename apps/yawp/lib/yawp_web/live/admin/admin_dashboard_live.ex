@@ -22,12 +22,52 @@ defmodule YawpWeb.AdminDashboardLive do
   def mount(_params, _session, socket) do
     {:ok, active_key} = Yawp.Federation.get_active_server_key()
     {:ok, recent_entries} = Yawp.Admin.list_recent_audit_entries()
+    {:ok, active_claim_token} = Yawp.Admin.get_active_claim_token()
 
     {:ok,
      socket
      |> assign(:page_title, "Admin")
      |> assign(:active_server_key, active_key)
+     |> assign(:active_claim_token, active_claim_token)
      |> stream(:audit_log, recent_entries)}
+  end
+
+  @impl true
+  def handle_event("generate_claim_token", _params, socket) do
+    account = socket.assigns.current_account
+
+    {:ok, token} =
+      Yawp.Admin.generate_claim_token(%{created_by_account_id: account.id})
+
+    entry =
+      Yawp.Admin.audit!(account.id, "claim_token.generate", %{token_id: token.id})
+
+    {:noreply,
+     socket
+     |> assign(:active_claim_token, token)
+     |> stream_insert(:audit_log, entry, at: 0)
+     |> put_flash(:info, "Claim token generated. Copy it now — it will not be shown again.")}
+  end
+
+  def handle_event("revoke_claim_token", _params, socket) do
+    account = socket.assigns.current_account
+
+    case socket.assigns.active_claim_token do
+      nil ->
+        {:noreply, socket}
+
+      token ->
+        {:ok, _revoked} = Yawp.Admin.revoke_claim_token(token)
+
+        entry =
+          Yawp.Admin.audit!(account.id, "claim_token.revoke", %{token_id: token.id})
+
+        {:noreply,
+         socket
+         |> assign(:active_claim_token, nil)
+         |> stream_insert(:audit_log, entry, at: 0)
+         |> put_flash(:info, "Claim token revoked.")}
+    end
   end
 
   @impl true
@@ -99,9 +139,104 @@ defmodule YawpWeb.AdminDashboardLive do
         </.section>
 
         <.section id="chat-owner-management" title="Chat-owner management" icon="hero-user-circle">
-          <p class="text-sm text-base-content/70">
-            No chat owner yet. Claim-token issuance ships in F7.1.5.
-          </p>
+          <div class="space-y-4">
+            <div>
+              <h3 class="text-sm font-semibold mb-1">Chat owner</h3>
+              <p class="text-sm text-base-content/70">No chat owner yet</p>
+            </div>
+
+            <div>
+              <h3 class="text-sm font-semibold mb-2">Claim token</h3>
+              <%= if @active_claim_token do %>
+                <div class="space-y-2">
+                  <code
+                    id="claim-token-value"
+                    phx-no-curly-interpolation
+                    class="block font-mono text-xs bg-base-200 px-2 py-1 rounded break-all"
+                  >
+                    {@active_claim_token.token}
+                  </code>
+                  <div
+                    id="claim-token-countdown"
+                    phx-hook=".Countdown"
+                    phx-update="ignore"
+                    data-expires-at={DateTime.to_iso8601(@active_claim_token.expires_at)}
+                    class="text-xs text-base-content/70 font-mono"
+                  >
+                    expires in …
+                  </div>
+                  <script :type={Phoenix.LiveView.ColocatedHook} name=".Countdown">
+                    export default {
+                      mounted() {
+                        this.tick = this.tick.bind(this)
+                        this.expiresAt = new Date(this.el.dataset.expiresAt).getTime()
+                        this.timer = setInterval(this.tick, 1000)
+                        this.tick()
+                      },
+                      updated() {
+                        this.expiresAt = new Date(this.el.dataset.expiresAt).getTime()
+                        this.tick()
+                      },
+                      destroyed() {
+                        clearInterval(this.timer)
+                      },
+                      tick() {
+                        const remaining = Math.max(0, this.expiresAt - Date.now())
+                        const totalSeconds = Math.floor(remaining / 1000)
+                        const minutes = Math.floor(totalSeconds / 60)
+                        const seconds = totalSeconds % 60
+                        const pad = (n) => String(n).padStart(2, "0")
+                        this.el.textContent =
+                          remaining === 0
+                            ? "expired"
+                            : `expires in ${pad(minutes)}:${pad(seconds)}`
+                      }
+                    }
+                  </script>
+                  <div class="flex gap-2">
+                    <button
+                      id="claim-token-copy-btn"
+                      type="button"
+                      phx-hook=".CopyToClipboard"
+                      data-token={@active_claim_token.token}
+                      class="btn btn-sm btn-soft"
+                    >
+                      <.icon name="hero-clipboard" class="size-4" /> Copy
+                    </button>
+                    <button
+                      id="claim-token-revoke-btn"
+                      type="button"
+                      phx-click="revoke_claim_token"
+                      class="btn btn-sm btn-soft"
+                    >
+                      <.icon name="hero-trash" class="size-4" /> Revoke
+                    </button>
+                  </div>
+                  <script :type={Phoenix.LiveView.ColocatedHook} name=".CopyToClipboard">
+                    export default {
+                      mounted() {
+                        this.el.addEventListener("click", () => {
+                          const token = this.el.dataset.token || ""
+                          if (navigator.clipboard && navigator.clipboard.writeText) {
+                            navigator.clipboard.writeText(token)
+                          }
+                        })
+                      }
+                    }
+                  </script>
+                </div>
+              <% else %>
+                <button
+                  id="claim-token-generate-btn"
+                  type="button"
+                  phx-click="generate_claim_token"
+                  class="btn btn-sm btn-primary"
+                >
+                  <.icon name="hero-key" class="size-4" /> Generate claim token
+                </button>
+              <% end %>
+            </div>
+          </div>
         </.section>
 
         <.section id="operator-audit-log" title="Operator audit log" icon="hero-list-bullet">
