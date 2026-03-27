@@ -25,7 +25,11 @@ defmodule Yawp.Identity do
   use Ash.Domain, otp_app: :yawp
 
   resources do
-    resource Yawp.Identity.Identity
+    resource Yawp.Identity.Identity do
+      define :claim_chat_owner, action: :upsert_chat_owner
+      define :get_chat_owner, action: :get_chat_owner, not_found_error?: false
+      define :get_identity_by_did, action: :get_by_did, args: [:did]
+    end
   end
 
   @base58_alphabet ~c"123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"

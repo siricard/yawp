@@ -23,12 +23,14 @@ defmodule YawpWeb.AdminDashboardLive do
     {:ok, active_key} = Yawp.Federation.get_active_server_key()
     {:ok, recent_entries} = Yawp.Admin.list_recent_audit_entries()
     {:ok, active_claim_token} = Yawp.Admin.get_active_claim_token()
+    {:ok, chat_owner} = Yawp.Identity.get_chat_owner()
 
     {:ok,
      socket
      |> assign(:page_title, "Admin")
      |> assign(:active_server_key, active_key)
      |> assign(:active_claim_token, active_claim_token)
+     |> assign(:chat_owner, chat_owner)
      |> stream(:audit_log, recent_entries)}
   end
 
@@ -142,7 +144,17 @@ defmodule YawpWeb.AdminDashboardLive do
           <div class="space-y-4">
             <div>
               <h3 class="text-sm font-semibold mb-1">Chat owner</h3>
-              <p class="text-sm text-base-content/70">No chat owner yet</p>
+              <%= if @chat_owner do %>
+                <p
+                  id="chat-owner-did"
+                  class="text-sm font-mono"
+                  title={@chat_owner.did}
+                >
+                  Chat owner: {truncate_did(@chat_owner.did)}
+                </p>
+              <% else %>
+                <p class="text-sm text-base-content/70">No chat owner yet</p>
+              <% end %>
             </div>
 
             <div>
@@ -277,6 +289,14 @@ defmodule YawpWeb.AdminDashboardLive do
       <div id={@id}>{render_slot(@inner_block)}</div>
     </section>
     """
+  end
+
+      defp truncate_did(did) when is_binary(did) do
+    if String.length(did) <= 28 do
+      did
+    else
+      String.slice(did, 0, 16) <> "…" <> String.slice(did, -8, 8)
+    end
   end
 
   defp database_health(assigns) do

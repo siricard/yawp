@@ -44,6 +44,16 @@ defmodule YawpWeb.Router do
     plug :accepts, ["json"]
   end
 
+      pipeline :api_unauth do
+    plug :accepts, ["json"]
+  end
+
+  scope "/api", YawpWeb do
+    pipe_through :api_unauth
+
+    post "/claim", ClaimController, :create
+  end
+
   scope "/.well-known/yawp", YawpWeb do
     pipe_through :well_known
 

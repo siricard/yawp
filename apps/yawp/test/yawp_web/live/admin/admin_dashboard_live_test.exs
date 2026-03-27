@@ -149,6 +149,26 @@ defmodule YawpWeb.AdminDashboardLiveTest do
     end
   end
 
+  describe "chat-owner rendering" do
+    setup ctx, do: sign_in!(ctx)
+
+    test "shows 'No chat owner yet' when no Identity row exists", %{conn: conn} do
+      {:ok, view, _html} = live(conn, "/admin")
+      refute has_element?(view, "#chat-owner-did")
+      assert render(view) =~ "No chat owner yet"
+    end
+
+    test "renders the truncated DID at #chat-owner-did when claimed", %{conn: conn} do
+      {pk, _sk} = :crypto.generate_key(:eddsa, :ed25519)
+      did = "did:yawp:" <> Yawp.Identity.did_from_pubkey(pk)
+      {:ok, _identity} = Yawp.Identity.claim_chat_owner(%{did: did, master_public_key: pk})
+
+      {:ok, view, _html} = live(conn, "/admin")
+      assert has_element?(view, "#chat-owner-did")
+            assert render(view) =~ String.slice(did, 0, 16)
+    end
+  end
+
   describe "/admin/logout" do
     setup ctx, do: sign_in!(ctx)
 

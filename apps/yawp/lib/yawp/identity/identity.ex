@@ -23,6 +23,30 @@ defmodule Yawp.Identity.Identity do
   end
 
   actions do
+    defaults [:read]
+
+    create :upsert_chat_owner do
+      description """
+      Upserts the singleton chat-owner Identity row keyed by `did`.
+      calls this from the `POST /api/claim` controller after the request
+      signature has been verified.
+      """
+
+      accept [:did, :master_public_key]
+      upsert? true
+      upsert_identity :unique_did
+    end
+
+    read :get_chat_owner do
+      description "Returns the singleton chat-owner row (or nil)."
+      get? true
+      prepare build(limit: 1)
+    end
+
+    read :get_by_did do
+      description "Look up an Identity by DID."
+      get_by [:did]
+    end
   end
 
   attributes do

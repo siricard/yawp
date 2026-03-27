@@ -25,6 +25,12 @@ defmodule Yawp.Servers do
     resource Yawp.Servers.Channel do
       define :create_channel, action: :create
     end
+
+    resource Yawp.Servers.Membership do
+      define :assign_role,
+        action: :create,
+        args: [:identity_id, :server_id, :role_id]
+    end
   end
 
   @doc """
