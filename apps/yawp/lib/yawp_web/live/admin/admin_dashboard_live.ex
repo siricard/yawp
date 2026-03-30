@@ -51,6 +51,21 @@ defmodule YawpWeb.AdminDashboardLive do
      |> put_flash(:info, "Claim token generated. Copy it now — it will not be shown again.")}
   end
 
+  def handle_event("acknowledge_per_server_defaults", _params, socket) do
+    account = socket.assigns.current_account
+
+    entry =
+      Yawp.Admin.audit!(account.id, "settings.change", %{
+        section: "per-server-defaults",
+        change: "acknowledged"
+      })
+
+    {:noreply,
+     socket
+     |> stream_insert(:audit_log, entry, at: 0)
+     |> put_flash(:info, "Per-server defaults acknowledged (stub — real settings land in M8).")}
+  end
+
   def handle_event("revoke_claim_token", _params, socket) do
     account = socket.assigns.current_account
 
@@ -109,6 +124,14 @@ defmodule YawpWeb.AdminDashboardLive do
           <p class="text-sm text-base-content/70">
             Retention policy, attachment size limit, voice participant cap. Read-only stub for now.
           </p>
+          <button
+            id="per-server-defaults-acknowledge-btn"
+            type="button"
+            phx-click="acknowledge_per_server_defaults"
+            class="btn btn-sm btn-soft mt-2"
+          >
+            Acknowledge defaults (stub — lands in M8)
+          </button>
         </.section>
 
         <.section id="body-archive" title="Body archive" icon="hero-archive-box">
