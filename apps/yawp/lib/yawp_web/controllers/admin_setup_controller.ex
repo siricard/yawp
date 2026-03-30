@@ -13,6 +13,25 @@ defmodule YawpWeb.AdminSetupController do
   On a successful POST, the operator account is created via
   `Yawp.Admin.create_account/2`, the setup token is invalidated, and
   the browser is redirected to `/admin`.
+
+  ## Atomicity
+
+  GET only previews the token (read-only). POST performs an atomic
+  `SetupToken.consume/1` BEFORE calling `Admin.create_account/1`.
+  `consume/1` is single-shot — the underlying Agent serializes all
+  callers and only one ever observes the correct token, so even if N
+  requests with the same valid token race the controller, at most
+  one ever reaches account creation. (The Ash create action itself
+  runs in its own DB transaction; we do not wrap it in an outer one,
+  since the agent — not the DB — is the real serialization point.)
+
+  If `create_account/1` then fails (e.g. validation), the setup token
+  has already been consumed by the agent. This is a deliberate
+  trade-off: consume wins eagerly; on failure the token stays
+  consumed and the user sees a "setup failed; restart the server to
+  mint a fresh token" error. Acceptable because (a) the operator
+  typed bad input, and (b) the server can be restarted to re-arm
+  setup mode. Simpler than trying to re-arm the agent on rollback.
   """
 
   use YawpWeb, :controller
@@ -37,26 +56,36 @@ defmodule YawpWeb.AdminSetupController do
   def create(conn, params) do
     token = Map.get(params, "token", "")
 
-    if SetupToken.valid?(token) do
-      attrs = %{
-        email: Map.get(params, "email", ""),
-        password: Map.get(params, "password", ""),
-        password_confirmation: Map.get(params, "password_confirmation", "")
-      }
+    attrs = %{
+      email: Map.get(params, "email", ""),
+      password: Map.get(params, "password", ""),
+      password_confirmation: Map.get(params, "password_confirmation", "")
+    }
 
-      case Admin.create_account(attrs) do
-        {:ok, _account} ->
-          :ok = SetupToken.invalidate()
+    case consume_and_create(token, attrs) do
+      {:ok, _account} ->
+        conn
+        |> put_flash(:info, "Operator account created. Welcome.")
+        |> redirect(to: "/admin")
 
-          conn
-          |> put_flash(:info, "Operator account created. Welcome.")
-          |> redirect(to: "/admin")
+      {:error, :invalid_token} ->
+        render_forbidden(conn, :invalid_token)
 
-        {:error, error} ->
-          render_form(conn, token, attrs, error_messages(error))
-      end
-    else
-      render_forbidden(conn, :invalid_token)
+      {:error, {:create_account, error}} ->
+                                render_form(conn, "", attrs, error_messages(error))
+    end
+  end
+
+          defp consume_and_create(token, attrs) do
+    case SetupToken.consume(token) do
+      {:ok, _token} ->
+        case Admin.create_account(attrs) do
+          {:ok, account} -> {:ok, account}
+          {:error, error} -> {:error, {:create_account, error}}
+        end
+
+      {:error, :invalid} ->
+        {:error, :invalid_token}
     end
   end
 

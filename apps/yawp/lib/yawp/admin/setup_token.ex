@@ -58,6 +58,29 @@ defmodule Yawp.Admin.SetupToken do
   @spec invalidate() :: :ok
   def invalidate, do: Agent.update(@name, fn _ -> nil end)
 
+  @doc """
+  Atomic check-and-clear. Returns `{:ok, token}` exactly once for the
+  caller that matches the current stored token, and `{:error, :invalid}`
+  for every other caller (wrong token, no token set, or a later caller
+  after the winner has already consumed). Safe under concurrent callers
+  — the underlying Agent serializes `get_and_update`, so only one task
+  can win.
+
+  Used by `YawpWeb.AdminSetupController` to make first-boot operator
+  creation atomic: the token must be consumed and the account created
+  in a single logical step so that two simultaneous valid POSTs cannot
+  both succeed.
+  """
+  @spec consume(binary() | nil) :: {:ok, binary()} | {:error, :invalid}
+  def consume(token) when is_binary(token) and byte_size(token) > 0 do
+    Agent.get_and_update(@name, fn
+      ^token -> {{:ok, token}, nil}
+      other -> {{:error, :invalid}, other}
+    end)
+  end
+
+  def consume(_), do: {:error, :invalid}
+
   @doc "Test-only: clear any current token without ceremony."
   @spec reset() :: :ok
   def reset, do: invalidate()
