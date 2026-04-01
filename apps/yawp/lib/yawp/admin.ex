@@ -80,29 +80,56 @@ defmodule Yawp.Admin do
   def consume_claim_token(token) when is_binary(token) do
     case get_claim_token_by_token(token) do
       {:ok, %Yawp.Admin.ClaimToken{} = claim} ->
-        cond do
-          claim.consumed_at != nil ->
-            {:error, :claim_token_consumed}
-
-          claim.revoked_at != nil ->
-            {:error, :claim_token_invalid}
-
-          DateTime.compare(claim.expires_at, DateTime.utc_now()) != :gt ->
-            {:error, :claim_token_expired}
-
-          true ->
-            {:ok, consumed} =
-              claim
-              |> Ash.Changeset.for_update(:consume, %{})
-              |> Ash.update(authorize?: false)
-
-            {:ok, consumed}
-        end
+        attempt_atomic_consume(claim)
 
       {:error, _} ->
         {:error, :claim_token_invalid}
 
       {:ok, nil} ->
+        {:error, :claim_token_invalid}
+    end
+  end
+
+            defp attempt_atomic_consume(%Yawp.Admin.ClaimToken{} = claim) do
+    claim
+    |> Ash.Changeset.for_update(:consume_if_active, %{})
+    |> Ash.update(authorize?: false)
+    |> case do
+      {:ok, consumed} ->
+        {:ok, consumed}
+
+      {:error, %Ash.Error.Invalid{errors: errors} = err} ->
+        if Enum.any?(errors, &match?(%Ash.Error.Changes.StaleRecord{}, &1)) do
+          classify_stale(claim.id)
+        else
+          require Logger
+
+          Logger.warning("consume_claim_token: unexpected error for #{claim.id}: #{inspect(err)}")
+
+          {:error, :claim_token_invalid}
+        end
+
+      {:error, _other} ->
+        {:error, :claim_token_invalid}
+    end
+  end
+
+  defp classify_stale(claim_id) do
+    case get_claim_token_by_id(claim_id) do
+      {:ok, %Yawp.Admin.ClaimToken{consumed_at: consumed_at}} when not is_nil(consumed_at) ->
+        {:error, :claim_token_consumed}
+
+      {:ok, %Yawp.Admin.ClaimToken{revoked_at: revoked_at}} when not is_nil(revoked_at) ->
+        {:error, :claim_token_invalid}
+
+      {:ok, %Yawp.Admin.ClaimToken{expires_at: expires_at}} ->
+        if DateTime.compare(expires_at, DateTime.utc_now()) != :gt do
+          {:error, :claim_token_expired}
+        else
+          {:error, :claim_token_invalid}
+        end
+
+      _ ->
         {:error, :claim_token_invalid}
     end
   end

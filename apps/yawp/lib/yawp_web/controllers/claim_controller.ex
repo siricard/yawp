@@ -34,8 +34,9 @@ defmodule YawpWeb.ClaimController do
          {:ok, claim} <- lookup_token(parsed.claim_token),
          :ok <- check_state(claim),
          :ok <- check_did(parsed.did, parsed.public_key),
-         :ok <- verify_signature(parsed, claim) do
-      finalize(conn, parsed, claim)
+         :ok <- verify_signature(parsed, claim),
+                                    {:ok, consumed_claim} <- Admin.consume_claim_token(parsed.claim_token) do
+      finalize(conn, parsed, consumed_claim)
     else
       {:error, slug} -> respond_error(conn, slug)
     end
@@ -134,11 +135,6 @@ defmodule YawpWeb.ClaimController do
         else
           {:ok, _membership} =
             Servers.assign_role(identity.id, server.id, owner_role.id)
-
-          {:ok, _consumed} =
-            claim
-            |> Ash.Changeset.for_update(:consume, %{})
-            |> Ash.update(authorize?: false)
 
           _ =
             Admin.audit!(nil, "claim_token.consume", %{

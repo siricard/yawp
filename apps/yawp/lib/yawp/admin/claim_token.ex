@@ -22,6 +22,18 @@ defmodule Yawp.Admin.ClaimToken do
   postgres do
     table "admin_claim_tokens"
     repo Yawp.Repo
+
+    references do
+      reference :created_by_account, on_delete: :delete
+    end
+
+    custom_indexes do
+                                    index [:id],
+        name: "admin_claim_tokens_one_active_index",
+        unique: true,
+        where: "consumed_at IS NULL AND revoked_at IS NULL",
+        using: "btree"
+    end
   end
 
   actions do
@@ -46,6 +58,31 @@ defmodule Yawp.Admin.ClaimToken do
       description "Marks the token as consumed (single-use)."
       accept []
       change set_attribute(:consumed_at, &DateTime.utc_now/0)
+    end
+
+    update :consume_if_active do
+      description """
+      Atomically marks the token consumed iff it is currently active
+      (unconsumed, unrevoked, unexpired). If the underlying row no
+      longer matches the active-state filter, the data layer raises
+      `Ash.Error.Changes.StaleRecord` and the caller can classify the
+      mismatch by re-reading the row (consumed vs revoked vs expired).
+
+      `require_atomic? false` is used because Ash 3's atomic-upgrade
+      path overwrites `changeset.filter` with `changeset.added_filter`
+      (see `Ash.Actions.Update.do_run/4`), discarding the filter set
+      by `change filter/1`. Running through the non-atomic path keeps
+      the filter intact, while `change atomic_update/2` still drives a
+      single SQL UPDATE — so this action is still race-safe: at most
+      one concurrent caller's `UPDATE ... WHERE ... AND consumed_at IS
+      NULL AND revoked_at IS NULL AND expires_at > now()` will affect
+      a row.
+      """
+
+      accept []
+      require_atomic? false
+      change filter(expr(is_nil(consumed_at) and is_nil(revoked_at) and expires_at > now()))
+      change atomic_update(:consumed_at, expr(now()))
     end
 
     update :force_expire do
@@ -94,12 +131,17 @@ defmodule Yawp.Admin.ClaimToken do
       public? true
     end
 
-    attribute :created_by_account_id, :uuid do
-      allow_nil? false
-      public? true
-    end
-
     create_timestamp :inserted_at
+  end
+
+  relationships do
+    belongs_to :created_by_account, Yawp.Admin.Account do
+      allow_nil? false
+      attribute_writable? true
+      attribute_type :uuid
+      public? true
+      source_attribute :created_by_account_id
+    end
   end
 
   identities do
