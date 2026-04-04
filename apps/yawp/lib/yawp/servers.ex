@@ -20,6 +20,12 @@ defmodule Yawp.Servers do
 
     resource Yawp.Servers.Role do
       define :create_role, action: :create
+      define :list_roles_for_server, action: :list_for_server, args: [:server_id]
+
+      define :get_system_role_for_server,
+        action: :get_system_role,
+        args: [:name, :server_id],
+        not_found_error?: false
     end
 
     resource Yawp.Servers.Channel do
@@ -45,33 +51,5 @@ defmodule Yawp.Servers do
       {:ok, [server | _]} -> {:ok, server}
       {:ok, []} -> {:ok, nil}
     end
-  end
-
-  @doc """
-  Returns the roles on the given server.
-  """
-  @spec list_roles_for_server(Ecto.UUID.t()) :: [Yawp.Servers.Role.t()]
-  def list_roles_for_server(server_id) do
-    require Ash.Query
-
-    Yawp.Servers.Role
-    |> Ash.Query.filter(server_id == ^server_id)
-    |> Ash.read!()
-  end
-
-  @doc """
-  Returns the system role with the given name on the given server, or `nil`.
-
-   uses this to grab the Owner Role row when assigning it to the
-  operator account.
-  """
-  @spec get_system_role_for_server(String.t(), Ecto.UUID.t()) ::
-          Yawp.Servers.Role.t() | nil
-  def get_system_role_for_server(name, server_id) do
-    require Ash.Query
-
-    Yawp.Servers.Role
-    |> Ash.Query.filter(server_id == ^server_id and name == ^name and system == true)
-    |> Ash.read_one!()
   end
 end

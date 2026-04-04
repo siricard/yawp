@@ -31,6 +31,20 @@ defmodule Yawp.Servers.Role do
       primary? true
       accept [:server_id, :name, :system, :permissions]
     end
+
+    read :list_for_server do
+      description "All roles on the given server."
+      argument :server_id, :uuid, allow_nil?: false
+      filter expr(server_id == ^arg(:server_id))
+    end
+
+    read :get_system_role do
+      description "System role with the given name on the given server."
+      get? true
+      argument :server_id, :uuid, allow_nil?: false
+      argument :name, :string, allow_nil?: false
+      filter expr(server_id == ^arg(:server_id) and name == ^arg(:name) and system == true)
+    end
   end
 
   attributes do

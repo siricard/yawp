@@ -97,7 +97,7 @@ defmodule YawpWeb.ClaimControllerConcurrencyTest do
     assert hd(identities).did == winning_did
 
         {:ok, server} = Yawp.Servers.get_singleton_server()
-    owner_role = Yawp.Servers.get_system_role_for_server("Owner", server.id)
+    {:ok, owner_role} = Yawp.Servers.get_system_role_for_server("Owner", server.id)
 
     require Ash.Query
 

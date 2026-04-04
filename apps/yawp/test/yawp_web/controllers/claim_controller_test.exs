@@ -140,7 +140,7 @@ defmodule YawpWeb.ClaimControllerTest do
     test "200 assigns the Owner role membership for the singleton server", %{conn: conn} do
       account = create_account!()
       {:ok, server} = Yawp.Servers.get_singleton_server()
-      owner_role = Yawp.Servers.get_system_role_for_server("Owner", server.id)
+      {:ok, owner_role} = Yawp.Servers.get_system_role_for_server("Owner", server.id)
 
       claim = issue_token!(account)
       body = build_claim_body(claim.token) |> Map.delete("_pk_raw")

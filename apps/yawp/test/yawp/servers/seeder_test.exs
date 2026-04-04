@@ -9,7 +9,7 @@ defmodule Yawp.Servers.SeederTest do
 
     {:ok, [server]} = Servers.list_servers()
 
-    roles = Servers.list_roles_for_server(server.id)
+    {:ok, roles} = Servers.list_roles_for_server(server.id)
     role_names = Enum.map(roles, & &1.name) |> Enum.sort()
     assert role_names == ["Admin", "Member", "Owner"]
     assert Enum.all?(roles, & &1.system)
@@ -33,7 +33,7 @@ defmodule Yawp.Servers.SeederTest do
     {:ok, servers} = Servers.list_servers()
     assert length(servers) == 1
 
-    roles = Servers.list_roles_for_server(hd(servers).id)
+    {:ok, roles} = Servers.list_roles_for_server(hd(servers).id)
     assert length(roles) == 3
   end
 

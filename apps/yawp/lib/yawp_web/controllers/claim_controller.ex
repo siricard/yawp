@@ -172,11 +172,11 @@ defmodule YawpWeb.ClaimController do
 
   defp get_owner_role_or_fail(server) do
     case Servers.get_system_role_for_server("Owner", server.id) do
-      nil ->
+      {:ok, nil} ->
         Logger.error("ClaimController: Owner system role missing for server #{server.id}")
         {:error, :internal_error}
 
-      role ->
+      {:ok, role} ->
         {:ok, role}
     end
   end
