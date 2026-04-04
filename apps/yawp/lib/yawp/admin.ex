@@ -74,13 +74,14 @@ defmodule Yawp.Admin do
   `POST /api/claim` controller; the action is defined here so the
   resource boundary owns the state validation.
   """
-  @spec consume_claim_token(String.t()) ::
+  @spec consume_claim_token(String.t(), keyword()) ::
           {:ok, Yawp.Admin.ClaimToken.t()}
+          | {:ok, Yawp.Admin.ClaimToken.t(), list()}
           | {:error, :claim_token_invalid | :claim_token_consumed | :claim_token_expired}
-  def consume_claim_token(token) when is_binary(token) do
+  def consume_claim_token(token, opts \\ []) when is_binary(token) do
     case get_claim_token_by_token(token) do
       {:ok, %Yawp.Admin.ClaimToken{} = claim} ->
-        attempt_atomic_consume(claim)
+        attempt_atomic_consume(claim, opts)
 
       {:error, _} ->
         {:error, :claim_token_invalid}
@@ -90,13 +91,18 @@ defmodule Yawp.Admin do
     end
   end
 
-            defp attempt_atomic_consume(%Yawp.Admin.ClaimToken{} = claim) do
+            defp attempt_atomic_consume(%Yawp.Admin.ClaimToken{} = claim, opts) do
+    return_notifications? = Keyword.get(opts, :return_notifications?, false)
+
     claim
     |> Ash.Changeset.for_update(:consume_if_active, %{})
-    |> Ash.update(authorize?: false)
+    |> Ash.update(authorize?: false, return_notifications?: return_notifications?)
     |> case do
       {:ok, consumed} ->
         {:ok, consumed}
+
+      {:ok, consumed, notifications} ->
+        {:ok, consumed, notifications}
 
       {:error, %Ash.Error.Invalid{errors: errors} = err} ->
         if Enum.any?(errors, &match?(%Ash.Error.Changes.StaleRecord{}, &1)) do

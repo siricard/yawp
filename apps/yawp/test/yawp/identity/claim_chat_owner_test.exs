@@ -36,6 +36,19 @@ defmodule Yawp.Identity.ClaimChatOwnerTest do
 
       assert first.id == second.id
     end
+
+    test "rejects mismatched (did, master_public_key) at the resource boundary" do
+      pk = gen_pk()
+      bad_did = "did:yawp:WRONG"
+
+      assert {:error, _err} =
+               Identity.claim_chat_owner(%{did: bad_did, master_public_key: pk})
+
+      assert {:ok, nil} = Identity.get_chat_owner()
+
+            good_did = "did:yawp:" <> Identity.did_from_pubkey(pk)
+      assert {:ok, _} = Identity.claim_chat_owner(%{did: good_did, master_public_key: pk})
+    end
   end
 
   describe "get_chat_owner/0" do

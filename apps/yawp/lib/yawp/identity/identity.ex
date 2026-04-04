@@ -35,6 +35,8 @@ defmodule Yawp.Identity.Identity do
       accept [:did, :master_public_key]
       upsert? true
       upsert_identity :unique_did
+
+      change Yawp.Identity.Identity.Changes.VerifyDidDerivation
     end
 
     read :get_chat_owner do

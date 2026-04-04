@@ -35,10 +35,21 @@ defmodule YawpWeb.ClaimController do
          :ok <- check_state(claim),
          :ok <- check_did(parsed.did, parsed.public_key),
          :ok <- verify_signature(parsed, claim),
-                                    {:ok, consumed_claim} <- Admin.consume_claim_token(parsed.claim_token) do
-      finalize(conn, parsed, consumed_claim)
+         {:ok, %{identity: identity, claim: consumed_claim}} <-
+           finalize_transaction(parsed) do
+                  _ =
+        Admin.audit!(nil, "claim_token.consume", %{
+          token_id: consumed_claim.id,
+          did: parsed.did,
+          identity_id: identity.id
+        })
+
+      conn
+      |> put_status(:ok)
+      |> json(%{"did" => parsed.did, "role" => "Owner"})
     else
-      {:error, slug} -> respond_error(conn, slug)
+      {:error, slug} when is_atom(slug) -> respond_error(conn, slug)
+      {:error, _other} -> respond_error(conn, :internal_error)
     end
   end
 
@@ -113,45 +124,60 @@ defmodule YawpWeb.ClaimController do
     end
   end
 
-  defp finalize(conn, parsed, claim) do
-    try do
-      {:ok, identity} =
-        Identity.claim_chat_owner(%{
-          did: parsed.did,
-          master_public_key: parsed.public_key
-        })
-
-      {:ok, server} = Servers.get_singleton_server()
-
-      if server == nil do
-        Logger.error("ClaimController: singleton server missing — seed did not run")
-        respond_error(conn, :internal_error)
-      else
-        owner_role = Servers.get_system_role_for_server("Owner", server.id)
-
-        if owner_role == nil do
-          Logger.error("ClaimController: Owner system role missing for server #{server.id}")
-          respond_error(conn, :internal_error)
-        else
-          {:ok, _membership} =
-            Servers.assign_role(identity.id, server.id, owner_role.id)
-
-          _ =
-            Admin.audit!(nil, "claim_token.consume", %{
-              token_id: claim.id,
-              did: parsed.did,
-              identity_id: identity.id
-            })
-
-          conn
-          |> put_status(:ok)
-          |> json(%{"did" => parsed.did, "role" => "Owner"})
+                              defp finalize_transaction(parsed) do
+    result =
+      Yawp.Repo.transaction(fn ->
+        case do_finalize(parsed) do
+          {:ok, payload, notifications} -> {payload, notifications}
+          {:error, reason} -> Yawp.Repo.rollback(reason)
         end
-      end
-    rescue
-      error ->
-        Logger.error("ClaimController: claim failed — #{inspect(error)}")
-        respond_error(conn, :internal_error)
+      end)
+
+    case result do
+      {:ok, {payload, notifications}} ->
+        _ = Ash.Notifier.notify(notifications)
+        {:ok, payload}
+
+      {:error, reason} ->
+        {:error, reason}
+    end
+  end
+
+  defp do_finalize(parsed) do
+    with {:ok, consumed_claim, n0} <-
+           Admin.consume_claim_token(parsed.claim_token, return_notifications?: true),
+         {:ok, identity, n1} <-
+           Identity.claim_chat_owner(
+             %{did: parsed.did, master_public_key: parsed.public_key},
+             return_notifications?: true
+           ),
+         {:ok, server} <- get_singleton_or_fail(),
+         {:ok, owner_role} <- get_owner_role_or_fail(server),
+         {:ok, _membership, n2} <-
+           Servers.assign_role(identity.id, server.id, owner_role.id, return_notifications?: true) do
+      {:ok, %{identity: identity, claim: consumed_claim}, n0 ++ n1 ++ n2}
+    end
+  end
+
+  defp get_singleton_or_fail do
+    case Servers.get_singleton_server() do
+      {:ok, nil} ->
+        Logger.error("ClaimController: singleton server missing — seed did not run")
+        {:error, :internal_error}
+
+      {:ok, server} ->
+        {:ok, server}
+    end
+  end
+
+  defp get_owner_role_or_fail(server) do
+    case Servers.get_system_role_for_server("Owner", server.id) do
+      nil ->
+        Logger.error("ClaimController: Owner system role missing for server #{server.id}")
+        {:error, :internal_error}
+
+      role ->
+        {:ok, role}
     end
   end
 
