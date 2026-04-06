@@ -84,7 +84,7 @@ defmodule YawpWeb.AdminSetupControllerTest do
       refute account_exists?("op@example.com")
     end
 
-    test "POST /admin/setup with mismatched password re-renders the form; token IS consumed",
+    test "POST /admin/setup with mismatched password renders the irrecoverable setup-failed page; token IS consumed",
          %{conn: conn} do
       {:ok, token} = SetupToken.generate()
 
@@ -96,8 +96,17 @@ defmodule YawpWeb.AdminSetupControllerTest do
           "password_confirmation" => "different"
         })
 
-      assert conn.status == 200
-      assert conn.resp_body =~ ~s(id="admin-setup-form")
+            assert conn.status == 500
+      assert conn.resp_body =~ ~s(id="admin-setup-failed")
+
+            assert conn.resp_body =~ ~r/restart the server/i
+
+                  assert conn.resp_body =~ "password_confirmation"
+
+            refute conn.resp_body =~ ~s(name="email")
+      refute conn.resp_body =~ ~s(name="password")
+      refute conn.resp_body =~ ~s(id="admin-setup-form")
+
                               assert SetupToken.current() == nil
     end
   end

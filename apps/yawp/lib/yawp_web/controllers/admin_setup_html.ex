@@ -92,6 +92,47 @@ defmodule YawpWeb.AdminSetupHTML do
     """
   end
 
+  def setup_failed(assigns) do
+    ~H"""
+    <!DOCTYPE html>
+    <html lang="en">
+      <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <title>Yawp — setup failed</title>
+        <link phx-track-static rel="stylesheet" href={~p"/assets/css/app.css"} />
+      </head>
+      <body class="min-h-screen bg-base-200 flex items-center justify-center px-4 py-12">
+        <main id="admin-setup-failed" class="w-full max-w-md">
+          <header class="mb-6">
+            <h1 class="text-2xl font-semibold">Setup failed — server restart required</h1>
+            <p class="text-sm text-base-content/70 mt-2">
+              The setup token was consumed but the operator account could not be created.
+              The token cannot be reused. To try again, <strong>restart the server</strong>
+              — on next boot it will mint a fresh setup token and log a new setup link.
+            </p>
+          </header>
+
+          <%= if @errors != [] do %>
+            <div id="admin-setup-failed-errors" class="alert alert-error mb-4">
+              <p class="font-semibold mb-2">Validation errors from the submitted form:</p>
+              <ul class="list-disc list-inside">
+                <li :for={msg <- @errors}>{msg}</li>
+              </ul>
+            </div>
+          <% end %>
+
+          <p class="text-sm text-base-content/70">
+            After restarting the server, check the startup log for the new
+            <code>/admin/setup?token=…</code>
+            link.
+          </p>
+        </main>
+      </body>
+    </html>
+    """
+  end
+
   def forbidden(assigns) do
     ~H"""
     <!DOCTYPE html>

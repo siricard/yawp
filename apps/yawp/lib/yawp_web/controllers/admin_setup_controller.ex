@@ -28,10 +28,11 @@ defmodule YawpWeb.AdminSetupController do
   If `create_account/1` then fails (e.g. validation), the setup token
   has already been consumed by the agent. This is a deliberate
   trade-off: consume wins eagerly; on failure the token stays
-  consumed and the user sees a "setup failed; restart the server to
-  mint a fresh token" error. Acceptable because (a) the operator
-  typed bad input, and (b) the server can be restarted to re-arm
-  setup mode. Simpler than trying to re-arm the agent on rollback.
+  consumed and the user sees the irrecoverable-failure page with
+  restart instructions (HTTP 500). The operator must restart the
+  server to mint a fresh setup token — we do not re-arm the agent
+  on rollback. Acceptable because (a) the operator typed bad input,
+  and (b) the server can be restarted to re-arm setup mode.
   """
 
   use YawpWeb, :controller
@@ -72,7 +73,7 @@ defmodule YawpWeb.AdminSetupController do
         render_forbidden(conn, :invalid_token)
 
       {:error, {:create_account, error}} ->
-                                render_form(conn, "", attrs, error_messages(error))
+                                        render_setup_failed(conn, error_messages(error))
     end
   end
 
@@ -120,6 +121,13 @@ defmodule YawpWeb.AdminSetupController do
     |> put_status(:forbidden)
     |> put_view(YawpWeb.AdminSetupHTML)
     |> render(:forbidden, reason: reason)
+  end
+
+  defp render_setup_failed(conn, errors) do
+    conn
+    |> put_status(:internal_server_error)
+    |> put_view(YawpWeb.AdminSetupHTML)
+    |> render(:setup_failed, errors: errors)
   end
 
   defp error_messages(%Ash.Error.Invalid{errors: errors}) do
