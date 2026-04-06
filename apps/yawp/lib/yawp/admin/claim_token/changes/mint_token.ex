@@ -5,27 +5,36 @@ defmodule Yawp.Admin.ClaimToken.Changes.MintToken do
   argument, and revokes any currently-active claim token so only one
   active token can exist at a time.
 
-  ## concurrent generators
+  ## production-safe concurrency
 
-  Two concurrent generators could previously both see the empty
-  active-set, both revoke nothing, and both insert a fresh row
-  leaving two active claim tokens and breaking the invariant.
+  The original wrapped Ash's inner transaction with an
+  `around_transaction` callback that issued `pg_advisory_lock` via
+  standalone `Repo.query!/2` calls. That works under the SQL sandbox
+  (which pins every test process to one checked-out connection) but
+  is unsound in production: the pool may hand the lock query and the
+  inner `Repo.transaction/1` two different connections, leaving the
+  revoke + insert running on a connection that does NOT hold the
+  lock.
 
-  The fix has two layers, both required:
+  The fix has three cooperating layers:
 
-  1. **Postgres partial unique index** `admin_claim_tokens_one_active_index`
-     (declared in `Yawp.Admin.ClaimToken`'s `custom_indexes`) is the
-     last line of defence — Postgres physically rejects a second
-     active row.
-  2. **Advisory transaction lock** keyed by
-     `hashtext('yawp.admin_claim_token.generate')` serialises concurrent
-     mints so the second caller blocks until the first has revoked the
-     old active row and inserted its replacement. Without this, the
-     second caller would simply crash on the unique-index violation.
+  1. **Action runs in a transaction.** `:generate` declares
+     `transaction? true`, so Ash issues a single `Repo.transaction/1`
+     that pins one connection for the whole action.
+  2. **Transaction-scoped advisory lock on the same connection.** A
+     `before_action` hook issues `pg_advisory_xact_lock(key)` from
+     inside the transaction. Postgres acquires the lock on the
+     pinned connection and auto-releases it on COMMIT or ROLLBACK
+     no leaked locks, no cross-connection race.
+  3. **Partial unique index on `((1))`.** Declared in the resource's
+     `custom_indexes` block, this is the last line of defence: if
+     two writers ever do get past the lock (e.g. someone disables
+     the advisory lock in a future refactor), Postgres still rejects
+     a second active row.
 
-  Both the revoke and the insert run inside the same `Repo.transaction`
-  so the index sees a consistent picture: either the old row is
-  revoked and the new row is inserted, or neither is.
+  Order matters in the change pipeline — the advisory lock MUST be
+  acquired before `revoke_active_tokens/1` so concurrent mints
+  serialise on the same key.
   """
 
   use Ash.Resource.Change
@@ -34,7 +43,7 @@ defmodule Yawp.Admin.ClaimToken.Changes.MintToken do
 
   @ttl_seconds 15 * 60
 
-          @advisory_lock_key 7_151_500_000_000_001
+      @advisory_lock_key 7_151_500_000_000_001
 
   @impl true
   def change(changeset, _opts, _context) do
@@ -50,18 +59,13 @@ defmodule Yawp.Admin.ClaimToken.Changes.MintToken do
     |> Ash.Changeset.force_change_attribute(:token, token)
     |> Ash.Changeset.force_change_attribute(:expires_at, expires_at)
     |> Ash.Changeset.force_change_attribute(:created_by_account_id, account_id)
-    |> Ash.Changeset.around_transaction(&with_advisory_lock/2)
+    |> Ash.Changeset.before_action(&acquire_xact_lock/1)
     |> Ash.Changeset.before_action(&revoke_active_tokens/1)
   end
 
-              defp with_advisory_lock(changeset, callback) do
-    Yawp.Repo.query!("SELECT pg_advisory_lock($1)", [@advisory_lock_key])
-
-    try do
-      callback.(changeset)
-    after
-      Yawp.Repo.query!("SELECT pg_advisory_unlock($1)", [@advisory_lock_key])
-    end
+                defp acquire_xact_lock(changeset) do
+    Yawp.Repo.query!("SELECT pg_advisory_xact_lock($1)", [@advisory_lock_key])
+    changeset
   end
 
   defp revoke_active_tokens(changeset) do

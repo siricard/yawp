@@ -28,7 +28,7 @@ defmodule Yawp.Admin.ClaimToken do
     end
 
     custom_indexes do
-                                    index [:id],
+                                                                                    index ["((1))"],
         name: "admin_claim_tokens_one_active_index",
         unique: true,
         where: "consumed_at IS NULL AND revoked_at IS NULL",
@@ -44,6 +44,8 @@ defmodule Yawp.Admin.ClaimToken do
       accept []
 
       argument :created_by_account_id, :uuid, allow_nil?: false
+
+                        transaction? true
 
       change Yawp.Admin.ClaimToken.Changes.MintToken
     end

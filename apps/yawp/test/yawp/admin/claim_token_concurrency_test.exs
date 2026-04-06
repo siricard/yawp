@@ -112,6 +112,38 @@ defmodule Yawp.Admin.ClaimTokenConcurrencyTest do
              "expected the claim token row to cascade-delete with its operator account"
     end
 
+    test "raw insert of a second active claim token is rejected by the singleton partial unique index" do
+                                          account = create_account!()
+      account_bin = Ecto.UUID.dump!(account.id)
+      now = DateTime.utc_now()
+      expires_at = DateTime.add(now, 15 * 60, :second)
+
+      assert {1, _} =
+               Yawp.Repo.insert_all("admin_claim_tokens", [
+                 %{
+                   id: Ecto.UUID.bingenerate(),
+                   token: "ROWAFAKETOKEN12345678901234",
+                   expires_at: expires_at,
+                   created_by_account_id: account_bin,
+                   inserted_at: now
+                 }
+               ])
+
+      assert_raise Postgrex.Error,
+                   ~r/admin_claim_tokens_one_active_index/,
+                   fn ->
+                     Yawp.Repo.insert_all("admin_claim_tokens", [
+                       %{
+                         id: Ecto.UUID.bingenerate(),
+                         token: "ROWBFAKETOKEN12345678901234",
+                         expires_at: expires_at,
+                         created_by_account_id: account_bin,
+                         inserted_at: now
+                       }
+                     ])
+                   end
+    end
+
     test "inserting a claim token with a non-existent created_by_account_id fails" do
       bogus_id = Ecto.UUID.generate()
 
