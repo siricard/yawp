@@ -92,6 +92,45 @@ defmodule Yawp.Admin.ClaimTokenConcurrencyTest do
     end
   end
 
+  describe "generate_claim_token/1 with stale expired-but-active rows" do
+    test "revokes an expired-unconsumed-unrevoked row so a fresh mint succeeds" do
+                                                            account = create_account!()
+      account_bin = Ecto.UUID.dump!(account.id)
+      now = DateTime.utc_now()
+      past = DateTime.add(now, -60, :second)
+
+      stale_id = Ecto.UUID.generate()
+      stale_id_bin = Ecto.UUID.dump!(stale_id)
+
+      {1, _} =
+        Yawp.Repo.insert_all("admin_claim_tokens", [
+          %{
+            id: stale_id_bin,
+            token: "STALEEXPIREDTOKEN1234567890",
+            expires_at: past,
+            created_by_account_id: account_bin,
+            inserted_at: past
+          }
+        ])
+
+      assert {:ok, %ClaimToken{} = fresh} =
+               Admin.generate_claim_token(%{created_by_account_id: account.id})
+
+      assert {:ok, active} = Admin.get_active_claim_token()
+      assert active.id == fresh.id
+
+      stale_revoked_at =
+        Yawp.Repo.one(
+          from t in "admin_claim_tokens",
+            where: t.id == type(^stale_id, Ecto.UUID),
+            select: t.revoked_at
+        )
+
+      refute is_nil(stale_revoked_at),
+             "expected the stale expired row to have been revoked by MintToken cleanup"
+    end
+  end
+
   describe "FK on created_by_account_id" do
     test "deleting an operator account cascades to its claim tokens" do
       account = create_account!()

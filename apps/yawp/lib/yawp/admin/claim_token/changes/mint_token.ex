@@ -68,11 +68,9 @@ defmodule Yawp.Admin.ClaimToken.Changes.MintToken do
     changeset
   end
 
-  defp revoke_active_tokens(changeset) do
-    now = DateTime.utc_now()
-
+                                      defp revoke_active_tokens(changeset) do
     Yawp.Admin.ClaimToken
-    |> Ash.Query.filter(is_nil(consumed_at) and is_nil(revoked_at) and expires_at > ^now)
+    |> Ash.Query.filter(is_nil(consumed_at) and is_nil(revoked_at))
     |> Ash.bulk_update!(:revoke, %{},
       authorize?: false,
       return_errors?: true,
