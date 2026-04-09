@@ -10,8 +10,10 @@ defmodule Yawp.Admin.ClaimToken do
   controller verifies and consumes.
 
   Only one active token can exist at any time — minting a new one
-  automatically revokes any prior unconsumed/unrevoked/unexpired
-  token (see `Yawp.Admin.ClaimToken.Changes.MintToken`).
+  automatically revokes any prior unconsumed/unrevoked token
+  (regardless of expiry, so the cleanup predicate matches the
+  `admin_claim_tokens_one_active_index` partial unique index — see
+  `Yawp.Admin.ClaimToken.Changes.MintToken`).
   """
 
   use Ash.Resource,
