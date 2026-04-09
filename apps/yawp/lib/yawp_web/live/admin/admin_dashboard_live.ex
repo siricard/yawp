@@ -37,18 +37,30 @@ defmodule YawpWeb.AdminDashboardLive do
   @impl true
   def handle_event("generate_claim_token", _params, socket) do
     account = socket.assigns.current_account
+    prior_token = socket.assigns.active_claim_token
 
     {:ok, token} =
       Yawp.Admin.generate_claim_token(%{created_by_account_id: account.id})
 
-    entry =
+    revoke_entry =
+      if prior_token do
+        Yawp.Admin.audit!(account.id, "claim_token.revoke", %{token_id: prior_token.id})
+      end
+
+    generate_entry =
       Yawp.Admin.audit!(account.id, "claim_token.generate", %{token_id: token.id})
 
+    socket = assign(socket, :active_claim_token, token)
+
+    socket =
+      if revoke_entry,
+        do: stream_insert(socket, :audit_log, revoke_entry, at: 0),
+        else: socket
+
+    socket = stream_insert(socket, :audit_log, generate_entry, at: 0)
+
     {:noreply,
-     socket
-     |> assign(:active_claim_token, token)
-     |> stream_insert(:audit_log, entry, at: 0)
-     |> put_flash(:info, "Claim token generated. Copy it now — it will not be shown again.")}
+     put_flash(socket, :info, "Claim token generated. Copy it now — it will not be shown again.")}
   end
 
   def handle_event("acknowledge_per_server_defaults", _params, socket) do
@@ -186,7 +198,6 @@ defmodule YawpWeb.AdminDashboardLive do
                 <div class="space-y-2">
                   <code
                     id="claim-token-value"
-                    phx-no-curly-interpolation
                     class="block font-mono text-xs bg-base-200 px-2 py-1 rounded break-all"
                   >
                     {@active_claim_token.token}
@@ -237,6 +248,14 @@ defmodule YawpWeb.AdminDashboardLive do
                       class="btn btn-sm btn-soft"
                     >
                       <.icon name="hero-clipboard" class="size-4" /> Copy
+                    </button>
+                    <button
+                      id="claim-token-replace-btn"
+                      type="button"
+                      phx-click="generate_claim_token"
+                      class="btn btn-sm btn-soft"
+                    >
+                      <.icon name="hero-arrow-path" class="size-4" /> Replace
                     </button>
                     <button
                       id="claim-token-revoke-btn"

@@ -104,16 +104,40 @@ defmodule YawpWeb.AdminDashboardLiveTest do
       refute has_element?(view, "#claim-token-revoke-btn")
     end
 
-    test "clicking Generate renders the token + Revoke control", %{conn: conn} do
+    test "clicking Generate renders the token + Replace + Revoke controls", %{conn: conn} do
       {:ok, view, _html} = live(conn, "/admin")
 
       view
       |> element("#claim-token-generate-btn")
       |> render_click()
 
-      assert has_element?(view, "#claim-token-value")
+      {:ok, token} = Yawp.Admin.get_active_claim_token()
+      assert token
+      assert has_element?(view, "#claim-token-value", token.token)
+      assert has_element?(view, "#claim-token-replace-btn")
       assert has_element?(view, "#claim-token-revoke-btn")
       refute has_element?(view, "#claim-token-generate-btn")
+    end
+
+    test "clicking Replace mints a fresh token and revokes the prior one", %{conn: conn} do
+      {:ok, view, _html} = live(conn, "/admin")
+
+      view |> element("#claim-token-generate-btn") |> render_click()
+      {:ok, first} = Yawp.Admin.get_active_claim_token()
+
+      view |> element("#claim-token-replace-btn") |> render_click()
+      {:ok, second} = Yawp.Admin.get_active_claim_token()
+
+      assert second
+      assert second.token != first.token
+      assert DateTime.compare(second.expires_at, first.expires_at) in [:gt, :eq]
+      assert has_element?(view, "#claim-token-value", second.token)
+      refute has_element?(view, "#claim-token-value", first.token)
+
+      {:ok, entries} = Yawp.Admin.list_recent_audit_entries()
+      actions = Enum.map(entries, & &1.action)
+      assert "claim_token.revoke" in actions
+            assert Enum.count(actions, &(&1 == "claim_token.generate")) >= 2
     end
 
     test "Generate writes a claim_token.generate audit entry", %{conn: conn} do
