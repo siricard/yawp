@@ -1,5 +1,10 @@
 # Yawp
 
+## Try it
+
+See [`docs/walkthroughs/m7-1.md`](docs/walkthroughs/m7-1.md) for the
+first-boot walkthrough (`just demo-m7-1`).
+
 ## Running everything locally
 
 All project commands should run through the Nix dev shell. The `justfile` recipes already wrap the commands with `nix develop -c`.

@@ -49,6 +49,17 @@ check:
 db-reset:
     nix develop -c mix ecto.reset
 
+# M7.1 vertical slice: fresh DB + Phoenix; prints the
+# operator setup URL on startup. See docs/walkthroughs/m7-1.md.
+demo-m7-1:
+    nix develop -c mix ecto.reset
+    @echo ""
+    @echo "--- M7.1 walkthrough ---"
+    @echo "After Phoenix boots, look for: OPERATOR SETUP <url>"
+    @echo "Then follow docs/walkthroughs/m7-1.md"
+    @echo ""
+    nix develop -c bash -c 'cd apps/yawp && mix phx.server'
+
 # Generate Ash migrations
 ash-migrate:
     nix develop -c mix ash.codegen
