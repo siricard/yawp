@@ -1,5 +1,6 @@
 
 import {canonicalJson} from './canonical-json';
+import {claimChatOwner} from './ash_generated';
 import {signWithIdentity, type Identity} from './identity';
 
 export type ClaimSuccess = {
@@ -57,12 +58,12 @@ function humanize(slug: string, fallback: string): string {
 
 /**
  * Build the canonical-JSON payload, sign it with the persisted identity,
- * and POST to `<serverUrl>/api/claim`.
+ * and dispatch through the generated `claimChatOwner` RPC binding.
  *
- * For the identity is the "stub" produced by
- * `getOrCreateIdentity` — a persisted random Ed25519 seed. Once
- * lands real BIP-39 onboarding the same call site keeps working: the
- * identity argument is the only crypto material we touch.
+ * The RPC endpoint lives at `${serverUrl}/rpc/run`. We override the
+ * generated binding's default fetch so callers can target a remote
+ * anchor (not just the current page's origin) and so tests can inject
+ * a fake fetch.
  */
 export async function submitClaim(args: {
   serverUrl: string;
@@ -71,10 +72,9 @@ export async function submitClaim(args: {
   fetchImpl?: typeof fetch;
 }): Promise<ClaimResult> {
   const {serverUrl, claimToken, identity} = args;
-  const doFetch = args.fetchImpl ?? fetch;
+  const baseFetch = args.fetchImpl ?? fetch;
 
   const base = normalizeServerUrl(serverUrl);
-  const url = `${base}/api/claim`;
 
   const did = `did:yawp:${identity.did}`;
   const pkB64 = bytesToBase64Url(identity.publicKey);
@@ -87,24 +87,21 @@ export async function submitClaim(args: {
 
   const encoded = new TextEncoder().encode(canonical);
   const sig = await signWithIdentity(encoded);
-  const sigB64 = bytesToBase64Url(sig);
+  const senderSignature = bytesToBase64Url(sig);
 
-  const body = JSON.stringify({
-    claim_token: claimToken,
-    did,
-    pk: pkB64,
-    sender_signature: sigB64,
-  });
+  const customFetch: typeof fetch = (input, init) => {
+    if (typeof input === 'string' && input.startsWith('/rpc/')) {
+      return baseFetch(`${base}${input}`, init);
+    }
+    return baseFetch(input as RequestInfo, init);
+  };
 
-  let res: Response;
+  let result;
   try {
-    res = await doFetch(url, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Accept: 'application/json',
-      },
-      body,
+    result = await claimChatOwner({
+      input: {claimToken, did, pk: pkB64, senderSignature},
+      fields: ['id', 'did'],
+      customFetch,
     });
   } catch (e) {
     return {
@@ -115,27 +112,23 @@ export async function submitClaim(args: {
     };
   }
 
-  let json: unknown = null;
-  try {
-    json = await res.json();
-  } catch {
-  }
-
-  if (res.ok) {
-    const j = (json ?? {}) as {did?: string; role?: string};
+  if (result.success) {
     return {
       ok: true,
-      did: j.did ?? did,
-      role: j.role ?? 'Owner',
+      did: (result.data as {did?: string}).did ?? did,
+      role: 'Owner',
     };
   }
 
-  const slug =
-    (json as {error?: string} | null)?.error ?? `http_${res.status}`;
+  const first = result.errors[0];
+  const slug = first?.type ?? 'internal_error';
+
+  const status = slug === 'network_error' ? 0 : 400;
+
   return {
     ok: false,
-    status: res.status,
+    status,
     error: slug,
-    message: humanize(slug, `Server returned ${res.status}.`),
+    message: humanize(slug, first?.message ?? 'Server returned an error.'),
   };
 }

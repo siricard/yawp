@@ -22,11 +22,17 @@ defmodule Yawp.Identity do
   stub; richer behavior lands+. See ADRs 005–007.
   """
 
-  use Ash.Domain, otp_app: :yawp
+  use Ash.Domain, otp_app: :yawp, extensions: [AshTypescript.Rpc]
+
+  typescript_rpc do
+    resource Yawp.Identity.Identity do
+      rpc_action :claim_chat_owner, :claim_chat_owner
+    end
+  end
 
   resources do
     resource Yawp.Identity.Identity do
-      define :claim_chat_owner, action: :upsert_chat_owner
+      define :claim_chat_owner, action: :claim_chat_owner
       define :get_chat_owner, action: :get_chat_owner, not_found_error?: false
       define :get_identity_by_did, action: :get_by_did, args: [:did]
     end

@@ -1,5 +1,6 @@
 
 
+import type { AshRpcError, IdentityResourceSchema, InferResult, UnifiedFieldSelection, ValidationResult } from "./ash_types";
 export type * from "./ash_types";
 
 /**
@@ -172,5 +173,78 @@ export async function executeValidationRpcRequest<T>(
   }
 
   return result as T;
+}
+
+export type ClaimChatOwnerInput = {
+  claimToken: string;
+  did: string;
+  pk: string;
+  senderSignature: string;
+};
+
+export type ClaimChatOwnerFields = UnifiedFieldSelection<IdentityResourceSchema>[];
+
+export type InferClaimChatOwnerResult<
+  Fields extends ClaimChatOwnerFields | undefined,
+> = InferResult<IdentityResourceSchema, Fields>;
+
+export type ClaimChatOwnerResult<Fields extends ClaimChatOwnerFields | undefined = undefined> = | { success: true; data: InferClaimChatOwnerResult<Fields>; }
+| { success: false; errors: AshRpcError[]; }
+
+;
+
+/**
+ * Create a new Identity
+ *
+ * @ashActionType :create
+ */
+export async function claimChatOwner<Fields extends ClaimChatOwnerFields | undefined = undefined>(
+  config: {
+  tenant?: string;
+  input: ClaimChatOwnerInput;
+  fields?: Fields;
+  headers?: Record<string, string>;
+  fetchOptions?: RequestInit;
+  customFetch?: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
+}
+): Promise<ClaimChatOwnerResult<Fields extends undefined ? [] : Fields>> {
+  const payload = {
+    action: "claim_chat_owner",
+    ...(config.tenant !== undefined && { tenant: config.tenant }),
+    input: config.input,
+    ...(config.fields !== undefined && { fields: config.fields })
+  };
+
+  return executeActionRpcRequest<ClaimChatOwnerResult<Fields extends undefined ? [] : Fields>>(
+    payload,
+    config
+  );
+}
+
+/**
+ * Validate: Create a new Identity
+ *
+ * @ashActionType :create
+ * @validation true
+ */
+export async function validateClaimChatOwner(
+  config: {
+  tenant?: string;
+  input: ClaimChatOwnerInput;
+  headers?: Record<string, string>;
+  fetchOptions?: RequestInit;
+  customFetch?: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
+}
+): Promise<ValidationResult> {
+  const payload = {
+    action: "claim_chat_owner",
+    ...(config.tenant !== undefined && { tenant: config.tenant }),
+    input: config.input
+  };
+
+  return executeValidationRpcRequest<ValidationResult>(
+    payload,
+    config
+  );
 }
 

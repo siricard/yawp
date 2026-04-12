@@ -12,10 +12,14 @@ defmodule Yawp.Identity.Identity.Changes.VerifyDidDerivation do
   """
   use Ash.Resource.Change
 
+  alias Yawp.RpcError
+
   @impl true
   def change(changeset, _opts, _context) do
     Ash.Changeset.before_action(changeset, &verify/1)
   end
+
+  defp verify(%{valid?: false} = changeset), do: changeset
 
   defp verify(changeset) do
     did = Ash.Changeset.get_attribute(changeset, :did)
@@ -26,15 +30,18 @@ defmodule Yawp.Identity.Identity.Changes.VerifyDidDerivation do
         changeset
 
       byte_size(pk) != 32 ->
-        Ash.Changeset.add_error(changeset, field: :master_public_key, message: "must be 32 bytes")
+        Ash.Changeset.add_error(
+          changeset,
+          RpcError.exception(type: "invalid_payload", message: "invalid_payload")
+        )
 
       did == "did:yawp:" <> Yawp.Identity.did_from_pubkey(pk) ->
         changeset
 
       true ->
-        Ash.Changeset.add_error(changeset,
-          field: :did,
-          message: "does not match master_public_key"
+        Ash.Changeset.add_error(
+          changeset,
+          RpcError.exception(type: "did_mismatch", message: "did_mismatch")
         )
     end
   end

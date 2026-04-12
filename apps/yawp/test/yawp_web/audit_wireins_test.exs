@@ -140,13 +140,13 @@ defmodule YawpWeb.AuditWireinsTest do
     end
   end
 
-  describe "claim controller wire-in" do
+  describe "claim_chat_owner RPC wire-in" do
     setup do
       :ok = Yawp.Servers.Seeder.run()
       :ok
     end
 
-    test "POST /api/claim writes claim_token.consume on success", %{conn: conn} do
+    test "claim_chat_owner RPC action writes claim_token.consume on success" do
       {:ok, account} =
         Admin.create_account(%{
           email: "op2@example.com",
@@ -169,15 +169,21 @@ defmodule YawpWeb.AuditWireinsTest do
 
       sig = :crypto.sign(:eddsa, :none, canonical, [sk, :ed25519])
 
-      body = %{
-        "claim_token" => claim.token,
-        "did" => did,
-        "pk" => pk_b64,
-        "sender_signature" => Base.url_encode64(sig, padding: false)
-      }
+      result =
+        AshTypescript.Rpc.run_action(:yawp, Phoenix.ConnTest.build_conn(), %{
+          "action" => "claim_chat_owner",
+          "fields" => ["id", "did"],
+          "input" => %{
+            "claimToken" => claim.token,
+            "did" => did,
+            "pk" => pk_b64,
+            "senderSignature" => Base.url_encode64(sig, padding: false)
+          }
+        })
 
-      conn = post(conn, "/api/claim", body)
-      assert %{"did" => ^did} = json_response(conn, 200)
+      assert (Map.get(result, :success) || Map.get(result, "success")) == true
+      data = Map.get(result, :data) || Map.get(result, "data")
+      assert (Map.get(data, :did) || Map.get(data, "did")) == did
 
       {:ok, entries} = Admin.list_recent_audit_entries()
       consume = Enum.find(entries, &(&1.action == "claim_token.consume"))

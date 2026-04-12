@@ -60,7 +60,11 @@ describe('AddServerScreen', () => {
         return {
           ok: true,
           status: 200,
-          json: async () => ({did: 'did:yawp:abc', role: 'Owner'}),
+          statusText: 'OK',
+          json: async () => ({
+            success: true,
+            data: {id: 'id-abc', did: 'did:yawp:abc'},
+          }),
         } as unknown as Response;
       });
 
@@ -102,7 +106,7 @@ describe('AddServerScreen', () => {
     });
 
     expect(fetchSpy).toHaveBeenCalledTimes(1);
-    expect(fetchSpy.mock.calls[0][0]).toBe('http://localhost:4000/api/claim');
+    expect(fetchSpy.mock.calls[0][0]).toBe('http://localhost:4000/rpc/run');
     expect(added).toMatchObject({
       url: 'http://localhost:4000',
       did: 'did:yawp:abc',
@@ -120,9 +124,15 @@ describe('AddServerScreen', () => {
       .spyOn(global, 'fetch')
       .mockImplementation(async () => {
         return {
-          ok: false,
-          status: 409,
-          json: async () => ({error: 'claim_token_consumed'}),
+          ok: true,
+          status: 200,
+          statusText: 'OK',
+          json: async () => ({
+            success: false,
+            errors: [
+              {type: 'claim_token_consumed', message: 'claim_token_consumed'},
+            ],
+          }),
         } as unknown as Response;
       });
 

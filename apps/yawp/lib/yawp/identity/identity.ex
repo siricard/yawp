@@ -15,28 +15,52 @@ defmodule Yawp.Identity.Identity do
   use Ash.Resource,
     otp_app: :yawp,
     domain: Yawp.Identity,
-    data_layer: AshPostgres.DataLayer
+    data_layer: AshPostgres.DataLayer,
+    extensions: [AshTypescript.Resource]
 
   postgres do
     table "identities"
     repo Yawp.Repo
   end
 
+  typescript do
+    type_name "Identity"
+  end
+
   actions do
     defaults [:read]
 
-    create :upsert_chat_owner do
+    create :claim_chat_owner do
       description """
-      Upserts the singleton chat-owner Identity row keyed by `did`.
-      calls this from the `POST /api/claim` controller after the request
-      signature has been verified.
+      Pre-auth chat-owner claim flow. The request
+      is authenticated by the ed25519 signature over the canonical
+      claim payload — the action runs with `actor: nil` and
+      `authorize?: false`, but the `VerifySenderSignature` change
+      gates execution before any write occurs. Multi-resource
+      orchestration (consume token, upsert identity, assign Owner
+      role, audit) runs inside the action's implicit transaction;
+      failure rolls back everything.
+
+      Replaces the legacy `:upsert_chat_owner` action and the
+      hand-rolled `POST /api/claim` controller.
       """
 
-      accept [:did, :master_public_key]
+      accept []
+
+      argument :claim_token, :string, allow_nil?: false
+      argument :did, :string, allow_nil?: false
+            argument :pk, :string, allow_nil?: false
+            argument :sender_signature, :string, allow_nil?: false
+
       upsert? true
       upsert_identity :unique_did
 
+            change Yawp.Identity.Identity.Changes.DecodeClaimPayload
       change Yawp.Identity.Identity.Changes.VerifyDidDerivation
+      change Yawp.Identity.Identity.Changes.VerifySenderSignature
+      change Yawp.Identity.Identity.Changes.ConsumeClaimToken
+      change Yawp.Identity.Identity.Changes.AssignOwnerRole
+      change Yawp.Identity.Identity.Changes.WriteClaimAudit
     end
 
     read :get_chat_owner do

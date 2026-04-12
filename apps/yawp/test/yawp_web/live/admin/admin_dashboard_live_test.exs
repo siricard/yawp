@@ -185,7 +185,7 @@ defmodule YawpWeb.AdminDashboardLiveTest do
     test "renders the truncated DID at #chat-owner-did when claimed", %{conn: conn} do
       {pk, _sk} = :crypto.generate_key(:eddsa, :ed25519)
       did = "did:yawp:" <> Yawp.Identity.did_from_pubkey(pk)
-      {:ok, _identity} = Yawp.Identity.claim_chat_owner(%{did: did, master_public_key: pk})
+      _identity = Ash.Seed.seed!(Yawp.Identity.Identity, %{did: did, master_public_key: pk})
 
       {:ok, view, _html} = live(conn, "/admin")
       assert has_element?(view, "#chat-owner-did")

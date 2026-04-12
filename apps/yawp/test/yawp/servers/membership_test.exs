@@ -22,7 +22,9 @@ defmodule Yawp.Servers.MembershipTest do
 
     {pk, _sk} = :crypto.generate_key(:eddsa, :ed25519)
     did = "did:yawp:" <> Identity.did_from_pubkey(pk)
-    {:ok, identity} = Identity.claim_chat_owner(%{did: did, master_public_key: pk})
+
+    identity =
+      Ash.Seed.seed!(Yawp.Identity.Identity, %{did: did, master_public_key: pk})
 
     %{server: server, role: role, identity: identity}
   end

@@ -1,5 +1,6 @@
 
 
+export type Binary = string;
 export type UUID = string;
 export type UtcDateTimeUsec = string;
 
@@ -17,6 +18,22 @@ export type AdminAccountAttributesOnlySchema = {
   id: UUID;
   email: string;
   lastLoginAt: UtcDateTimeUsec | null;
+};
+
+export type IdentityResourceSchema = {
+  __type: "Resource";
+  __primitiveFields: "id" | "did" | "masterPublicKey";
+  id: UUID;
+  did: string;
+  masterPublicKey: Binary;
+};
+
+export type IdentityAttributesOnlySchema = {
+  __type: "Resource";
+  __primitiveFields: "id" | "did" | "masterPublicKey";
+  id: UUID;
+  did: string;
+  masterPublicKey: Binary;
 };
 
 export type AdminAccountFilterInput = {
@@ -48,12 +65,42 @@ export type AdminAccountFilterInput = {
   };
 
 };
+export type IdentityFilterInput = {
+  and?: Array<IdentityFilterInput>;
+  or?: Array<IdentityFilterInput>;
+  not?: Array<IdentityFilterInput>;
+
+  id?: {
+    eq?: UUID;
+    notEq?: UUID;
+    in?: Array<UUID>;
+  };
+
+  did?: {
+    eq?: string;
+    notEq?: string;
+    in?: Array<string>;
+  };
+
+  masterPublicKey?: {
+    eq?: Binary;
+    notEq?: Binary;
+    in?: Array<Binary>;
+  };
+
+};
 
 export const adminAccountFilterFields = ["id", "email", "lastLoginAt"] as const;
 export type AdminAccountFilterField = (typeof adminAccountFilterFields)[number];
 
+export const identityFilterFields = ["id", "did", "masterPublicKey"] as const;
+export type IdentityFilterField = (typeof identityFilterFields)[number];
+
 export const adminAccountSortFields = ["id", "email", "lastLoginAt"] as const;
 export type AdminAccountSortField = (typeof adminAccountSortFields)[number];
+
+export const identitySortFields = ["id", "did", "masterPublicKey"] as const;
+export type IdentitySortField = (typeof identitySortFields)[number];
 
 export type SortString<T extends string> = T | `+${T}` | `-${T}` | `++${T}` | `--${T}`;
 
