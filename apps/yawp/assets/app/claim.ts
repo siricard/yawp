@@ -1,7 +1,8 @@
 
 import {canonicalJson} from './canonical-json';
 import {claimChatOwner} from './ash_generated';
-import {signWithIdentity, type Identity} from './identity';
+import {signWithIdentity} from './identity';
+import type {Identity} from './identity-context';
 
 export type ClaimSuccess = {
   ok: true;
@@ -86,7 +87,10 @@ export async function submitClaim(args: {
   });
 
   const encoded = new TextEncoder().encode(canonical);
-  const sig = await signWithIdentity(encoded);
+  const sig =
+    typeof (identity as {sign?: (b: Uint8Array) => Uint8Array}).sign === 'function'
+      ? (identity as {sign: (b: Uint8Array) => Uint8Array}).sign(encoded)
+      : await signWithIdentity(encoded);
   const senderSignature = bytesToBase64Url(sig);
 
   const customFetch: typeof fetch = (input, init) => {

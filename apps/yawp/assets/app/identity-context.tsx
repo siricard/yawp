@@ -2,20 +2,46 @@
 import React, {createContext, useCallback, useContext, useEffect, useState} from 'react';
 import {Platform} from 'react-native';
 
-import {getOrCreateIdentity, type Identity} from './identity';
+import {b64UrlToBytes, bytesToB64Url, type IdentityBundleV1} from './identity/bundle';
+import {generateDeviceSubkey, signWithDevice} from './identity/device';
+import {didFromPubkey, fingerprintFromPubkey} from './identity/did';
+import {generateMaster, masterPkFromSk, signWithMaster} from './identity/master';
+import {loadIdentity, saveIdentity} from './identity/storage-bundle';
+
+export type Identity = {
+  /**
+   * Bare base58 form, preserved for back-compat (claim.ts /
+   * AddServerScreen / DidScreen all prefix `did:yawp:` themselves).
+   */
+  did: string;
+  /** Full `did:yawp:<base58>` form. */
+  didFull: string;
+  /** Long-lived master public key (32-byte Ed25519). */
+  masterPk: Uint8Array;
+  /** Per-device unique id (UUID v4). */
+  deviceId: string;
+  /** Device subkey's public key. */
+  devicePk: Uint8Array;
+  /** Master-signed delegation over `{device_id, pk, issued_at}`. */
+  deviceDelegationSignature: Uint8Array;
+  /** ISO 8601 timestamp of device subkey issuance. */
+  deviceIssuedAt: string;
+  /** short fingerprint of the master key, e.g. `yp:8f3a · …`. */
+  fingerprint: string;
+  /** Sign bytes with the master secret key. */
+  sign: (bytes: Uint8Array) => Uint8Array;
+  /** Sign bytes with the device subkey's secret key. */
+  signDevice: (bytes: Uint8Array) => Uint8Array;
+};
 
 export type WorkspaceServer = {
-  /** Origin/base URL the client uses, e.g. `http://localhost:4000`. */
   url: string;
-  /** DID returned by the server claim (or any subsequent join). */
   did: string;
-  /** Role granted on this server (Owner/Admin/Member). */
   role: string;
-  /** Display name; for we just reuse the URL's host. */
   label: string;
 };
 
-const WORKSPACES_KEY = 'yawp.workspaces.v1';
+const WORKSPACES_KEY = 'mook.workspaces';
 
 type State =
   | {status: 'loading'; identity: null; error: null}
@@ -31,9 +57,7 @@ type Ctx = {
 const IdentityContext = createContext<Ctx | null>(null);
 
 function loadServers(): WorkspaceServer[] {
-  if (Platform.OS !== 'web') {
-    return [];
-  }
+  if (Platform.OS !== 'web') return [];
   try {
     const raw = window.localStorage.getItem(WORKSPACES_KEY);
     if (!raw) return [];
@@ -60,6 +84,53 @@ function persistServers(servers: WorkspaceServer[]): void {
   }
 }
 
+function buildIdentityFromBundle(bundle: IdentityBundleV1): Identity {
+  const masterSk = b64UrlToBytes(bundle.master.sk);
+  const masterPk = masterPkFromSk(masterSk);
+  const deviceSk = b64UrlToBytes(bundle.device.sk);
+  const devicePk = b64UrlToBytes(bundle.device.pk);
+  const deviceDelegationSignature = b64UrlToBytes(bundle.device.signature);
+  const didFull = didFromPubkey(masterPk);
+  const didBase58 = didFull.replace(/^did:yawp:/, '');
+  return {
+    did: didBase58,
+    didFull,
+    masterPk,
+    deviceId: bundle.device.deviceId,
+    devicePk,
+    deviceDelegationSignature,
+    deviceIssuedAt: bundle.device.issuedAt,
+    fingerprint: fingerprintFromPubkey(masterPk),
+    sign: bytes => signWithMaster(masterSk, bytes),
+    signDevice: bytes => signWithDevice(deviceSk, bytes),
+  };
+}
+
+/**
+ * Load the persisted bundle, or generate + persist a fresh one on first run.
+ */
+export async function loadOrCreateIdentity(): Promise<Identity> {
+  const existing = await loadIdentity();
+  if (existing) {
+    return buildIdentityFromBundle(existing);
+  }
+  const master = generateMaster();
+  const device = generateDeviceSubkey(master.sk);
+  const bundle: IdentityBundleV1 = {
+    version: 1,
+    master: {sk: bytesToB64Url(master.sk)},
+    device: {
+      deviceId: device.deviceId,
+      sk: bytesToB64Url(device.sk),
+      pk: bytesToB64Url(device.pk),
+      signature: bytesToB64Url(device.signature),
+      issuedAt: device.issuedAt,
+    },
+  };
+  await saveIdentity(bundle);
+  return buildIdentityFromBundle(bundle);
+}
+
 export function IdentityProvider({children}: {children: React.ReactNode}) {
   const [state, setState] = useState<State>({
     status: 'loading',
@@ -70,7 +141,7 @@ export function IdentityProvider({children}: {children: React.ReactNode}) {
 
   useEffect(() => {
     let mounted = true;
-    getOrCreateIdentity()
+    loadOrCreateIdentity()
       .then(identity => {
         if (mounted) {
           setState({status: 'ready', identity, error: null});
@@ -106,21 +177,17 @@ export function IdentityProvider({children}: {children: React.ReactNode}) {
   );
 }
 
-/** Returns the loaded identity or throws if still loading / errored. */
 export function useIdentity(): Identity {
   const ctx = useContext(IdentityContext);
   if (!ctx) {
     throw new Error('useIdentity must be used inside an <IdentityProvider>');
   }
   if (ctx.state.status !== 'ready') {
-    throw new Error(
-      'useIdentity: identity not ready; check useIdentityState() first',
-    );
+    throw new Error('useIdentity: identity not ready; check useIdentityState() first');
   }
   return ctx.state.identity;
 }
 
-/** Lower-level hook that exposes the full loading/ready/error state. */
 export function useIdentityState(): State {
   const ctx = useContext(IdentityContext);
   if (!ctx) {
@@ -129,16 +196,13 @@ export function useIdentityState(): State {
   return ctx.state;
 }
 
-/** Hook for the user's workspace-bar server list. */
 export function useWorkspaceServers(): {
   servers: WorkspaceServer[];
   addServer: (server: WorkspaceServer) => void;
 } {
   const ctx = useContext(IdentityContext);
   if (!ctx) {
-    throw new Error(
-      'useWorkspaceServers must be used inside an <IdentityProvider>',
-    );
+    throw new Error('useWorkspaceServers must be used inside an <IdentityProvider>');
   }
   return {servers: ctx.servers, addServer: ctx.addServer};
 }

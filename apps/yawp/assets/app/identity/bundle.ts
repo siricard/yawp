@@ -1,0 +1,61 @@
+
+export const STORAGE_KEY_V1 = '****************';
+
+export type IdentityBundleV1 = {
+  version: 1;
+  master: {
+    sk: string; 
+  };
+  device: {
+    deviceId: string;
+    sk: string; 
+    pk: string; 
+    signature: string; 
+    issuedAt: string; 
+  };
+};
+
+/** base64url (no padding) encode. */
+export function bytesToB64Url(bytes: Uint8Array): string {
+  let bin = '';
+  for (let i = 0; i < bytes.length; i++) {
+    bin += String.fromCharCode(bytes[i]);
+  }
+  const b64 =
+    typeof btoa === 'function'
+      ? btoa(bin)
+      : Buffer.from(bin, 'binary').toString('base64');
+  return b64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+
+/** base64url (no padding) decode. */
+export function b64UrlToBytes(s: string): Uint8Array {
+  const pad = s.length % 4 === 2 ? '==' : s.length % 4 === 3 ? '=' : '';
+  const b64 = s.replace(/-/g, '+').replace(/_/g, '/') + pad;
+  const bin =
+    typeof atob === 'function'
+      ? atob(b64)
+      : Buffer.from(b64, 'base64').toString('binary');
+  const out = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) {
+    out[i] = bin.charCodeAt(i);
+  }
+  return out;
+}
+
+export function isIdentityBundleV1(value: unknown): value is IdentityBundleV1 {
+  if (!value || typeof value !== 'object') return false;
+  const v = value as Record<string, unknown>;
+  if (v.version !== 1) return false;
+  const m = v.master as Record<string, unknown> | undefined;
+  const d = v.device as Record<string, unknown> | undefined;
+  if (!m || typeof m.sk !== 'string') return false;
+  if (!d) return false;
+  return (
+    typeof d.deviceId === 'string' &&
+    typeof d.sk === 'string' &&
+    typeof d.pk === 'string' &&
+    typeof d.signature === 'string' &&
+    typeof d.issuedAt === 'string'
+  );
+}
