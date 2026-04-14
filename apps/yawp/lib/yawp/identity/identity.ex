@@ -21,6 +21,8 @@ defmodule Yawp.Identity.Identity do
   postgres do
     table "identities"
     repo Yawp.Repo
+
+    migration_defaults device_subkeys: ~s|fragment("'{\\"subkeys\\": []}'::jsonb")|
   end
 
   typescript do
@@ -73,6 +75,28 @@ defmodule Yawp.Identity.Identity do
       description "Look up an Identity by DID."
       get_by [:did]
     end
+
+    update :bind_device do
+      description """
+      binds a new device subkey to an existing chat identity. Verifies the master-key delegation signature over the
+      canonical JSON `{device_id, pk, issued_at}`, appends the subkey
+      to `device_subkeys.subkeys` (first-write-wins on `device_id`),
+      appends `anchor_url` to `anchor_list` if missing, and bumps
+      `profile_version`. will layer the RPC wire shape
+      (pre-auth sender_signature, session+refresh tokens via action
+      metadata) on top of this base action.
+      """
+
+      require_atomic? false
+
+      argument :device_id, :string, allow_nil?: false
+            argument :device_pk, :string, allow_nil?: false
+                  argument :device_signature, :string, allow_nil?: false
+      argument :issued_at, :utc_datetime_usec, allow_nil?: false
+      argument :anchor_url, :string, allow_nil?: false
+
+      change Yawp.Identity.Identity.Changes.BindDevice
+    end
   end
 
   attributes do
@@ -88,6 +112,44 @@ defmodule Yawp.Identity.Identity do
       allow_nil? false
       public? true
       description "Raw 32-byte Ed25519 master public key."
+    end
+
+    attribute :device_subkeys, :map do
+      allow_nil? false
+      public? true
+      default %{"subkeys" => []}
+
+      description """
+      JSON object holding the user's bound device subkeys. Shape:
+      `%{"subkeys" => [%{"device_id" => uuid, "pk" => base64url(32),
+      "signature" => base64url(64), "issued_at" => iso8601}, ...]}`.
+      Persisted as JSONB. Stays inline on the row ; a dedicated
+      resource (if needed) lands in alongside PPE + recovery.
+      """
+    end
+
+    attribute :anchor_list, {:array, :string} do
+      allow_nil? false
+      public? true
+      default []
+
+      description """
+      List of anchor URLs this identity has bound itself to.
+      appends the singleton-anchor URL on first bind; subsequent
+      anchors append as the user adds devices/servers.
+      """
+    end
+
+    attribute :profile_version, :integer do
+      allow_nil? false
+      public? true
+      default 0
+
+      description """
+      Monotonic counter bumped on every PPE/anchor-list change. The
+      PPE refresh protocol uses this for conflict
+      resolution between anchors.
+      """
     end
 
     create_timestamp :inserted_at

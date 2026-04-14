@@ -22,18 +22,24 @@ export type AdminAccountAttributesOnlySchema = {
 
 export type IdentityResourceSchema = {
   __type: "Resource";
-  __primitiveFields: "id" | "did" | "masterPublicKey";
+  __primitiveFields: "id" | "did" | "masterPublicKey" | "deviceSubkeys" | "anchorList" | "profileVersion";
   id: UUID;
   did: string;
   masterPublicKey: Binary;
+  deviceSubkeys: Record<string, any>;
+  anchorList: Array<string>;
+  profileVersion: number;
 };
 
 export type IdentityAttributesOnlySchema = {
   __type: "Resource";
-  __primitiveFields: "id" | "did" | "masterPublicKey";
+  __primitiveFields: "id" | "did" | "masterPublicKey" | "deviceSubkeys" | "anchorList" | "profileVersion";
   id: UUID;
   did: string;
   masterPublicKey: Binary;
+  deviceSubkeys: Record<string, any>;
+  anchorList: Array<string>;
+  profileVersion: number;
 };
 
 export type AdminAccountFilterInput = {
@@ -88,18 +94,40 @@ export type IdentityFilterInput = {
     in?: Array<Binary>;
   };
 
+  deviceSubkeys?: {
+    eq?: Record<string, any>;
+    notEq?: Record<string, any>;
+    in?: Array<Record<string, any>>;
+  };
+
+  anchorList?: {
+    eq?: Array<string>;
+    notEq?: Array<string>;
+    in?: Array<Array<string>>;
+  };
+
+  profileVersion?: {
+    eq?: number;
+    notEq?: number;
+    greaterThan?: number;
+    greaterThanOrEqual?: number;
+    lessThan?: number;
+    lessThanOrEqual?: number;
+    in?: Array<number>;
+  };
+
 };
 
 export const adminAccountFilterFields = ["id", "email", "lastLoginAt"] as const;
 export type AdminAccountFilterField = (typeof adminAccountFilterFields)[number];
 
-export const identityFilterFields = ["id", "did", "masterPublicKey"] as const;
+export const identityFilterFields = ["id", "did", "masterPublicKey", "deviceSubkeys", "anchorList", "profileVersion"] as const;
 export type IdentityFilterField = (typeof identityFilterFields)[number];
 
 export const adminAccountSortFields = ["id", "email", "lastLoginAt"] as const;
 export type AdminAccountSortField = (typeof adminAccountSortFields)[number];
 
-export const identitySortFields = ["id", "did", "masterPublicKey"] as const;
+export const identitySortFields = ["id", "did", "masterPublicKey", "deviceSubkeys", "anchorList", "profileVersion"] as const;
 export type IdentitySortField = (typeof identitySortFields)[number];
 
 export type SortString<T extends string> = T | `+${T}` | `-${T}` | `++${T}` | `--${T}`;

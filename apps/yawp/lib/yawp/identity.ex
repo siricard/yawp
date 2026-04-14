@@ -35,6 +35,7 @@ defmodule Yawp.Identity do
       define :claim_chat_owner, action: :claim_chat_owner
       define :get_chat_owner, action: :get_chat_owner, not_found_error?: false
       define :get_identity_by_did, action: :get_by_did, args: [:did]
+      define :bind_device, action: :bind_device
     end
   end
 
