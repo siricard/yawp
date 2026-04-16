@@ -1,6 +1,8 @@
 defmodule YawpWeb.AshTypescriptRpcController do
   use YawpWeb, :controller
 
+            plug Yawp.Plug.ChatSession
+
   def run(conn, params) do
     result = AshTypescript.Rpc.run_action(:yawp, conn, params)
     json(conn, result)
