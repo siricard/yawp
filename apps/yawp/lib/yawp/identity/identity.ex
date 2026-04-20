@@ -78,24 +78,36 @@ defmodule Yawp.Identity.Identity do
 
     update :bind_device do
       description """
-      binds a new device subkey to an existing chat identity. Verifies the master-key delegation signature over the
-      canonical JSON `{device_id, pk, issued_at}`, appends the subkey
-      to `device_subkeys.subkeys` (first-write-wins on `device_id`),
-      appends `anchor_url` to `anchor_list` if missing, and bumps
-      `profile_version`. will layer the RPC wire shape
-      (pre-auth sender_signature, session+refresh tokens via action
-      metadata) on top of this base action.
+      binds a new device subkey to an existing chat identity. Pre-auth: gated by `sender_signature` over
+      the canonical request body, signed by the device subkey itself.
+      The master-key `device_signature` attests "this device is mine"
+      via canonical-JSON over `{device_id, pk, issued_at}`.
+
+      Operates on an existing Identity row keyed by `did`. On
+      success issues a session+refresh pair returned as action
+      metadata (`session_token`, `refresh_token`, `expires_at`).
       """
 
       require_atomic? false
 
-      argument :device_id, :string, allow_nil?: false
+      argument :device_id, :uuid, allow_nil?: false
             argument :device_pk, :string, allow_nil?: false
                   argument :device_signature, :string, allow_nil?: false
+                  argument :sender_signature, :string, allow_nil?: false
       argument :issued_at, :utc_datetime_usec, allow_nil?: false
-      argument :anchor_url, :string, allow_nil?: false
 
-      change Yawp.Identity.Identity.Changes.BindDevice
+      metadata :session_token, :string
+      metadata :refresh_token, :string
+      metadata :expires_at, :utc_datetime_usec
+
+      change Yawp.Identity.Identity.Changes.DecodeBindPayload
+      change Yawp.Identity.Identity.Changes.VerifyBindSenderSignature
+      change Yawp.Identity.Identity.Changes.VerifyDeviceDelegation
+      change Yawp.Identity.Identity.Changes.AppendDeviceSubkey
+      change Yawp.Identity.Identity.Changes.AppendAnchorUrl
+      change Yawp.Identity.Identity.Changes.BumpProfileVersion
+      change Yawp.Identity.Identity.Changes.IssueSessionPair
+      change Yawp.Identity.Identity.Changes.WriteBindAudit
     end
   end
 

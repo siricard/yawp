@@ -29,6 +29,10 @@ defmodule Yawp.Identity do
   typescript_rpc do
     resource Yawp.Identity.Identity do
       rpc_action :claim_chat_owner, :claim_chat_owner
+
+      rpc_action :bind_device, :bind_device,
+        identities: [:unique_did],
+        show_metadata: [:session_token, :refresh_token, :expires_at]
     end
   end
 

@@ -1,6 +1,6 @@
 
 
-import type { AshRpcError, IdentityResourceSchema, InferResult, UnifiedFieldSelection, ValidationResult } from "./ash_types";
+import type { AshRpcError, IdentityResourceSchema, InferResult, UUID, UnifiedFieldSelection, UtcDateTimeUsec, ValidationResult } from "./ash_types";
 export type * from "./ash_types";
 
 /**
@@ -173,6 +173,93 @@ export async function executeValidationRpcRequest<T>(
   }
 
   return result as T;
+}
+
+export type BindDeviceInput = {
+  deviceId: UUID;
+  devicePk: string;
+  deviceSignature: string;
+  senderSignature: string;
+  issuedAt: UtcDateTimeUsec;
+};
+
+export type BindDeviceFields = UnifiedFieldSelection<IdentityResourceSchema>[];
+
+export type BindDeviceMetadata = {
+  sessionToken?: string;
+  refreshToken?: string;
+  expiresAt?: UtcDateTimeUsec;
+};
+
+export type InferBindDeviceResult<
+  Fields extends BindDeviceFields | undefined,
+  MetadataFields extends ReadonlyArray<keyof BindDeviceMetadata> = []
+> = InferResult<IdentityResourceSchema, Fields>;
+
+export type BindDeviceResult<Fields extends BindDeviceFields | undefined = undefined, MetadataFields extends ReadonlyArray<keyof BindDeviceMetadata> = []> = | { success: true; data: InferBindDeviceResult<Fields>; metadata: Pick<BindDeviceMetadata, MetadataFields[number]>; }
+| { success: false; errors: AshRpcError[]; }
+
+;
+
+/**
+ * Update an existing Identity
+ *
+ * @ashActionType :update
+ */
+export async function bindDevice<Fields extends BindDeviceFields | undefined = undefined, MetadataFields extends ReadonlyArray<keyof BindDeviceMetadata> = []>(
+  config: {
+  tenant?: string;
+  identity: { did: string };
+  input: BindDeviceInput;
+  fields?: Fields;
+  metadataFields?: MetadataFields;
+  headers?: Record<string, string>;
+  fetchOptions?: RequestInit;
+  customFetch?: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
+}
+): Promise<BindDeviceResult<Fields extends undefined ? [] : Fields, MetadataFields>> {
+  const payload = {
+    action: "bind_device",
+    ...(config.tenant !== undefined && { tenant: config.tenant }),
+    identity: config.identity,
+    input: config.input,
+    ...(config.fields !== undefined && { fields: config.fields }),
+    ...(config.metadataFields && { metadataFields: config.metadataFields })
+  };
+
+  return executeActionRpcRequest<BindDeviceResult<Fields extends undefined ? [] : Fields, MetadataFields>>(
+    payload,
+    config
+  );
+}
+
+/**
+ * Validate: Update an existing Identity
+ *
+ * @ashActionType :update
+ * @validation true
+ */
+export async function validateBindDevice(
+  config: {
+  tenant?: string;
+  identity: { did: string };
+  input: BindDeviceInput;
+  headers?: Record<string, string>;
+  fetchOptions?: RequestInit;
+  customFetch?: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
+}
+): Promise<ValidationResult> {
+  const payload = {
+    action: "bind_device",
+    ...(config.tenant !== undefined && { tenant: config.tenant }),
+    identity: config.identity,
+    input: config.input
+  };
+
+  return executeValidationRpcRequest<ValidationResult>(
+    payload,
+    config
+  );
 }
 
 export type ClaimChatOwnerInput = {

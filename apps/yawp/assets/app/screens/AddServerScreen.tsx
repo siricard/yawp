@@ -3,6 +3,7 @@ import React, {useState} from 'react';
 import {Platform, Pressable, Text, TextInput, View} from 'react-native';
 
 import {submitClaim} from '../claim';
+import {submitBindDevice} from '../bind';
 import {
   useIdentityState,
   useWorkspaceServers,
@@ -57,9 +58,19 @@ export function AddServerScreen({onCancel, onAdded}: Props) {
       identity: identityState.identity,
     });
 
-    setSubmitting(false);
-
     if (result.ok) {
+      const bind = await submitBindDevice({
+        serverUrl: serverUrl.trim(),
+        identity: identityState.identity,
+      });
+
+      setSubmitting(false);
+
+      if (!bind.ok) {
+        setErrorMessage(bind.message);
+        return;
+      }
+
       const server: WorkspaceServer = {
         url: serverUrl.trim().replace(/\/+$/, ''),
         did: result.did,
@@ -71,6 +82,7 @@ export function AddServerScreen({onCancel, onAdded}: Props) {
       return;
     }
 
+    setSubmitting(false);
     setErrorMessage(result.message);
   }
 
