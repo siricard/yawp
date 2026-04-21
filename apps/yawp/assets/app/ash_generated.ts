@@ -1,6 +1,6 @@
 
 
-import type { AshRpcError, IdentityResourceSchema, InferResult, UUID, UnifiedFieldSelection, UtcDateTimeUsec, ValidationResult } from "./ash_types";
+import type { AshRpcError, IdentityResourceSchema, InferResult, ServerChannelFilterInput, ServerChannelResourceSchema, ServerChannelSortField, SortString, UUID, UnifiedFieldSelection, UtcDateTimeUsec, ValidationResult } from "./ash_types";
 export type * from "./ash_types";
 
 /**
@@ -327,6 +327,71 @@ export async function validateClaimChatOwner(
     action: "claim_chat_owner",
     ...(config.tenant !== undefined && { tenant: config.tenant }),
     input: config.input
+  };
+
+  return executeValidationRpcRequest<ValidationResult>(
+    payload,
+    config
+  );
+}
+
+export type ListTextChannelsFields = UnifiedFieldSelection<ServerChannelResourceSchema>[];
+export type InferListTextChannelsResult<
+  Fields extends ListTextChannelsFields,
+> = Array<InferResult<ServerChannelResourceSchema, Fields>>;
+
+export type ListTextChannelsResult<Fields extends ListTextChannelsFields> = | { success: true; data: InferListTextChannelsResult<Fields>; }
+| { success: false; errors: AshRpcError[]; }
+
+;
+
+/**
+ * Read Channel records
+ *
+ * @ashActionType :read
+ */
+export async function listTextChannels<Fields extends ListTextChannelsFields>(
+  config: {
+  tenant?: string;
+  fields: Fields;
+  filter?: ServerChannelFilterInput;
+  sort?: SortString<ServerChannelSortField> | SortString<ServerChannelSortField>[];
+  headers?: Record<string, string>;
+  fetchOptions?: RequestInit;
+  customFetch?: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
+}
+): Promise<ListTextChannelsResult<Fields>> {
+  const payload = {
+    action: "list_text_channels",
+    ...(config.tenant !== undefined && { tenant: config.tenant }),
+    ...(config.fields !== undefined && { fields: config.fields }),
+    ...(config.filter && { filter: config.filter }),
+    ...(config.sort && { sort: Array.isArray(config.sort) ? config.sort.join(",") : config.sort })
+  };
+
+  return executeActionRpcRequest<ListTextChannelsResult<Fields>>(
+    payload,
+    config
+  );
+}
+
+/**
+ * Validate: Read Channel records
+ *
+ * @ashActionType :read
+ * @validation true
+ */
+export async function validateListTextChannels(
+  config: {
+  tenant?: string;
+  headers?: Record<string, string>;
+  fetchOptions?: RequestInit;
+  customFetch?: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
+}
+): Promise<ValidationResult> {
+  const payload = {
+    action: "list_text_channels",
+    ...(config.tenant !== undefined && { tenant: config.tenant })
   };
 
   return executeValidationRpcRequest<ValidationResult>(

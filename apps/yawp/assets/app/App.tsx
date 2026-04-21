@@ -2,13 +2,25 @@
 import React, {useEffect, useState} from 'react';
 import {Platform, StatusBar, View, useWindowDimensions} from 'react-native';
 
-import {IdentityProvider} from './identity-context';
+import {discoverGeneralChannel} from './chat/discover';
+import {IdentityProvider, type WorkspaceServer} from './identity-context';
 import {AddServerScreen} from './screens/AddServerScreen';
+import {ChannelScreen} from './screens/ChannelScreen';
 import {DidScreen} from './screens/DidScreen';
 import {VectorTestScreen} from './screens/VectorTestScreen';
 import {WorkspaceBar} from './screens/WorkspaceBar';
 
-type Screen = {kind: 'home'} | {kind: 'vector'} | {kind: 'add-server'};
+type Screen =
+  | {kind: 'home'}
+  | {kind: 'vector'}
+  | {kind: 'add-server'}
+  | {
+      kind: 'channel';
+      serverUrl: string;
+      serverLabel: string;
+      channelId: string;
+      channelName: string;
+    };
 
 const MOBILE_BREAKPOINT = 480;
 
@@ -24,6 +36,20 @@ export default function App() {
       setScreen({kind: 'add-server'});
     }
   }, []);
+
+  async function handleSelectServer(server: WorkspaceServer) {
+    const general = await discoverGeneralChannel(server.url);
+    if (!general) {
+      return;
+    }
+    setScreen({
+      kind: 'channel',
+      serverUrl: server.url,
+      serverLabel: server.label,
+      channelId: general.id,
+      channelName: general.name,
+    });
+  }
 
   let body: React.ReactNode;
   switch (screen.kind) {
@@ -41,6 +67,17 @@ export default function App() {
         />
       );
       break;
+    case 'channel':
+      body = (
+        <ChannelScreen
+          serverUrl={screen.serverUrl}
+          serverLabel={screen.serverLabel}
+          channelId={screen.channelId}
+          channelName={screen.channelName}
+          onBack={() => setScreen({kind: 'home'})}
+        />
+      );
+      break;
   }
 
   return (
@@ -55,6 +92,7 @@ export default function App() {
           <WorkspaceBar
             orientation={horizontalBar ? 'horizontal' : 'vertical'}
             onAddServer={() => setScreen({kind: 'add-server'})}
+            onSelectServer={handleSelectServer}
           />
           <View style={{flex: 1}}>{body}</View>
         </View>

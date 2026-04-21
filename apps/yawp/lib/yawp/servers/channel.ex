@@ -10,7 +10,8 @@ defmodule Yawp.Servers.Channel do
   use Ash.Resource,
     otp_app: :yawp,
     domain: Yawp.Servers,
-    data_layer: AshPostgres.DataLayer
+    data_layer: AshPostgres.DataLayer,
+    extensions: [AshTypescript.Resource]
 
   postgres do
     table "server_channels"
@@ -21,12 +22,27 @@ defmodule Yawp.Servers.Channel do
     end
   end
 
+  typescript do
+    type_name "ServerChannel"
+  end
+
   actions do
     defaults [:read, :destroy]
 
     create :create do
       primary? true
       accept [:server_id, :name, :type]
+    end
+
+    read :list_text_channels do
+      description """
+      returns every text channel across all servers on this
+      anchor. has a singleton server with one text channel
+      (`#general`), so the client picks the first entry. layers
+      a real per-server channel sidebar on top.
+      """
+
+      filter expr(type == :text)
     end
   end
 

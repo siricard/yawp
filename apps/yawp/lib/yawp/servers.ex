@@ -10,7 +10,13 @@ defmodule Yawp.Servers do
   .
   """
 
-  use Ash.Domain, otp_app: :yawp
+  use Ash.Domain, otp_app: :yawp, extensions: [AshTypescript.Rpc]
+
+  typescript_rpc do
+    resource Yawp.Servers.Channel do
+      rpc_action :list_text_channels, :list_text_channels
+    end
+  end
 
   resources do
     resource Yawp.Servers.Server do

@@ -12,6 +12,8 @@ defmodule YawpWeb.Endpoint do
     websocket: [connect_info: [session: @session_options]],
     longpoll: [connect_info: [session: @session_options]]
 
+    socket "/socket", YawpWeb.UserSocket, websocket: true
+
             plug Plug.Static,
     at: "/",
     from: :yawp,

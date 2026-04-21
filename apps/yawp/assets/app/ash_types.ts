@@ -42,6 +42,22 @@ export type IdentityAttributesOnlySchema = {
   profileVersion: number;
 };
 
+export type ServerChannelResourceSchema = {
+  __type: "Resource";
+  __primitiveFields: "id" | "name" | "type";
+  id: UUID;
+  name: string;
+  type: "text" | "voice";
+};
+
+export type ServerChannelAttributesOnlySchema = {
+  __type: "Resource";
+  __primitiveFields: "id" | "name" | "type";
+  id: UUID;
+  name: string;
+  type: "text" | "voice";
+};
+
 export type AdminAccountFilterInput = {
   and?: Array<AdminAccountFilterInput>;
   or?: Array<AdminAccountFilterInput>;
@@ -117,6 +133,30 @@ export type IdentityFilterInput = {
   };
 
 };
+export type ServerChannelFilterInput = {
+  and?: Array<ServerChannelFilterInput>;
+  or?: Array<ServerChannelFilterInput>;
+  not?: Array<ServerChannelFilterInput>;
+
+  id?: {
+    eq?: UUID;
+    notEq?: UUID;
+    in?: Array<UUID>;
+  };
+
+  name?: {
+    eq?: string;
+    notEq?: string;
+    in?: Array<string>;
+  };
+
+  type?: {
+    eq?: "text" | "voice";
+    notEq?: "text" | "voice";
+    in?: Array<"text" | "voice">;
+  };
+
+};
 
 export const adminAccountFilterFields = ["id", "email", "lastLoginAt"] as const;
 export type AdminAccountFilterField = (typeof adminAccountFilterFields)[number];
@@ -124,11 +164,17 @@ export type AdminAccountFilterField = (typeof adminAccountFilterFields)[number];
 export const identityFilterFields = ["id", "did", "masterPublicKey", "deviceSubkeys", "anchorList", "profileVersion"] as const;
 export type IdentityFilterField = (typeof identityFilterFields)[number];
 
+export const serverChannelFilterFields = ["id", "name", "type"] as const;
+export type ServerChannelFilterField = (typeof serverChannelFilterFields)[number];
+
 export const adminAccountSortFields = ["id", "email", "lastLoginAt"] as const;
 export type AdminAccountSortField = (typeof adminAccountSortFields)[number];
 
 export const identitySortFields = ["id", "did", "masterPublicKey", "deviceSubkeys", "anchorList", "profileVersion"] as const;
 export type IdentitySortField = (typeof identitySortFields)[number];
+
+export const serverChannelSortFields = ["id", "name", "type"] as const;
+export type ServerChannelSortField = (typeof serverChannelSortFields)[number];
 
 export type SortString<T extends string> = T | `+${T}` | `-${T}` | `++${T}` | `--${T}`;
 
