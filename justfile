@@ -60,6 +60,23 @@ demo-m7-1:
     @echo ""
     nix develop -c bash -c 'cd apps/yawp && mix phx.server'
 
+# M7.2 vertical slice: fresh DB + Phoenix; builds on M7.1 and
+# adds real-time #general messaging between two browser sessions
+# bound to the chat-owner identity. See docs/walkthroughs/m7-2.md.
+demo-m7-2:
+    nix develop -c mix ecto.reset
+    @echo ""
+    @echo "--- M7.2 walkthrough ---"
+    @echo "After Phoenix boots, look for: OPERATOR SETUP <url>"
+    @echo "1. Run M7.1 steps 1-5 (operator + chat-owner claim)."
+    @echo "2. Open the workspace tile, then #general (window A)."
+    @echo "3. Open a private/incognito window B at http://localhost:4000/"
+    @echo "   - it auto-binds a NEW device to the same chat-owner identity."
+    @echo "4. Send messages back and forth (~250ms round-trip)."
+    @echo "Full instructions: docs/walkthroughs/m7-2.md"
+    @echo ""
+    nix develop -c bash -c 'cd apps/yawp && mix phx.server'
+
 # Generate Ash migrations
 ash-migrate:
     nix develop -c mix ash.codegen
