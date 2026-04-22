@@ -34,14 +34,14 @@ export function DidScreen({onOpenVectorTest}: Props) {
 
   const didText =
     state.status === 'ready'
-      ? `Your DID: ${state.identity.did}`
+      ? `Your DID: ${state.identity.didFull}`
       : state.status === 'loading'
         ? 'Generating identity…'
         : 'Identity unavailable — see error below.';
 
   const pkHex =
     state.status === 'ready'
-      ? Array.from(state.identity.publicKey)
+      ? Array.from(state.identity.masterPk)
           .map(b => b.toString(16).padStart(2, '0'))
           .join('')
       : '';

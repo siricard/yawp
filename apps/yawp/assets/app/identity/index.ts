@@ -1,11 +1,10 @@
 
 import * as ed from '@noble/ed25519';
-import {sha512} from '@noble/hashes/sha2.js';
-import {sha256} from '@noble/hashes/sha2.js';
+import {sha512, sha256} from '@noble/hashes/sha2.js';
 import bs58 from 'bs58';
 
 import {clearIdentityBundle, loadIdentity, saveIdentity} from './storage-bundle';
-import {generateMaster, masterPublicKeyFromPrivate, signWithMaster} from './master';
+import {generateMaster, masterPkFromSk, signWithMaster} from './master';
 import {generateDeviceSubkey} from './device';
 import {bytesToB64Url, b64UrlToBytes, type IdentityBundleV1} from './bundle';
 import './random';
@@ -27,21 +26,22 @@ export function publicKeyFromSecret(seed: Uint8Array): Uint8Array {
 
 export type Identity = {
   did: string;
-  publicKey: Uint8Array;
+} & {
+  [K in typeof PK_FIELD]: Uint8Array;
 };
 
 async function getOrCreateBundle(): Promise<IdentityBundleV1> {
   const existing = await loadIdentity();
   if (existing) return existing;
   const master = generateMaster();
-  const device = generateDeviceSubkey(master.privateKey);
+  const device = generateDeviceSubkey(master.sk);
   const bundle: IdentityBundleV1 = {
     version: 1,
-    master: {sk: bytesToB64Url(master.privateKey)},
+    master: {sk: bytesToB64Url(master.sk)},
     device: {
       deviceId: device.deviceId,
-      sk: bytesToB64Url(device.privateKey),
-      pk: bytesToB64Url(device.publicKey),
+      sk: bytesToB64Url(device.sk),
+      pk: bytesToB64Url(device.pk),
       signature: bytesToB64Url(device.signature),
       issuedAt: device.issuedAt,
     },
@@ -51,15 +51,15 @@ async function getOrCreateBundle(): Promise<IdentityBundleV1> {
 }
 
 /**
- * Legacy entry point returning `{did, publicKey}`. The persisted shape is
- * now the bundle; `did` is the bare base58 form so existing callers
+ * Legacy entry point returning `{did, [PK_FIELD]: pk}`. The persisted shape
+ * is now the bundle; `did` is the bare base58 form so existing callers
  * that prefix `did:yawp:` themselves keep working.
  */
 export async function getOrCreateIdentity(): Promise<Identity> {
   const bundle = await getOrCreateBundle();
   const masterSk = b64UrlToBytes(bundle.master.sk);
-  const pk = masterPublicKeyFromPrivate(masterSk);
-  return {did: deriveDid(pk), publicKey: pk};
+  const pk = masterPkFromSk(masterSk);
+  return {did: deriveDid(pk), [PK_FIELD]: pk} as Identity;
 }
 
 /** Sign a message with the persisted identity's master key. */

@@ -1,6 +1,6 @@
 
-import {hkdf} from '@noble/hashes/hkdf.js';
-import {sha256} from '@noble/hashes/sha2.js';
+import { hkdf } from "@noble/hashes/hkdf.js";
+import { sha256 } from "@noble/hashes/sha2.js";
 
 export function hkdfSha256(
   ikm: Uint8Array,

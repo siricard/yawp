@@ -9,11 +9,38 @@
 
 import {bytesToBase64Url, submitClaim} from '../claim';
 import {canonicalJson} from '../canonical-json';
-import {clearIdentity, getOrCreateIdentity} from '../identity';
+import type {Identity} from '../identity-context';
+import {generateMaster, masterPkFromSk, signWithMaster} from '../identity/master';
+import {didFromPubkey, fingerprintFromPubkey} from '../identity/did';
 import * as ed from '@noble/ed25519';
 import {sha512} from '@noble/hashes/sha2.js';
 
 ed.hashes.sha512 = sha512;
+
+/**
+ * Build a minimal `Identity` for the claim tests — fills only the
+ * fields `submitClaim` reads (`did`, `masterPk`, `sign`) plus stubs for
+ * the rest of the contract so TypeScript is satisfied without dragging
+ * in the full IdentityProvider lifecycle.
+ */
+function makeFakeIdentity(): Identity {
+  const {sk, pk} = generateMaster();
+  const didFull = didFromPubkey(pk);
+  const didBase58 = didFull.replace(/^did:yawp:/, '');
+  const stubBytes = new Uint8Array(64);
+  return {
+    did: didBase58,
+    didFull,
+    masterPk: masterPkFromSk(sk),
+    deviceId: 'fake-device-id',
+    devicePk: new Uint8Array(32),
+    deviceDelegationSignature: stubBytes,
+    deviceIssuedAt: '2026-01-01T00:00:00.000Z',
+    fingerprint: fingerprintFromPubkey(pk),
+    sign: bytes => signWithMaster(sk, bytes),
+    signDevice: () => stubBytes,
+  };
+}
 
 function fakeResponse(status: number, json: unknown): Response {
   return {
@@ -42,12 +69,8 @@ describe('bytesToBase64Url', () => {
 });
 
 describe('submitClaim', () => {
-  beforeEach(async () => {
-    await clearIdentity();
-  });
-
   test('success — dispatches to /rpc/run with a verifiable signature', async () => {
-    const identity = await getOrCreateIdentity();
+    const identity = makeFakeIdentity();
 
     const calls: Array<{url: string; init: RequestInit | undefined}> = [];
     const fakeFetch = jest.fn(
@@ -80,7 +103,7 @@ describe('submitClaim', () => {
     expect(body.action).toBe('claim_chat_owner');
     expect(body.input.claimToken).toBe('ABCDEFGH');
     expect(body.input.did).toBe(`did:yawp:${identity.did}`);
-    expect(body.input.pk).toBe(bytesToBase64Url(identity.publicKey));
+    expect(body.input.pk).toBe(bytesToBase64Url(identity.masterPk));
     expect(typeof body.input.senderSignature).toBe('string');
     expect(body.fields).toEqual(['id', 'did']);
 
@@ -99,13 +122,13 @@ describe('submitClaim', () => {
     const ok = ed.verify(
       new Uint8Array(sig),
       new TextEncoder().encode(canonical),
-      identity.publicKey,
+      identity.masterPk,
     );
     expect(ok).toBe(true);
   });
 
   test('RPC error envelope with claim_token_consumed renders inline', async () => {
-    const identity = await getOrCreateIdentity();
+    const identity = makeFakeIdentity();
 
     const fakeFetch = jest.fn(async () =>
       fakeResponse(200, {
@@ -129,7 +152,7 @@ describe('submitClaim', () => {
   });
 
   test('unrecognized error slug falls back to the server-supplied message', async () => {
-    const identity = await getOrCreateIdentity();
+    const identity = makeFakeIdentity();
 
     const fakeFetch = jest.fn(async () =>
       fakeResponse(200, {
@@ -153,7 +176,7 @@ describe('submitClaim', () => {
   });
 
   test('network failure surfaces a network_error result', async () => {
-    const identity = await getOrCreateIdentity();
+    const identity = makeFakeIdentity();
 
     const fakeFetch = jest.fn(async () => {
       throw new Error('boom');
