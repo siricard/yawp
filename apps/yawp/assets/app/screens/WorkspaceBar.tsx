@@ -12,6 +12,12 @@ type Props = {
    * callers pass "horizontal".
    */
   orientation?: 'vertical' | 'horizontal';
+  /**
+   * URL of the tile whose lazy bind RPC is currently in
+   * flight, if any. The matching tile renders a muted/pulsing overlay
+   * so the user has feedback while we mint a fresh session.
+   */
+  bindingUrl?: string | null;
 };
 
 function initials(label: string): string {
@@ -24,6 +30,7 @@ export function WorkspaceBar({
   onAddServer,
   onSelectServer,
   orientation = 'vertical',
+  bindingUrl = null,
 }: Props) {
   const {servers} = useWorkspaceServers();
   const horizontal = orientation === 'horizontal';
@@ -53,19 +60,35 @@ export function WorkspaceBar({
             ? {flexDirection: 'row', alignItems: 'center', gap: 8}
             : {flexDirection: 'column', alignItems: 'center', gap: 8}
         }>
-        {servers.map(server => (
-          <Pressable
-            key={server.url}
-            testID={`workspace-tile-${server.url}`}
-            accessibilityRole="button"
-            accessibilityLabel={`server ${server.label}`}
-            onPress={() => onSelectServer?.(server)}
-            className="w-12 h-12 rounded-2xl bg-indigo-700 items-center justify-center active:bg-indigo-600">
-            <Text className="text-base font-bold text-slate-50">
-              {initials(server.label)}
-            </Text>
-          </Pressable>
-        ))}
+        {servers.map(server => {
+          const isBinding = bindingUrl === server.url;
+          return (
+            <Pressable
+              key={server.url}
+              testID={`workspace-tile-${server.url}`}
+              accessibilityRole="button"
+              accessibilityLabel={`server ${server.label}`}
+              onPress={() => onSelectServer?.(server)}
+              disabled={isBinding}
+              className={[
+                'w-12 h-12 rounded-2xl bg-indigo-700 items-center justify-center active:bg-indigo-600',
+                isBinding ? 'opacity-60 animate-pulse' : '',
+              ].join(' ')}>
+              <Text className="text-base font-bold text-slate-50">
+                {initials(server.label)}
+              </Text>
+              {isBinding ? (
+                <View
+                  testID={`workspace-tile-binding-${server.url}`}
+                  accessibilityLabel={`binding ${server.label}`}
+                  pointerEvents="none"
+                  style={{position: 'absolute', right: 4, bottom: 4}}
+                  className="w-2 h-2 rounded-full bg-emerald-400"
+                />
+              ) : null}
+            </Pressable>
+          );
+        })}
 
         <Pressable
           testID="workspace-add-button"
