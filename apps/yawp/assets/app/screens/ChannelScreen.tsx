@@ -26,9 +26,15 @@ const monospace = Platform.select({
   default: 'monospace',
 });
 
-function truncateDid(did: string): string {
-  if (did.length <= 12) return did;
-  return `${did.slice(0, 6)}…${did.slice(-4)}`;
+/**
+ * Build the display form of a message author DID.
+ *
+ * Wire ships the bare base58 form; the client prefixes `did:yawp:` and truncates long
+ * values for the row label.
+ */
+export function displayAuthor(authorDid: string): string {
+  const full = `did:yawp:${authorDid}`;
+  return full.length <= 18 ? full : `${full.slice(0, 12)}…${full.slice(-4)}`;
 }
 
 function formatTimestamp(iso: string): string {
@@ -51,7 +57,7 @@ function MessageRow({message}: {message: ChannelMessage}) {
         <Text
           className="text-xs text-indigo-300 mr-2"
           style={{fontFamily: monospace}}>
-          {truncateDid(message.author_identity_id)}
+          {displayAuthor(message.author_did)}
         </Text>
         <Text className="text-[10px] text-slate-500">
           {formatTimestamp(message.server_inserted_at)}

@@ -9,7 +9,12 @@ import {signMessage} from './sign-message';
 export type ChannelMessage = {
   id: string;
   channel_id: string;
-  author_identity_id: string;
+  /**
+   * Bare base58 DID (i.e. `did:yawp:<base58>` with the `did:yawp:`
+   * prefix stripped on the wire). Matches every other use of
+   * `identity.did` — the client prefixes `did:yawp:` for display.
+   */
+  author_did: string;
   body: string;
   signed_by: string;
   signature: string;
@@ -66,7 +71,13 @@ export function useChannel(
         if (cancelled) return;
         setMessages(prev => {
           if (prev.some(m => m.id === msg.id)) return prev;
-          return [...prev, msg];
+          return [...prev, msg].sort((a, b) =>
+            a.server_inserted_at < b.server_inserted_at
+              ? -1
+              : a.server_inserted_at > b.server_inserted_at
+                ? 1
+                : 0,
+          );
         });
       });
 

@@ -41,7 +41,12 @@ defmodule YawpWeb.ChannelTopic do
 
   @impl true
   def handle_info({:after_join, channel_id}, socket) do
-    {:ok, messages} = Yawp.Channels.list_recent_messages(channel_id, authorize?: false)
+    {:ok, messages} =
+      Yawp.Channels.list_recent_messages(channel_id,
+        authorize?: false,
+        load: [:author_identity]
+      )
+
     push(socket, "history", %{messages: Enum.map(messages, &serialize/1)})
     {:noreply, socket}
   end
@@ -79,7 +84,8 @@ defmodule YawpWeb.ChannelTopic do
                  signature: signature,
                  ts: ts
                },
-               authorize?: false
+               authorize?: false,
+               load: [:author_identity]
              ) do
           {:ok, message} ->
             payload = serialize(message)
@@ -109,11 +115,14 @@ defmodule YawpWeb.ChannelTopic do
     %{
       id: m.id,
       channel_id: m.channel_id,
-      author_identity_id: m.author_identity_id,
+      author_did: bare_base58_did(m.author_identity.did),
       body: m.body,
       signed_by: m.signed_by,
       signature: Base.url_encode64(m.signature, padding: false),
       server_inserted_at: DateTime.to_iso8601(m.server_inserted_at)
     }
   end
+
+        defp bare_base58_did("did:yawp:" <> base58), do: base58
+  defp bare_base58_did(other) when is_binary(other), do: other
 end

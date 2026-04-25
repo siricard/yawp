@@ -88,8 +88,44 @@ defmodule YawpWeb.ChannelTopicTest do
         "ts" => ts
       })
 
-    assert_reply ref, :ok, %{body: ^body}
-    assert_broadcast "new_message", %{body: ^body}
+    expected_did = String.replace_prefix(ctx.identity.did, "did:yawp:", "")
+
+    assert_reply ref, :ok, %{body: ^body, author_did: ^expected_did} = reply
+    refute Map.has_key?(reply, :author_identity_id)
+    assert_broadcast "new_message", %{body: ^body, author_did: ^expected_did}
+  end
+
+  test "history payload uses bare base58 author_did and omits author_identity_id", ctx do
+    assert_push "history", _
+
+    body = "first"
+    ts = System.system_time(:millisecond)
+    sig = sign_message(ctx.channel.id, body, ts, ctx.device_sk)
+
+    ref =
+      push(ctx.socket, "send", %{
+        "body" => body,
+        "signature" => sig,
+        "signed_by" => ctx.device_id,
+        "ts" => ts
+      })
+
+    assert_reply ref, :ok, _
+
+        {:ok, _, socket2} =
+      YawpWeb.UserSocket
+      |> Phoenix.ChannelTest.socket("identity_socket:#{ctx.identity.id}-2", %{
+        current_identity: ctx.identity
+      })
+      |> subscribe_and_join(YawpWeb.ChannelTopic, "channel:#{ctx.channel.id}")
+
+    expected_did = String.replace_prefix(ctx.identity.did, "did:yawp:", "")
+
+    assert_push "history", %{messages: [msg]}
+    assert msg.author_did == expected_did
+    refute Map.has_key?(msg, :author_identity_id)
+
+    _ = socket2
   end
 
   test "send with a bad signature replies invalid_signature and does not broadcast", ctx do
