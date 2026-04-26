@@ -37,8 +37,10 @@ defmodule Yawp.Identity.IdentityTest do
   defp bind_args(master_sk, did, opts \\ []) do
     device_id = Keyword.get(opts, :device_id, Ecto.UUID.generate())
     {device_pk, device_sk} = :crypto.generate_key(:eddsa, :ed25519)
-    issued_at = DateTime.utc_now()
-    issued_at_iso = DateTime.to_iso8601(issued_at)
+
+    issued_at_iso =
+      Keyword.get_lazy(opts, :issued_at_iso, fn -> DateTime.to_iso8601(DateTime.utc_now()) end)
+
     device_sig = sign_delegation(master_sk, device_id, device_pk, issued_at_iso)
     device_pk_b64 = Base.url_encode64(device_pk, padding: false)
     device_sig_b64 = Base.url_encode64(device_sig, padding: false)
@@ -59,7 +61,7 @@ defmodule Yawp.Identity.IdentityTest do
       device_pk: device_pk_b64,
       device_signature: device_sig_b64,
       sender_signature: Base.url_encode64(sender_sig, padding: false),
-      issued_at: issued_at
+      issued_at: issued_at_iso
     }
   end
 
@@ -111,6 +113,22 @@ defmodule Yawp.Identity.IdentityTest do
 
             sub = hd(after_second.device_subkeys["subkeys"])
       assert sub["signature"] == args.device_signature
+    end
+  end
+
+  describe "bind_device (millisecond issued_at)" do
+    test "client-realistic JS Date.toISOString shape (milliseconds) is accepted verbatim" do
+      %{identity: identity, master_sk: sk, did: did} = seed_identity!()
+
+      ms_iso =
+        DateTime.utc_now()
+        |> DateTime.truncate(:millisecond)
+        |> DateTime.to_iso8601()
+
+      args = bind_args(sk, did, issued_at_iso: ms_iso)
+      assert {:ok, updated} = Identity.bind_device(identity, args)
+      sub = hd(updated.device_subkeys["subkeys"])
+      assert sub["issued_at"] == ms_iso
     end
   end
 

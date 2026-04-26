@@ -94,13 +94,14 @@ defmodule Yawp.Identity.Identity do
             argument :device_pk, :string, allow_nil?: false
                   argument :device_signature, :string, allow_nil?: false
                   argument :sender_signature, :string, allow_nil?: false
-      argument :issued_at, :utc_datetime_usec, allow_nil?: false
+                                    argument :issued_at, :string, allow_nil?: false
 
       metadata :session_token, :string
       metadata :refresh_token, :string
       metadata :expires_at, :utc_datetime_usec
 
       change Yawp.Identity.Identity.Changes.DecodeBindPayload
+      change Yawp.Identity.Identity.Changes.ValidateIssuedAt
       change Yawp.Identity.Identity.Changes.VerifyBindSenderSignature
       change Yawp.Identity.Identity.Changes.VerifyDeviceDelegation
       change Yawp.Identity.Identity.Changes.AppendDeviceSubkey

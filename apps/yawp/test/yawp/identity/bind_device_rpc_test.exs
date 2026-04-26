@@ -48,8 +48,9 @@ defmodule Yawp.Identity.BindDeviceRpcTest do
     device_id = Keyword.get(opts, :device_id, Ecto.UUID.generate())
 
     {device_pk_bytes, device_sk_bytes} = :crypto.generate_key(:eddsa, :ed25519)
-    issued_at_dt = DateTime.utc_now()
-    issued_at_iso = DateTime.to_iso8601(issued_at_dt)
+
+    issued_at_iso =
+      Keyword.get_lazy(opts, :issued_at_iso, fn -> DateTime.to_iso8601(DateTime.utc_now()) end)
 
     device_sig = sign_delegation(master_sk, device_id, device_pk_bytes, issued_at_iso)
     device_pk_b64 = Base.url_encode64(device_pk_bytes, padding: false)
@@ -227,6 +228,53 @@ defmodule Yawp.Identity.BindDeviceRpcTest do
       bad_input = Map.put(built.input, "devicePk", "!!!notb64!!!")
       result = run(did, bad_input)
       assert "invalid_payload" in error_types(result)
+    end
+
+    test "invalid_payload when issued_at is not parseable ISO-8601" do
+      %{master_sk: master_sk, did: did} = seed_identity!()
+      built = build_input(master_sk: master_sk, did: did, issued_at_iso: "not-a-date")
+      result = run(did, built.input)
+      assert success?(result) == false
+      assert "invalid_payload" in error_types(result)
+    end
+
+    test "invalid_payload when issued_at is more than 5 minutes in the past" do
+      %{master_sk: master_sk, did: did} = seed_identity!()
+      stale_iso = DateTime.utc_now() |> DateTime.add(-10 * 60, :second) |> DateTime.to_iso8601()
+      built = build_input(master_sk: master_sk, did: did, issued_at_iso: stale_iso)
+      result = run(did, built.input)
+      assert success?(result) == false
+      assert "invalid_payload" in error_types(result)
+    end
+
+    test "invalid_payload when issued_at is more than 5 minutes in the future" do
+      %{master_sk: master_sk, did: did} = seed_identity!()
+      future_iso = DateTime.utc_now() |> DateTime.add(10 * 60, :second) |> DateTime.to_iso8601()
+      built = build_input(master_sk: master_sk, did: did, issued_at_iso: future_iso)
+      result = run(did, built.input)
+      assert success?(result) == false
+      assert "invalid_payload" in error_types(result)
+    end
+  end
+
+  describe "bind_device (client-realistic millisecond issued_at)" do
+    test "issued_at with millisecond precision (JS Date.toISOString shape) succeeds" do
+      %{identity: identity, master_sk: master_sk, did: did} = seed_identity!()
+                  ms_iso =
+        DateTime.utc_now()
+        |> DateTime.truncate(:millisecond)
+        |> DateTime.to_iso8601()
+
+      assert String.match?(ms_iso, ~r/\.\d{3}Z$/)
+
+      built = build_input(master_sk: master_sk, did: did, issued_at_iso: ms_iso)
+      result = run(did, built.input)
+
+      assert success?(result), inspect(result)
+
+      {:ok, refreshed} = Ash.get(Yawp.Identity.Identity, identity.id, authorize?: false)
+      sub = hd(refreshed.device_subkeys["subkeys"])
+            assert sub["issued_at"] == ms_iso
     end
   end
 

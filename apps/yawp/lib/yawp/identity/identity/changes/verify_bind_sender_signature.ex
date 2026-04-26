@@ -35,17 +35,12 @@ defmodule Yawp.Identity.Identity.Changes.VerifyBindSenderSignature do
   end
 
   defp build_canonical(changeset) do
-    issued_at_iso =
-      changeset
-      |> Ash.Changeset.get_argument(:issued_at)
-      |> DateTime.to_iso8601()
-
-    Yawp.CanonicalJson.encode(%{
+                Yawp.CanonicalJson.encode(%{
       "did" => changeset.data.did,
       "device_id" => Ash.Changeset.get_argument(changeset, :device_id),
       "device_pk" => Ash.Changeset.get_argument(changeset, :device_pk),
       "device_signature" => Ash.Changeset.get_argument(changeset, :device_signature),
-      "issued_at" => issued_at_iso
+      "issued_at" => Ash.Changeset.get_argument(changeset, :issued_at)
     })
   end
 end
