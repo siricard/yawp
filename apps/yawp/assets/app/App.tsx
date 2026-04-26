@@ -15,7 +15,7 @@ import {ChannelScreen} from './screens/ChannelScreen';
 import {DidScreen} from './screens/DidScreen';
 import {VectorTestScreen} from './screens/VectorTestScreen';
 import {WorkspaceBar} from './screens/WorkspaceBar';
-import {loadSession} from './session-storage';
+import {getValidSessionToken} from './session';
 
 /**
  * lazy auto-bind on server-tile click. If we have no
@@ -28,13 +28,9 @@ export async function ensureSession(
   serverUrl: string,
   identity: Identity,
 ): Promise<{ok: true} | {ok: false; error: string; message: string}> {
-  const existing = await loadSession(serverUrl);
-  if (existing) {
-    const expiresAt = new Date(existing.expiresAt).getTime();
-    if (Number.isFinite(expiresAt) && expiresAt > Date.now() + 30_000) {
-      return {ok: true};
-    }
-  }
+  const session = await getValidSessionToken({serverUrl});
+  if (session.ok) return {ok: true};
+
   const bind = await submitBindDevice({serverUrl, identity});
   if (bind.ok) return {ok: true};
   return {ok: false, error: bind.error, message: bind.message};

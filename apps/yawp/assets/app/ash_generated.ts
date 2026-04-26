@@ -1,6 +1,6 @@
 
 
-import type { AshRpcError, IdentityResourceSchema, InferResult, ServerChannelFilterInput, ServerChannelResourceSchema, ServerChannelSortField, SortString, UUID, UnifiedFieldSelection, UtcDateTimeUsec, ValidationResult } from "./ash_types";
+import type { AshRpcError, IdentityResourceSchema, InferResult, RefreshTokenResourceSchema, ServerChannelFilterInput, ServerChannelResourceSchema, ServerChannelSortField, SortString, UUID, UnifiedFieldSelection, UtcDateTimeUsec, ValidationResult } from "./ash_types";
 export type * from "./ash_types";
 
 /**
@@ -180,7 +180,7 @@ export type BindDeviceInput = {
   devicePk: string;
   deviceSignature: string;
   senderSignature: string;
-  issuedAt: UtcDateTimeUsec;
+  issuedAt: string;
 };
 
 export type BindDeviceFields = UnifiedFieldSelection<IdentityResourceSchema>[];
@@ -325,6 +325,159 @@ export async function validateClaimChatOwner(
 ): Promise<ValidationResult> {
   const payload = {
     action: "claim_chat_owner",
+    ...(config.tenant !== undefined && { tenant: config.tenant }),
+    input: config.input
+  };
+
+  return executeValidationRpcRequest<ValidationResult>(
+    payload,
+    config
+  );
+}
+
+export type RevokeDeviceSessionsInput = {
+  deviceId: UUID;
+};
+
+export type RevokeDeviceSessionsFields = UnifiedFieldSelection<IdentityResourceSchema>[];
+
+export type InferRevokeDeviceSessionsResult<
+  Fields extends RevokeDeviceSessionsFields | undefined,
+> = InferResult<IdentityResourceSchema, Fields>;
+
+export type RevokeDeviceSessionsResult<Fields extends RevokeDeviceSessionsFields | undefined = undefined> = | { success: true; data: InferRevokeDeviceSessionsResult<Fields>; }
+| { success: false; errors: AshRpcError[]; }
+
+;
+
+/**
+ * Update an existing Identity
+ *
+ * @ashActionType :update
+ */
+export async function revokeDeviceSessions<Fields extends RevokeDeviceSessionsFields | undefined = undefined>(
+  config: {
+  tenant?: string;
+  identity: { did: string };
+  input: RevokeDeviceSessionsInput;
+  fields?: Fields;
+  headers?: Record<string, string>;
+  fetchOptions?: RequestInit;
+  customFetch?: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
+}
+): Promise<RevokeDeviceSessionsResult<Fields extends undefined ? [] : Fields>> {
+  const payload = {
+    action: "revoke_device_sessions",
+    ...(config.tenant !== undefined && { tenant: config.tenant }),
+    identity: config.identity,
+    input: config.input,
+    ...(config.fields !== undefined && { fields: config.fields })
+  };
+
+  return executeActionRpcRequest<RevokeDeviceSessionsResult<Fields extends undefined ? [] : Fields>>(
+    payload,
+    config
+  );
+}
+
+/**
+ * Validate: Update an existing Identity
+ *
+ * @ashActionType :update
+ * @validation true
+ */
+export async function validateRevokeDeviceSessions(
+  config: {
+  tenant?: string;
+  identity: { did: string };
+  input: RevokeDeviceSessionsInput;
+  headers?: Record<string, string>;
+  fetchOptions?: RequestInit;
+  customFetch?: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
+}
+): Promise<ValidationResult> {
+  const payload = {
+    action: "revoke_device_sessions",
+    ...(config.tenant !== undefined && { tenant: config.tenant }),
+    identity: config.identity,
+    input: config.input
+  };
+
+  return executeValidationRpcRequest<ValidationResult>(
+    payload,
+    config
+  );
+}
+
+export type RotateRefreshInput = {
+  token: string;
+};
+
+export type RotateRefreshFields = UnifiedFieldSelection<RefreshTokenResourceSchema>[];
+
+export type RotateRefreshMetadata = {
+  sessionToken?: string;
+  refreshToken?: string;
+  expiresAt?: UtcDateTimeUsec;
+};
+
+export type InferRotateRefreshResult<
+  Fields extends RotateRefreshFields | undefined,
+  MetadataFields extends ReadonlyArray<keyof RotateRefreshMetadata> = []
+> = InferResult<RefreshTokenResourceSchema, Fields>;
+
+export type RotateRefreshResult<Fields extends RotateRefreshFields | undefined = undefined, MetadataFields extends ReadonlyArray<keyof RotateRefreshMetadata> = []> = | { success: true; data: InferRotateRefreshResult<Fields>; metadata: Pick<RotateRefreshMetadata, MetadataFields[number]>; }
+| { success: false; errors: AshRpcError[]; }
+
+;
+
+/**
+ * Create a new RefreshToken
+ *
+ * @ashActionType :create
+ */
+export async function rotateRefresh<Fields extends RotateRefreshFields | undefined = undefined, MetadataFields extends ReadonlyArray<keyof RotateRefreshMetadata> = []>(
+  config: {
+  tenant?: string;
+  input: RotateRefreshInput;
+  fields?: Fields;
+  metadataFields?: MetadataFields;
+  headers?: Record<string, string>;
+  fetchOptions?: RequestInit;
+  customFetch?: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
+}
+): Promise<RotateRefreshResult<Fields extends undefined ? [] : Fields, MetadataFields>> {
+  const payload = {
+    action: "rotate_refresh",
+    ...(config.tenant !== undefined && { tenant: config.tenant }),
+    input: config.input,
+    ...(config.fields !== undefined && { fields: config.fields }),
+    ...(config.metadataFields && { metadataFields: config.metadataFields })
+  };
+
+  return executeActionRpcRequest<RotateRefreshResult<Fields extends undefined ? [] : Fields, MetadataFields>>(
+    payload,
+    config
+  );
+}
+
+/**
+ * Validate: Create a new RefreshToken
+ *
+ * @ashActionType :create
+ * @validation true
+ */
+export async function validateRotateRefresh(
+  config: {
+  tenant?: string;
+  input: RotateRefreshInput;
+  headers?: Record<string, string>;
+  fetchOptions?: RequestInit;
+  customFetch?: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
+}
+): Promise<ValidationResult> {
+  const payload = {
+    action: "rotate_refresh",
     ...(config.tenant !== undefined && { tenant: config.tenant }),
     input: config.input
   };

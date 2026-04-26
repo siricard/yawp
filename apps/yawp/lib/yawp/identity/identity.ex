@@ -76,6 +76,26 @@ defmodule Yawp.Identity.Identity do
       get_by [:did]
     end
 
+    update :revoke_device_sessions do
+      description """
+      revokes every session + refresh
+      token belonging to `(actor.id, device_id)`. The actor MUST be
+      the Identity being targeted. Unauthorized callers receive
+      `Yawp.RpcError type: "unauthorized"`.
+
+      No row attributes change; the side effect lives in the
+      `RevokeDeviceSessions` change which calls
+      `Yawp.Identity.revoke_all_for_device/2`.
+      """
+
+      require_atomic? false
+      accept []
+
+      argument :device_id, :uuid, allow_nil?: false
+
+      change Yawp.Identity.Identity.Changes.RevokeDeviceSessions
+    end
+
     update :bind_device do
       description """
       binds a new device subkey to an existing chat identity. Pre-auth: gated by `sender_signature` over

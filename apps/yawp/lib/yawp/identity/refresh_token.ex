@@ -15,12 +15,8 @@ defmodule Yawp.Identity.RefreshToken do
   use Ash.Resource,
     otp_app: :yawp,
     domain: Yawp.Identity,
-    data_layer: AshPostgres.DataLayer
-
-  @ttl_seconds 14 * 24 * 60 * 60
-
-  @doc "Default refresh TTL in seconds (14 days)."
-  def ttl_seconds, do: @ttl_seconds
+    data_layer: AshPostgres.DataLayer,
+    extensions: [AshTypescript.Resource]
 
   postgres do
     table "identity_refresh_tokens"
@@ -32,8 +28,41 @@ defmodule Yawp.Identity.RefreshToken do
     end
   end
 
+  @ttl_seconds 14 * 24 * 60 * 60
+
+  @doc "Default refresh TTL in seconds (14 days)."
+  def ttl_seconds, do: @ttl_seconds
+
+  typescript do
+    type_name "RefreshToken"
+  end
+
   actions do
     defaults [:read]
+
+    create :rotate do
+      description """
+      RPC-facing wrapper around
+      `Yawp.Identity.rotate_refresh/1`. Manual implementation: the
+      ManualCreate change owns the writes (via the existing domain
+      function which runs its own transaction), and surfaces the
+      fresh session+refresh strings + expiry on action metadata.
+
+      Errors map to stable RPC slugs:
+        - `refresh_rotated` (replay of a rotated token)
+        - `refresh_revoked`
+        - `refresh_expired`
+        - `refresh_invalid` (unknown token)
+      """
+
+      accept []
+      argument :token, :string, allow_nil?: false
+      manual Yawp.Identity.RefreshToken.Changes.RotatePair
+
+      metadata :session_token, :string
+      metadata :refresh_token, :string
+      metadata :expires_at, :utc_datetime_usec
+    end
 
     create :issue_pair do
       description """

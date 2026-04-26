@@ -1,7 +1,7 @@
 
 import {Socket, type SocketConnectOption} from 'phoenix';
 
-import {loadSession} from '../session-storage';
+import {getValidSessionToken} from '../session';
 
 const sockets = new Map<string, Socket>();
 
@@ -29,8 +29,8 @@ export async function getSocket(
     return {ok: true, socket: existing};
   }
 
-  const session = await loadSession(base);
-  if (!session) {
+  const session = await getValidSessionToken({serverUrl: base});
+  if (!session.ok) {
     return {ok: false, reason: 'no_session'};
   }
 

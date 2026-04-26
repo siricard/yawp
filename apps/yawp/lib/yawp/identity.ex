@@ -33,6 +33,13 @@ defmodule Yawp.Identity do
       rpc_action :bind_device, :bind_device,
         identities: [:unique_did],
         show_metadata: [:session_token, :refresh_token, :expires_at]
+
+      rpc_action :revoke_device_sessions, :revoke_device_sessions, identities: [:unique_did]
+    end
+
+    resource Yawp.Identity.RefreshToken do
+      rpc_action :rotate_refresh, :rotate,
+        show_metadata: [:session_token, :refresh_token, :expires_at]
     end
   end
 

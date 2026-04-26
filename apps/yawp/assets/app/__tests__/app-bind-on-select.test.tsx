@@ -59,6 +59,10 @@ jest.mock('../session-storage', () => ({
   loadSession: jest.fn(),
 }));
 
+jest.mock('../session', () => ({
+  getValidSessionToken: jest.fn(),
+}));
+
 jest.mock('../chat/discover', () => ({
   discoverGeneralChannel: jest.fn(),
 }));
@@ -80,7 +84,7 @@ import App from '../App';
 import {submitBindDevice} from '../bind';
 import {discoverGeneralChannel} from '../chat/discover';
 import {useIdentityState, useWorkspaceServers} from '../identity-context';
-import {loadSession} from '../session-storage';
+import {getValidSessionToken} from '../session';
 
 function findByTestId(
   tree: ReactTestRenderer.ReactTestInstance,
@@ -120,7 +124,10 @@ describe('App — auto-bind on server-tile click', () => {
   });
 
   test('no stored session → submitBindDevice called once, then discoverGeneralChannel', async () => {
-    (loadSession as jest.Mock).mockResolvedValue(null);
+    (getValidSessionToken as jest.Mock).mockResolvedValue({
+      ok: false,
+      reason: 'no_session',
+    });
     (submitBindDevice as jest.Mock).mockResolvedValue({
       ok: true,
       session: {
@@ -156,11 +163,9 @@ describe('App — auto-bind on server-tile click', () => {
   });
 
   test('valid stored session → submitBindDevice NOT called; discoverGeneralChannel called', async () => {
-    const future = new Date(Date.now() + 60 * 60 * 1000).toISOString();
-    (loadSession as jest.Mock).mockResolvedValue({
+    (getValidSessionToken as jest.Mock).mockResolvedValue({
+      ok: true,
       sessionToken: 't',
-      refreshToken: 'r',
-      expiresAt: future,
     });
     (discoverGeneralChannel as jest.Mock).mockResolvedValue({
       id: 'chan-id',
@@ -183,8 +188,69 @@ describe('App — auto-bind on server-tile click', () => {
     expect(discoverGeneralChannel).toHaveBeenCalledWith(SERVER.url);
   });
 
+  test('expired session + successful rotation → no bind call; discovery runs', async () => {
+    (getValidSessionToken as jest.Mock).mockResolvedValue({
+      ok: true,
+      sessionToken: 'rotated-token',
+    });
+    (discoverGeneralChannel as jest.Mock).mockResolvedValue({
+      id: 'chan-id',
+      name: 'general',
+    });
+
+    let root: ReactTestRenderer.ReactTestRenderer | null = null;
+    await ReactTestRenderer.act(async () => {
+      root = ReactTestRenderer.create(<App />);
+    });
+    await flush();
+
+    await ReactTestRenderer.act(async () => {
+      findByTestId(root!.root, `workspace-tile-${SERVER.url}`).props.onPress();
+    });
+    await flush();
+
+    expect(submitBindDevice).not.toHaveBeenCalled();
+    expect(discoverGeneralChannel).toHaveBeenCalledTimes(1);
+  });
+
+  test('expired session + rotation_failed → falls through to submitBindDevice', async () => {
+    (getValidSessionToken as jest.Mock).mockResolvedValue({
+      ok: false,
+      reason: 'rotation_failed',
+    });
+    (submitBindDevice as jest.Mock).mockResolvedValue({
+      ok: true,
+      session: {
+        sessionToken: 't',
+        refreshToken: 'r',
+        expiresAt: '2099-01-01T00:00:00.000Z',
+      },
+    });
+    (discoverGeneralChannel as jest.Mock).mockResolvedValue({
+      id: 'chan-id',
+      name: 'general',
+    });
+
+    let root: ReactTestRenderer.ReactTestRenderer | null = null;
+    await ReactTestRenderer.act(async () => {
+      root = ReactTestRenderer.create(<App />);
+    });
+    await flush();
+
+    await ReactTestRenderer.act(async () => {
+      findByTestId(root!.root, `workspace-tile-${SERVER.url}`).props.onPress();
+    });
+    await flush();
+
+    expect(submitBindDevice).toHaveBeenCalledTimes(1);
+    expect(discoverGeneralChannel).toHaveBeenCalledTimes(1);
+  });
+
   test('bind failure (identity_not_found) → discoverGeneralChannel NOT called; banner shown', async () => {
-    (loadSession as jest.Mock).mockResolvedValue(null);
+    (getValidSessionToken as jest.Mock).mockResolvedValue({
+      ok: false,
+      reason: 'no_session',
+    });
     (submitBindDevice as jest.Mock).mockResolvedValue({
       ok: false,
       error: 'identity_not_found',

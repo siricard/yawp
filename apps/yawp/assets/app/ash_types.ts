@@ -42,6 +42,32 @@ export type IdentityAttributesOnlySchema = {
   profileVersion: number;
 };
 
+export type RefreshTokenResourceSchema = {
+  __type: "Resource";
+  __primitiveFields: "id" | "token" | "identityId" | "deviceId" | "expiresAt" | "revokedAt" | "rotatedTo";
+  id: UUID;
+  token: string;
+  identityId: UUID;
+  deviceId: UUID;
+  expiresAt: UtcDateTimeUsec;
+  revokedAt: UtcDateTimeUsec | null;
+  rotatedTo: UUID | null;
+  identity: { __type: "Relationship"; __resource: IdentityResourceSchema; };
+  rotatedToRefresh: { __type: "Relationship"; __resource: RefreshTokenResourceSchema | null; };
+};
+
+export type RefreshTokenAttributesOnlySchema = {
+  __type: "Resource";
+  __primitiveFields: "id" | "token" | "identityId" | "deviceId" | "expiresAt" | "revokedAt" | "rotatedTo";
+  id: UUID;
+  token: string;
+  identityId: UUID;
+  deviceId: UUID;
+  expiresAt: UtcDateTimeUsec;
+  revokedAt: UtcDateTimeUsec | null;
+  rotatedTo: UUID | null;
+};
+
 export type ServerChannelResourceSchema = {
   __type: "Resource";
   __primitiveFields: "id" | "name" | "type";
@@ -133,6 +159,68 @@ export type IdentityFilterInput = {
   };
 
 };
+export type RefreshTokenFilterInput = {
+  and?: Array<RefreshTokenFilterInput>;
+  or?: Array<RefreshTokenFilterInput>;
+  not?: Array<RefreshTokenFilterInput>;
+
+  id?: {
+    eq?: UUID;
+    notEq?: UUID;
+    in?: Array<UUID>;
+  };
+
+  token?: {
+    eq?: string;
+    notEq?: string;
+    in?: Array<string>;
+  };
+
+  identityId?: {
+    eq?: UUID;
+    notEq?: UUID;
+    in?: Array<UUID>;
+  };
+
+  deviceId?: {
+    eq?: UUID;
+    notEq?: UUID;
+    in?: Array<UUID>;
+  };
+
+  expiresAt?: {
+    eq?: UtcDateTimeUsec;
+    notEq?: UtcDateTimeUsec;
+    greaterThan?: UtcDateTimeUsec;
+    greaterThanOrEqual?: UtcDateTimeUsec;
+    lessThan?: UtcDateTimeUsec;
+    lessThanOrEqual?: UtcDateTimeUsec;
+    in?: Array<UtcDateTimeUsec>;
+  };
+
+  revokedAt?: {
+    eq?: UtcDateTimeUsec;
+    notEq?: UtcDateTimeUsec;
+    greaterThan?: UtcDateTimeUsec;
+    greaterThanOrEqual?: UtcDateTimeUsec;
+    lessThan?: UtcDateTimeUsec;
+    lessThanOrEqual?: UtcDateTimeUsec;
+    in?: Array<UtcDateTimeUsec>;
+    isNil?: boolean;
+  };
+
+  rotatedTo?: {
+    eq?: UUID;
+    notEq?: UUID;
+    in?: Array<UUID>;
+    isNil?: boolean;
+  };
+
+  identity?: IdentityFilterInput;
+
+  rotatedToRefresh?: RefreshTokenFilterInput;
+
+};
 export type ServerChannelFilterInput = {
   and?: Array<ServerChannelFilterInput>;
   or?: Array<ServerChannelFilterInput>;
@@ -164,6 +252,9 @@ export type AdminAccountFilterField = (typeof adminAccountFilterFields)[number];
 export const identityFilterFields = ["id", "did", "masterPublicKey", "deviceSubkeys", "anchorList", "profileVersion"] as const;
 export type IdentityFilterField = (typeof identityFilterFields)[number];
 
+export const refreshTokenFilterFields = ["id", "token", "identityId", "deviceId", "expiresAt", "revokedAt", "rotatedTo", "identity", "rotatedToRefresh"] as const;
+export type RefreshTokenFilterField = (typeof refreshTokenFilterFields)[number];
+
 export const serverChannelFilterFields = ["id", "name", "type"] as const;
 export type ServerChannelFilterField = (typeof serverChannelFilterFields)[number];
 
@@ -172,6 +263,9 @@ export type AdminAccountSortField = (typeof adminAccountSortFields)[number];
 
 export const identitySortFields = ["id", "did", "masterPublicKey", "deviceSubkeys", "anchorList", "profileVersion"] as const;
 export type IdentitySortField = (typeof identitySortFields)[number];
+
+export const refreshTokenSortFields = ["id", "token", "identityId", "deviceId", "expiresAt", "revokedAt", "rotatedTo"] as const;
+export type RefreshTokenSortField = (typeof refreshTokenSortFields)[number];
 
 export const serverChannelSortFields = ["id", "name", "type"] as const;
 export type ServerChannelSortField = (typeof serverChannelSortFields)[number];
