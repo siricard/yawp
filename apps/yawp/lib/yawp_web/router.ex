@@ -22,6 +22,18 @@ defmodule YawpWeb.Router do
     plug :set_actor, :user
   end
 
+                  pipeline :rpc do
+    plug :accepts, ["json"]
+    plug :put_secure_browser_headers
+  end
+
+      scope "/", YawpWeb do
+    pipe_through :rpc
+
+    post "/rpc/run", AshTypescriptRpcController, :run
+    post "/rpc/validate", AshTypescriptRpcController, :validate
+  end
+
   scope "/", YawpWeb do
     pipe_through :browser
 
@@ -29,8 +41,6 @@ defmodule YawpWeb.Router do
       live "/admin", AdminDashboardLive, :index
     end
 
-    post "/rpc/run", AshTypescriptRpcController, :run
-    post "/rpc/validate", AshTypescriptRpcController, :validate
     get "/ash-typescript", PageController, :index
   end
 
