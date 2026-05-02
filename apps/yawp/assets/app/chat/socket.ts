@@ -3,7 +3,9 @@ import {Socket, type SocketConnectOption} from 'phoenix';
 
 import {getValidSessionToken} from '../session';
 
-const sockets = new Map<string, Socket>();
+type CacheEntry = {socket: Socket; token: string};
+
+const sockets = new Map<string, CacheEntry>();
 
 function normalize(url: string): string {
   return url.trim().replace(/\/+$/, '');
@@ -15,6 +17,16 @@ function wsUrl(serverUrl: string): string {
   return `${wsBase}/socket`;
 }
 
+function dropCachedSocket(base: string): void {
+  const existing = sockets.get(base);
+  if (!existing) return;
+  try {
+    existing.socket.disconnect();
+  } catch {
+  }
+  sockets.delete(base);
+}
+
 export type GetSocketResult =
   | {ok: true; socket: Socket}
   | {ok: false; reason: 'no_session'};
@@ -24,14 +36,24 @@ export async function getSocket(
   opts: Partial<SocketConnectOption> = {},
 ): Promise<GetSocketResult> {
   const base = normalize(serverUrl);
-  const existing = sockets.get(base);
-  if (existing) {
-    return {ok: true, socket: existing};
-  }
 
   const session = await getValidSessionToken({serverUrl: base});
   if (!session.ok) {
+    dropCachedSocket(base);
     return {ok: false, reason: 'no_session'};
+  }
+
+  const existing = sockets.get(base);
+  if (existing && existing.token === session.sessionToken) {
+    return {ok: true, socket: existing.socket};
+  }
+
+  if (existing) {
+    try {
+      existing.socket.disconnect();
+    } catch {
+    }
+    sockets.delete(base);
   }
 
   const socket = new Socket(wsUrl(base), {
@@ -39,17 +61,13 @@ export async function getSocket(
     ...opts,
   });
   socket.connect();
-  sockets.set(base, socket);
+  sockets.set(base, {socket, token: session.sessionToken});
   return {ok: true, socket};
 }
 
 /** Test-only: drop the cached socket for `serverUrl`. */
 export function _resetSocketCache(): void {
-  for (const sock of sockets.values()) {
-    try {
-      sock.disconnect();
-    } catch {
-    }
+  for (const base of Array.from(sockets.keys())) {
+    dropCachedSocket(base);
   }
-  sockets.clear();
 }
