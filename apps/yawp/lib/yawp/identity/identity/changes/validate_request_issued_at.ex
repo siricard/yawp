@@ -1,9 +1,15 @@
-defmodule Yawp.Identity.Identity.Changes.ValidateIssuedAt do
+defmodule Yawp.Identity.Identity.Changes.ValidateRequestIssuedAt do
   @moduledoc """
-  fix2 — validates the opaque `issued_at` argument is a
+  fix3 — validates the opaque `request_issued_at` argument is a
   parseable ISO-8601 UTC timestamp AND within the 5-minute replay
   window around server time. Any failure → `RpcError type:
   "invalid_payload"`.
+
+  `request_issued_at` is the freshness anchor for THIS bind request
+  signed by the device subkey via `sender_signature`. The companion
+  `device_issued_at` argument (the master-signed device delegation
+  timestamp) is NOT subject to this window; it is a stable attestation
+  captured when the subkey was generated.
 
   The string itself is consumed verbatim by downstream canonical-JSON
   encoders; this change only gates semantic validity. will tighten
@@ -23,11 +29,14 @@ defmodule Yawp.Identity.Identity.Changes.ValidateIssuedAt do
   defp validate(%{valid?: false} = changeset), do: changeset
 
   defp validate(changeset) do
-    issued_at = Ash.Changeset.get_argument(changeset, :issued_at)
+    request_issued_at = Ash.Changeset.get_argument(changeset, :request_issued_at)
+    device_issued_at = Ash.Changeset.get_argument(changeset, :device_issued_at)
 
-    with true <- is_binary(issued_at),
-         {:ok, dt, _offset} <- DateTime.from_iso8601(issued_at),
-         true <- within_window?(dt) do
+    with true <- is_binary(request_issued_at),
+         true <- is_binary(device_issued_at),
+                                    {:ok, _device_dt, _device_offset} <- DateTime.from_iso8601(device_issued_at),
+         {:ok, request_dt, _request_offset} <- DateTime.from_iso8601(request_issued_at),
+         true <- within_window?(request_dt) do
       changeset
     else
       _ ->

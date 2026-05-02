@@ -40,7 +40,8 @@ defmodule Yawp.Identity.Identity.Changes.VerifyBindSenderSignature do
       "device_id" => Ash.Changeset.get_argument(changeset, :device_id),
       "device_pk" => Ash.Changeset.get_argument(changeset, :device_pk),
       "device_signature" => Ash.Changeset.get_argument(changeset, :device_signature),
-      "issued_at" => Ash.Changeset.get_argument(changeset, :issued_at)
+      "device_issued_at" => Ash.Changeset.get_argument(changeset, :device_issued_at),
+      "request_issued_at" => Ash.Changeset.get_argument(changeset, :request_issued_at)
     })
   end
 end

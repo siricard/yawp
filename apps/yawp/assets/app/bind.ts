@@ -55,14 +55,16 @@ export async function submitBindDevice(args: {
   const deviceId = identity.deviceId;
   const devicePk = bytesToBase64Url(identity.devicePk);
   const deviceSignature = bytesToBase64Url(identity.deviceDelegationSignature);
-  const issuedAt = identity.deviceIssuedAt;
+  const deviceIssuedAt = identity.deviceIssuedAt;
+  const requestIssuedAt = new Date().toISOString();
 
   const canonical = canonicalJson({
     did,
     device_id: deviceId,
     device_pk: devicePk,
     device_signature: deviceSignature,
-    issued_at: issuedAt,
+    device_issued_at: deviceIssuedAt,
+    request_issued_at: requestIssuedAt,
   });
   const encoded = new TextEncoder().encode(canonical);
   const senderSig = identity.signDevice(encoded);
@@ -84,7 +86,8 @@ export async function submitBindDevice(args: {
         devicePk,
         deviceSignature,
         senderSignature,
-        issuedAt,
+        deviceIssuedAt,
+        requestIssuedAt,
       },
       fields: ['id', 'did', 'profileVersion'],
       metadataFields: ['sessionToken', 'refreshToken', 'expiresAt'],

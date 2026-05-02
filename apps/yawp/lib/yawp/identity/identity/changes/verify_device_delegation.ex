@@ -25,11 +25,11 @@ defmodule Yawp.Identity.Identity.Changes.VerifyDeviceDelegation do
     device_pk_b64 = Ash.Changeset.get_argument(changeset, :device_pk)
     device_id = Ash.Changeset.get_argument(changeset, :device_id)
 
-        canonical =
+                canonical =
       Yawp.CanonicalJson.encode(%{
         "device_id" => device_id,
         "pk" => device_pk_b64,
-        "issued_at" => Ash.Changeset.get_argument(changeset, :issued_at)
+        "issued_at" => Ash.Changeset.get_argument(changeset, :device_issued_at)
       })
 
     with true <- is_binary(master_pk) and is_binary(device_sig),

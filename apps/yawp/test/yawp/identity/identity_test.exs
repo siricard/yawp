@@ -38,10 +38,17 @@ defmodule Yawp.Identity.IdentityTest do
     device_id = Keyword.get(opts, :device_id, Ecto.UUID.generate())
     {device_pk, device_sk} = :crypto.generate_key(:eddsa, :ed25519)
 
-    issued_at_iso =
-      Keyword.get_lazy(opts, :issued_at_iso, fn -> DateTime.to_iso8601(DateTime.utc_now()) end)
+    device_issued_at =
+      Keyword.get_lazy(opts, :issued_at_iso, fn ->
+        DateTime.to_iso8601(DateTime.utc_now())
+      end)
 
-    device_sig = sign_delegation(master_sk, device_id, device_pk, issued_at_iso)
+    request_issued_at =
+      Keyword.get_lazy(opts, :request_issued_at, fn ->
+        DateTime.to_iso8601(DateTime.utc_now())
+      end)
+
+    device_sig = sign_delegation(master_sk, device_id, device_pk, device_issued_at)
     device_pk_b64 = Base.url_encode64(device_pk, padding: false)
     device_sig_b64 = Base.url_encode64(device_sig, padding: false)
 
@@ -51,7 +58,8 @@ defmodule Yawp.Identity.IdentityTest do
         "device_id" => device_id,
         "device_pk" => device_pk_b64,
         "device_signature" => device_sig_b64,
-        "issued_at" => issued_at_iso
+        "device_issued_at" => device_issued_at,
+        "request_issued_at" => request_issued_at
       })
 
     sender_sig = :crypto.sign(:eddsa, :none, canonical_body, [device_sk, :ed25519])
@@ -61,7 +69,8 @@ defmodule Yawp.Identity.IdentityTest do
       device_pk: device_pk_b64,
       device_signature: device_sig_b64,
       sender_signature: Base.url_encode64(sender_sig, padding: false),
-      issued_at: issued_at_iso
+      device_issued_at: device_issued_at,
+      request_issued_at: request_issued_at
     }
   end
 

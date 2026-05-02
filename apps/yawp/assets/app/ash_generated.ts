@@ -180,7 +180,8 @@ export type BindDeviceInput = {
   devicePk: string;
   deviceSignature: string;
   senderSignature: string;
-  issuedAt: string;
+  deviceIssuedAt: string;
+  requestIssuedAt: string;
 };
 
 export type BindDeviceFields = UnifiedFieldSelection<IdentityResourceSchema>[];

@@ -11,7 +11,8 @@ defmodule Yawp.Identity.BindDeviceRpcTest do
                  "input" => %{
                    "deviceId" => ..., "devicePk" => ...,
                    "deviceSignature" => ...,
-                   "senderSignature" => ..., "issuedAt" => ...
+                   "senderSignature" => ...,
+                   "deviceIssuedAt" => ..., "requestIssuedAt" => ...
                  }}`.
 
   Errors surface via `result.errors[0].type`. Tokens surface via
@@ -49,10 +50,17 @@ defmodule Yawp.Identity.BindDeviceRpcTest do
 
     {device_pk_bytes, device_sk_bytes} = :crypto.generate_key(:eddsa, :ed25519)
 
-    issued_at_iso =
-      Keyword.get_lazy(opts, :issued_at_iso, fn -> DateTime.to_iso8601(DateTime.utc_now()) end)
+    device_issued_at =
+      Keyword.get_lazy(opts, :device_issued_at, fn ->
+        DateTime.to_iso8601(DateTime.utc_now())
+      end)
 
-    device_sig = sign_delegation(master_sk, device_id, device_pk_bytes, issued_at_iso)
+    request_issued_at =
+      Keyword.get_lazy(opts, :request_issued_at, fn ->
+        DateTime.to_iso8601(DateTime.utc_now())
+      end)
+
+    device_sig = sign_delegation(master_sk, device_id, device_pk_bytes, device_issued_at)
     device_pk_b64 = Base.url_encode64(device_pk_bytes, padding: false)
     device_sig_b64 = Base.url_encode64(device_sig, padding: false)
 
@@ -62,7 +70,8 @@ defmodule Yawp.Identity.BindDeviceRpcTest do
         "device_id" => device_id,
         "device_pk" => device_pk_b64,
         "device_signature" => device_sig_b64,
-        "issued_at" => issued_at_iso
+        "device_issued_at" => device_issued_at,
+        "request_issued_at" => request_issued_at
       })
 
     sender_sig = :crypto.sign(:eddsa, :none, canonical_body, [device_sk_bytes, :ed25519])
@@ -73,7 +82,8 @@ defmodule Yawp.Identity.BindDeviceRpcTest do
       "devicePk" => device_pk_b64,
       "deviceSignature" => device_sig_b64,
       "senderSignature" => sender_sig_b64,
-      "issuedAt" => issued_at_iso
+      "deviceIssuedAt" => device_issued_at,
+      "requestIssuedAt" => request_issued_at
     }
 
     %{
@@ -83,7 +93,9 @@ defmodule Yawp.Identity.BindDeviceRpcTest do
       device_pk_b64: device_pk_b64,
       device_sig_b64: device_sig_b64,
       sender_sig_b64: sender_sig_b64,
-      device_sk: device_sk_bytes
+      device_sk: device_sk_bytes,
+      device_issued_at: device_issued_at,
+      request_issued_at: request_issued_at
     }
   end
 
@@ -230,27 +242,59 @@ defmodule Yawp.Identity.BindDeviceRpcTest do
       assert "invalid_payload" in error_types(result)
     end
 
-    test "invalid_payload when issued_at is not parseable ISO-8601" do
+    test "invalid_payload when device_issued_at is not parseable ISO-8601" do
       %{master_sk: master_sk, did: did} = seed_identity!()
-      built = build_input(master_sk: master_sk, did: did, issued_at_iso: "not-a-date")
+      built = build_input(master_sk: master_sk, did: did, device_issued_at: "not-a-date")
       result = run(did, built.input)
       assert success?(result) == false
       assert "invalid_payload" in error_types(result)
     end
 
-    test "invalid_payload when issued_at is more than 5 minutes in the past" do
+    test "invalid_payload when request_issued_at is more than 5 minutes in the past" do
       %{master_sk: master_sk, did: did} = seed_identity!()
       stale_iso = DateTime.utc_now() |> DateTime.add(-10 * 60, :second) |> DateTime.to_iso8601()
-      built = build_input(master_sk: master_sk, did: did, issued_at_iso: stale_iso)
+      built = build_input(master_sk: master_sk, did: did, request_issued_at: stale_iso)
       result = run(did, built.input)
       assert success?(result) == false
       assert "invalid_payload" in error_types(result)
     end
 
-    test "invalid_payload when issued_at is more than 5 minutes in the future" do
+    test "invalid_payload when request_issued_at is more than 5 minutes in the future" do
       %{master_sk: master_sk, did: did} = seed_identity!()
       future_iso = DateTime.utc_now() |> DateTime.add(10 * 60, :second) |> DateTime.to_iso8601()
-      built = build_input(master_sk: master_sk, did: did, issued_at_iso: future_iso)
+      built = build_input(master_sk: master_sk, did: did, request_issued_at: future_iso)
+      result = run(did, built.input)
+      assert success?(result) == false
+      assert "invalid_payload" in error_types(result)
+    end
+  end
+
+  describe "bind_device" do
+    test "stale device_issued_at + fresh request_issued_at SUCCEEDS (user-reported flow)" do
+      %{identity: identity, master_sk: master_sk, did: did} = seed_identity!()
+                  stale_device =
+        DateTime.utc_now() |> DateTime.add(-60 * 60, :second) |> DateTime.to_iso8601()
+
+      built =
+        build_input(master_sk: master_sk, did: did, device_issued_at: stale_device)
+
+      result = run(did, built.input)
+      assert success?(result), inspect(result)
+
+      {:ok, refreshed} = Ash.get(Yawp.Identity.Identity, identity.id, authorize?: false)
+      sub = hd(refreshed.device_subkeys["subkeys"])
+      assert sub["issued_at"] == stale_device
+    end
+
+    test "fresh device_issued_at + stale request_issued_at → invalid_payload" do
+      %{master_sk: master_sk, did: did} = seed_identity!()
+
+      stale_request =
+        DateTime.utc_now() |> DateTime.add(-60 * 60, :second) |> DateTime.to_iso8601()
+
+      built =
+        build_input(master_sk: master_sk, did: did, request_issued_at: stale_request)
+
       result = run(did, built.input)
       assert success?(result) == false
       assert "invalid_payload" in error_types(result)
@@ -267,7 +311,7 @@ defmodule Yawp.Identity.BindDeviceRpcTest do
 
       assert String.match?(ms_iso, ~r/\.\d{3}Z$/)
 
-      built = build_input(master_sk: master_sk, did: did, issued_at_iso: ms_iso)
+      built = build_input(master_sk: master_sk, did: did, device_issued_at: ms_iso)
       result = run(did, built.input)
 
       assert success?(result), inspect(result)
