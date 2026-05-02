@@ -13,6 +13,7 @@ import {
 import {AddServerScreen} from './screens/AddServerScreen';
 import {ChannelScreen} from './screens/ChannelScreen';
 import {DidScreen} from './screens/DidScreen';
+import {OnboardingFlow} from './screens/OnboardingFlow';
 import {VectorTestScreen} from './screens/VectorTestScreen';
 import {WorkspaceBar} from './screens/WorkspaceBar';
 import {getValidSessionToken} from './session';
@@ -98,6 +99,15 @@ function AppShell() {
     } finally {
       setBindingUrl(null);
     }
+  }
+
+  if (identityState.status === 'onboarding') {
+    return (
+      <View className="flex-1 bg-slate-900" nativeID="app-root">
+        {Platform.OS !== 'web' ? <StatusBar barStyle="light-content" /> : null}
+        <OnboardingFlow onDone={() => setScreen({kind: 'home'})} />
+      </View>
+    );
   }
 
   let body: React.ReactNode;

@@ -1,11 +1,12 @@
 
-import React, {createContext, useCallback, useContext, useEffect, useState} from 'react';
+import React, {createContext, useCallback, useContext, useEffect, useRef, useState} from 'react';
 import {Platform} from 'react-native';
 
+import {entropyToMnemonic, mnemonicToSeed} from './identity/bip39';
 import {b64UrlToBytes, bytesToB64Url, type IdentityBundleV1} from './identity/bundle';
 import {generateDeviceSubkey, signWithDevice} from './identity/device';
 import {didFromPubkey, fingerprintFromPubkey} from './identity/did';
-import {generateMaster, masterPkFromSk, signWithMaster} from './identity/master';
+import {masterFromMnemonicSeed, masterPkFromSk, signWithMaster} from './identity/master';
 import {loadIdentity, saveIdentity} from './identity/storage-bundle';
 
 export type Identity = {
@@ -41,10 +42,42 @@ export type WorkspaceServer = {
   label: string;
 };
 
+/**
+ * In-flight identity material during the onboarding ceremony. NOT persisted
+ * to disk until `completeOnboarding()` is called.
+ */
+export type DraftIdentity = {
+  /** 12-word BIP-39 mnemonic shown to the user. */
+  mnemonic: string[];
+  /** Master keypair derived from the mnemonic seed. */
+  masterSk: Uint8Array;
+  masterPk: Uint8Array;
+  /** Device subkey generated in the same step. */
+  deviceId: string;
+  deviceSk: Uint8Array;
+  devicePk: Uint8Array;
+  deviceDelegationSignature: Uint8Array;
+  deviceIssuedAt: string;
+};
+
+export type OnboardingStep =
+  | 'mnemonic'
+  | 'passphrase'
+  | 'display_name'
+  | 'complete';
+
 const WORKSPACES_KEY = 'mook.workspaces';
+const DISPLAY_NAME_KEY = 'yawp.identity.display_name';
 
 type State =
   | {status: 'loading'; identity: null; error: null}
+  | {
+      status: 'onboarding';
+      step: OnboardingStep;
+      draftIdentity: DraftIdentity;
+      identity: null;
+      error: null;
+    }
   | {status: 'ready'; identity: Identity; error: null}
   | {status: 'error'; identity: null; error: string};
 
@@ -52,6 +85,23 @@ type Ctx = {
   state: State;
   servers: WorkspaceServer[];
   addServer: (server: WorkspaceServer) => void;
+  displayName: string | null;
+  setDisplayName: (name: string) => void;
+  /** Advance to the next onboarding step (or to 'ready' if completing). */
+  advanceOnboarding: (next: OnboardingStep) => void;
+  /**
+   * Persist the draft identity to disk and advance to the 'complete' step
+   * (still inside 'onboarding'). The Identity is not yet active — call
+   * `finishOnboarding` after the user dismisses the landing tile.
+   * The passphrase is accepted for future sealing ignores
+   * it at the storage layer.
+   */
+  completeOnboarding: (opts: {
+    passphrase: string | null;
+    displayName: string;
+  }) => Promise<void>;
+  /** Transition from 'onboarding/complete' to 'ready'. */
+  finishOnboarding: () => void;
 };
 
 const IdentityContext = createContext<Ctx | null>(null);
@@ -84,6 +134,23 @@ function persistServers(servers: WorkspaceServer[]): void {
   }
 }
 
+function loadDisplayName(): string | null {
+  if (Platform.OS !== 'web') return null;
+  try {
+    return window.localStorage.getItem(DISPLAY_NAME_KEY);
+  } catch {
+    return null;
+  }
+}
+
+function persistDisplayName(name: string): void {
+  if (Platform.OS !== 'web') return;
+  try {
+    window.localStorage.setItem(DISPLAY_NAME_KEY, name);
+  } catch {
+  }
+}
+
 function buildIdentityFromBundle(bundle: IdentityBundleV1): Identity {
   const masterSk = b64UrlToBytes(bundle.master.sk);
   const masterPk = masterPkFromSk(masterSk);
@@ -106,29 +173,50 @@ function buildIdentityFromBundle(bundle: IdentityBundleV1): Identity {
   };
 }
 
-/**
- * Load the persisted bundle, or generate + persist a fresh one on first run.
- */
-export async function loadOrCreateIdentity(): Promise<Identity> {
-  const existing = await loadIdentity();
-  if (existing) {
-    return buildIdentityFromBundle(existing);
-  }
-  const master = generateMaster();
-  const device = generateDeviceSubkey(master.sk);
-  const bundle: IdentityBundleV1 = {
-    version: 1,
-    master: {sk: bytesToB64Url(master.sk)},
-    device: {
-      deviceId: device.deviceId,
-      sk: bytesToB64Url(device.sk),
-      pk: bytesToB64Url(device.pk),
-      signature: bytesToB64Url(device.signature),
-      issuedAt: device.issuedAt,
-    },
+function buildIdentityFromDraft(draft: DraftIdentity): Identity {
+  const didFull = didFromPubkey(draft.masterPk);
+  const didBase58 = didFull.replace(/^did:yawp:/, '');
+  return {
+    did: didBase58,
+    didFull,
+    masterPk: draft.masterPk,
+    deviceId: draft.deviceId,
+    devicePk: draft.devicePk,
+    deviceDelegationSignature: draft.deviceDelegationSignature,
+    deviceIssuedAt: draft.deviceIssuedAt,
+    fingerprint: fingerprintFromPubkey(draft.masterPk),
+    sign: bytes => signWithMaster(draft.masterSk, bytes),
+    signDevice: bytes => signWithDevice(draft.deviceSk, bytes),
   };
-  await saveIdentity(bundle);
-  return buildIdentityFromBundle(bundle);
+}
+
+/**
+ * Generate a fresh BIP-39 12-word mnemonic + derived master + device subkey,
+ * entirely in memory. **Not persisted.** Used to seed onboarding.
+ */
+export function generateDraftIdentity(): DraftIdentity {
+  const entropy = new Uint8Array(16);
+  if (typeof crypto !== 'undefined' && crypto.getRandomValues) {
+    crypto.getRandomValues(entropy);
+  } else {
+    for (let i = 0; i < entropy.length; i++) {
+      entropy[i] = Math.floor(Math.random() * 256);
+    }
+  }
+  const mnemonic = entropyToMnemonic(entropy);
+  const seed = mnemonicToSeed(mnemonic);
+  const master = masterFromMnemonicSeed(seed);
+  const device = generateDeviceSubkey(master.sk);
+  return {
+    mnemonic,
+    masterSk: master.sk,
+    masterPk: master.pk,
+    deviceId: device.deviceId,
+    deviceSk: device.sk,
+    devicePk: device.pk,
+    deviceDelegationSignature: device.signature,
+    deviceIssuedAt: device.issuedAt,
+  };
 }
 
 export function IdentityProvider({children}: {children: React.ReactNode}) {
@@ -138,24 +226,43 @@ export function IdentityProvider({children}: {children: React.ReactNode}) {
     error: null,
   });
   const [servers, setServers] = useState<WorkspaceServer[]>(() => loadServers());
+  const [displayName, setDisplayNameState] = useState<string | null>(() =>
+    loadDisplayName(),
+  );
+  const draftRef = useRef<DraftIdentity | null>(null);
 
   useEffect(() => {
     let mounted = true;
-    loadOrCreateIdentity()
-      .then(identity => {
-        if (mounted) {
-          setState({status: 'ready', identity, error: null});
-        }
-      })
-      .catch(e => {
-        if (mounted) {
+    (async () => {
+      try {
+        const existing = await loadIdentity();
+        if (!mounted) return;
+        if (existing) {
           setState({
-            status: 'error',
-            identity: null,
-            error: String(e?.message ?? e),
+            status: 'ready',
+            identity: buildIdentityFromBundle(existing),
+            error: null,
           });
+          return;
         }
-      });
+        const draft = generateDraftIdentity();
+        draftRef.current = draft;
+        setState({
+          status: 'onboarding',
+          step: 'mnemonic',
+          draftIdentity: draft,
+          identity: null,
+          error: null,
+        });
+      } catch (e: unknown) {
+        if (!mounted) return;
+        const msg =
+          e && typeof e === 'object' && 'message' in e
+            ? String((e as {message: unknown}).message)
+            : String(e);
+        setState({status: 'error', identity: null, error: msg});
+      }
+    })();
     return () => {
       mounted = false;
     };
@@ -170,8 +277,74 @@ export function IdentityProvider({children}: {children: React.ReactNode}) {
     });
   }, []);
 
+  const setDisplayName = useCallback((name: string) => {
+    persistDisplayName(name);
+    setDisplayNameState(name);
+  }, []);
+
+  const advanceOnboarding = useCallback((next: OnboardingStep) => {
+    setState(prev => {
+      if (prev.status !== 'onboarding') return prev;
+      return {...prev, step: next};
+    });
+  }, []);
+
+  const completeOnboarding = useCallback(
+    async ({
+      passphrase: _passphrase,
+      displayName: chosenName,
+    }: {
+      passphrase: string | null;
+      displayName: string;
+    }) => {
+      const draft = draftRef.current;
+      if (!draft) {
+        throw new Error('completeOnboarding called outside onboarding flow');
+      }
+      const bundle: IdentityBundleV1 = {
+        version: 1,
+        master: {sk: bytesToB64Url(draft.masterSk)},
+        device: {
+          deviceId: draft.deviceId,
+          sk: bytesToB64Url(draft.deviceSk),
+          pk: bytesToB64Url(draft.devicePk),
+          signature: bytesToB64Url(draft.deviceDelegationSignature),
+          issuedAt: draft.deviceIssuedAt,
+        },
+      };
+      await saveIdentity(bundle);
+      persistDisplayName(chosenName);
+      setDisplayNameState(chosenName);
+      setState(prev => {
+        if (prev.status !== 'onboarding') return prev;
+        return {...prev, step: 'complete'};
+      });
+    },
+    [],
+  );
+
+  const finishOnboarding = useCallback(() => {
+    const draft = draftRef.current;
+    if (!draft) return;
+    setState({
+      status: 'ready',
+      identity: buildIdentityFromDraft(draft),
+      error: null,
+    });
+  }, []);
+
   return (
-    <IdentityContext.Provider value={{state, servers, addServer}}>
+    <IdentityContext.Provider
+      value={{
+        state,
+        servers,
+        addServer,
+        displayName,
+        setDisplayName,
+        advanceOnboarding,
+        completeOnboarding,
+        finishOnboarding,
+      }}>
       {children}
     </IdentityContext.Provider>
   );
@@ -205,4 +378,62 @@ export function useWorkspaceServers(): {
     throw new Error('useWorkspaceServers must be used inside an <IdentityProvider>');
   }
   return {servers: ctx.servers, addServer: ctx.addServer};
+}
+
+/**
+ * Onboarding handle used by the OnboardingFlow screen. Returns undefined
+ * outside an `<IdentityProvider>` to keep tests that don't wrap simple.
+ */
+export function useOnboarding(): {
+  advance: (next: OnboardingStep) => void;
+  complete: (opts: {passphrase: string | null; displayName: string}) => Promise<void>;
+  finish: () => void;
+} {
+  const ctx = useContext(IdentityContext);
+  if (!ctx) {
+    throw new Error('useOnboarding must be used inside an <IdentityProvider>');
+  }
+  return {
+    advance: ctx.advanceOnboarding,
+    complete: ctx.completeOnboarding,
+    finish: ctx.finishOnboarding,
+  };
+}
+
+export function useDisplayName(): {
+  displayName: string | null;
+  setDisplayName: (name: string) => void;
+} {
+  const ctx = useContext(IdentityContext);
+  if (!ctx) {
+    throw new Error('useDisplayName must be used inside an <IdentityProvider>');
+  }
+  return {displayName: ctx.displayName, setDisplayName: ctx.setDisplayName};
+}
+
+/**
+ * Legacy entry point used by `apps/yawp/assets/app/identity/index.ts` and
+ * older call sites. Performs the silent auto-generate-and-persist path
+ * with NO onboarding ceremony. New UI code must go through the
+ * `IdentityProvider` instead.
+ */
+export async function loadOrCreateIdentity(): Promise<Identity> {
+  const existing = await loadIdentity();
+  if (existing) {
+    return buildIdentityFromBundle(existing);
+  }
+  const draft = generateDraftIdentity();
+  const bundle: IdentityBundleV1 = {
+    version: 1,
+    master: {sk: bytesToB64Url(draft.masterSk)},
+    device: {
+      deviceId: draft.deviceId,
+      sk: bytesToB64Url(draft.deviceSk),
+      pk: bytesToB64Url(draft.devicePk),
+      signature: bytesToB64Url(draft.deviceDelegationSignature),
+      issuedAt: draft.deviceIssuedAt,
+    },
+  };
+  await saveIdentity(bundle);
+  return buildIdentityFromDraft(draft);
 }

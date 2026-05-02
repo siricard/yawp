@@ -11,7 +11,7 @@ import ReactTestRenderer from 'react-test-renderer';
 
 import {IdentityProvider, useWorkspaceServers} from '../identity-context';
 import {AddServerScreen} from '../screens/AddServerScreen';
-import {clearIdentity} from '../identity';
+import {clearIdentity, getOrCreateIdentity} from '../identity';
 
 function findByTestId(
   tree: ReactTestRenderer.ReactTestInstance,
@@ -31,6 +31,7 @@ function ServersProbe({onLoaded}: {onLoaded: (servers: unknown[]) => void}) {
 describe('AddServerScreen', () => {
   beforeEach(async () => {
     await clearIdentity();
+    await getOrCreateIdentity();
   });
 
   test('renders inputs, submit button, and cancel button', async () => {
