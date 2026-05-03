@@ -213,7 +213,7 @@ describe('Onboarding ceremony (IdentityProvider)', () => {
 
     expect(observed!.status).toBe('onboarding');
     if (observed!.status === 'onboarding') {
-      expect(observed!.step).toBe('mnemonic');
+      expect(observed!.step).toBe('choose_path');
       expect(observed!.draftIdentity.mnemonic).toHaveLength(12);
       expect(observed!.draftIdentity.masterPk.length).toBe(32);
     }

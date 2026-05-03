@@ -2,10 +2,12 @@
 import React, {useMemo, useState} from 'react';
 
 import {useIdentityState, useOnboarding} from '../identity-context';
+import {OnboardingChoiceScreen} from './OnboardingChoiceScreen';
 import {OnboardingCompleteScreen} from './OnboardingCompleteScreen';
 import {OnboardingDisplayNameScreen} from './OnboardingDisplayNameScreen';
 import {OnboardingMnemonicScreen} from './OnboardingMnemonicScreen';
 import {OnboardingPassphraseScreen} from './OnboardingPassphraseScreen';
+import {RestoreMnemonicScreen} from './RestoreMnemonicScreen';
 import {fingerprintFromPubkey} from '../identity/did';
 
 type Props = {
@@ -30,7 +32,7 @@ export function OnboardingFlow({
   defaultDisplayNameFor = placeholderDisplayName,
 }: Props) {
   const state = useIdentityState();
-  const {advance, complete, finish} = useOnboarding();
+  const {advance, complete, finish, restore} = useOnboarding();
   const [pendingPassphrase, setPendingPassphrase] = useState<string | null>(null);
 
   const defaultName = useMemo(() => {
@@ -43,6 +45,20 @@ export function OnboardingFlow({
   }
 
   switch (state.step) {
+    case 'choose_path':
+      return (
+        <OnboardingChoiceScreen
+          onCreate={() => advance('mnemonic')}
+          onRestore={() => advance('restore')}
+        />
+      );
+    case 'restore':
+      return (
+        <RestoreMnemonicScreen
+          onRestore={restore}
+          onCancel={() => advance('choose_path')}
+        />
+      );
     case 'mnemonic':
       return (
         <OnboardingMnemonicScreen

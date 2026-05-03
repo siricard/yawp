@@ -2,7 +2,7 @@
 import React, {createContext, useCallback, useContext, useEffect, useRef, useState} from 'react';
 import {Platform} from 'react-native';
 
-import {entropyToMnemonic, mnemonicToSeed} from './identity/bip39';
+import {entropyToMnemonic, mnemonicToSeed, validateMnemonic} from './identity/bip39';
 import {b64UrlToBytes, bytesToB64Url, type IdentityBundleV1} from './identity/bundle';
 import {generateDeviceSubkey, signWithDevice} from './identity/device';
 import {didFromPubkey, fingerprintFromPubkey} from './identity/did';
@@ -61,10 +61,21 @@ export type DraftIdentity = {
 };
 
 export type OnboardingStep =
+  | 'choose_path'
+  | 'restore'
   | 'mnemonic'
   | 'passphrase'
   | 'display_name'
   | 'complete';
+
+/**
+ * outcome of a recovery attempt. `ok: false` cases mirror the
+ * BIP-39 `validateMnemonic` reasons plus `wrong_word_count` so callers can
+ * display a precise error.
+ */
+export type RestoreResult =
+  | {ok: true}
+  | {ok: false; reason: 'wrong_word_count' | 'unknown_word' | 'bad_checksum'};
 
 const WORKSPACES_KEY = 'mook.workspaces';
 const DISPLAY_NAME_KEY = 'yawp.identity.display_name';
@@ -102,6 +113,13 @@ type Ctx = {
   }) => Promise<void>;
   /** Transition from 'onboarding/complete' to 'ready'. */
   finishOnboarding: () => void;
+  /**
+   * restore an identity from a 12-word BIP-39 mnemonic. On success,
+   * the derived master keypair REPLACES the in-memory draft, a fresh device
+   * subkey is generated, the bundle is persisted, and the provider
+   * transitions directly to 'ready'. No network calls are made.
+   */
+  restoreFromMnemonic: (words: string[]) => Promise<RestoreResult>;
 };
 
 const IdentityContext = createContext<Ctx | null>(null);
@@ -249,7 +267,7 @@ export function IdentityProvider({children}: {children: React.ReactNode}) {
         draftRef.current = draft;
         setState({
           status: 'onboarding',
-          step: 'mnemonic',
+          step: 'choose_path',
           draftIdentity: draft,
           identity: null,
           error: null,
@@ -323,6 +341,54 @@ export function IdentityProvider({children}: {children: React.ReactNode}) {
     [],
   );
 
+  const restoreFromMnemonic = useCallback(
+    async (words: string[]): Promise<RestoreResult> => {
+      if (words.length !== 12) {
+        return {ok: false, reason: 'wrong_word_count'};
+      }
+      const validation = validateMnemonic(words);
+      if (!validation.ok) {
+        if (validation.reason === 'invalid_word_count') {
+          return {ok: false, reason: 'wrong_word_count'};
+        }
+        return {ok: false, reason: validation.reason};
+      }
+      const seed = mnemonicToSeed(words);
+      const master = masterFromMnemonicSeed(seed);
+      const device = generateDeviceSubkey(master.sk);
+      const draft: DraftIdentity = {
+        mnemonic: words,
+        masterSk: master.sk,
+        masterPk: master.pk,
+        deviceId: device.deviceId,
+        deviceSk: device.sk,
+        devicePk: device.pk,
+        deviceDelegationSignature: device.signature,
+        deviceIssuedAt: device.issuedAt,
+      };
+      const bundle: IdentityBundleV1 = {
+        version: 1,
+        master: {sk: bytesToB64Url(draft.masterSk)},
+        device: {
+          deviceId: draft.deviceId,
+          sk: bytesToB64Url(draft.deviceSk),
+          pk: bytesToB64Url(draft.devicePk),
+          signature: bytesToB64Url(draft.deviceDelegationSignature),
+          issuedAt: draft.deviceIssuedAt,
+        },
+      };
+      await saveIdentity(bundle);
+      draftRef.current = draft;
+      setState({
+        status: 'ready',
+        identity: buildIdentityFromDraft(draft),
+        error: null,
+      });
+      return {ok: true};
+    },
+    [],
+  );
+
   const finishOnboarding = useCallback(() => {
     const draft = draftRef.current;
     if (!draft) return;
@@ -344,6 +410,7 @@ export function IdentityProvider({children}: {children: React.ReactNode}) {
         advanceOnboarding,
         completeOnboarding,
         finishOnboarding,
+        restoreFromMnemonic,
       }}>
       {children}
     </IdentityContext.Provider>
@@ -388,6 +455,7 @@ export function useOnboarding(): {
   advance: (next: OnboardingStep) => void;
   complete: (opts: {passphrase: string | null; displayName: string}) => Promise<void>;
   finish: () => void;
+  restore: (words: string[]) => Promise<RestoreResult>;
 } {
   const ctx = useContext(IdentityContext);
   if (!ctx) {
@@ -397,6 +465,7 @@ export function useOnboarding(): {
     advance: ctx.advanceOnboarding,
     complete: ctx.completeOnboarding,
     finish: ctx.finishOnboarding,
+    restore: ctx.restoreFromMnemonic,
   };
 }
 
