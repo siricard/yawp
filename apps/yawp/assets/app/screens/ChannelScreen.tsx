@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 
 import {useChannel, type ChannelMessage} from '../chat/channel-store';
+import {useDisplayName, useIdentityState} from '../identity-context';
 
 type Props = {
   serverUrl: string;
@@ -48,7 +49,18 @@ function formatTimestamp(iso: string): string {
   }
 }
 
-function MessageRow({message}: {message: ChannelMessage}) {
+function MessageRow({
+  message,
+  selfDid,
+  selfDisplayName,
+}: {
+  message: ChannelMessage;
+  selfDid: string | null;
+  selfDisplayName: string | null;
+}) {
+  const isSelf = selfDid !== null && message.author_did === selfDid;
+  const label =
+    isSelf && selfDisplayName ? selfDisplayName : displayAuthor(message.author_did);
   return (
     <View
       testID={`channel-message-${message.id}`}
@@ -57,7 +69,7 @@ function MessageRow({message}: {message: ChannelMessage}) {
         <Text
           className="text-xs text-indigo-300 mr-2"
           style={{fontFamily: monospace}}>
-          {displayAuthor(message.author_did)}
+          {label}
         </Text>
         <Text className="text-[10px] text-slate-500">
           {formatTimestamp(message.server_inserted_at)}
@@ -76,6 +88,10 @@ export function ChannelScreen({
   onBack,
 }: Props) {
   const {status, errorMessage, messages, send} = useChannel(serverUrl, channelId);
+  const identityState = useIdentityState();
+  const {effectiveDisplayName} = useDisplayName();
+  const selfDid =
+    identityState.status === 'ready' ? identityState.identity.did : null;
   const [draft, setDraft] = useState('');
   const scrollRef = useRef<ScrollView | null>(null);
 
@@ -138,7 +154,12 @@ export function ChannelScreen({
         className="flex-1"
         contentContainerStyle={{paddingVertical: 8}}>
         {messages.map(message => (
-          <MessageRow key={message.id} message={message} />
+          <MessageRow
+            key={message.id}
+            message={message}
+            selfDid={selfDid}
+            selfDisplayName={effectiveDisplayName}
+          />
         ))}
       </ScrollView>
 

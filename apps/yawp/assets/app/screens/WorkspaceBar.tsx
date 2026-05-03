@@ -2,7 +2,7 @@
 import React from 'react';
 import {Platform, Pressable, ScrollView, Text, View} from 'react-native';
 
-import {useWorkspaceServers, type WorkspaceServer} from '../identity-context';
+import {useDisplayName, useWorkspaceServers, type WorkspaceServer} from '../identity-context';
 
 type Props = {
   onAddServer: () => void;
@@ -33,7 +33,11 @@ export function WorkspaceBar({
   bindingUrl = null,
 }: Props) {
   const {servers} = useWorkspaceServers();
+  const {effectiveDisplayName} = useDisplayName();
   const horizontal = orientation === 'horizontal';
+  const selfInitial = effectiveDisplayName
+    ? effectiveDisplayName.charAt(0).toUpperCase()
+    : '?';
 
   return (
     <View
@@ -60,6 +64,17 @@ export function WorkspaceBar({
             ? {flexDirection: 'row', alignItems: 'center', gap: 8}
             : {flexDirection: 'column', alignItems: 'center', gap: 8}
         }>
+        {effectiveDisplayName ? (
+          <View
+            testID="workspace-self-tile"
+            accessibilityLabel={`you ${effectiveDisplayName}`}
+            className="w-12 h-12 rounded-2xl bg-emerald-700 items-center justify-center mb-2">
+            <Text className="text-base font-bold text-slate-50">
+              {selfInitial}
+            </Text>
+          </View>
+        ) : null}
+
         {servers.map(server => {
           const isBinding = bindingUrl === server.url;
           return (

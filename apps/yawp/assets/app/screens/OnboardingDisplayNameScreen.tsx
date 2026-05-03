@@ -11,7 +11,11 @@ const monospace = Platform.select({
 
 type Props = {
   defaultDisplayName: string;
-  onSubmit: (displayName: string) => void;
+  /**
+   * Called when the user confirms. Receives the override (trimmed) or
+   * `null` when the user kept the default unchanged.
+   */
+  onSubmit: (override: string | null) => void;
 };
 
 export function OnboardingDisplayNameScreen({
@@ -21,7 +25,8 @@ export function OnboardingDisplayNameScreen({
   const [editing, setEditing] = useState(false);
   const [override, setOverride] = useState(defaultDisplayName);
 
-  const effective = editing ? override.trim() : defaultDisplayName;
+  const trimmedOverride = override.trim();
+  const effective = editing ? trimmedOverride : defaultDisplayName;
   const canSubmit = effective.length > 0;
 
   return (
@@ -76,7 +81,13 @@ export function OnboardingDisplayNameScreen({
         accessibilityLabel="continue"
         accessibilityState={{disabled: !canSubmit}}
         disabled={!canSubmit}
-        onPress={() => onSubmit(effective)}
+        onPress={() => {
+          if (editing && trimmedOverride !== defaultDisplayName) {
+            onSubmit(trimmedOverride);
+          } else {
+            onSubmit(null);
+          }
+        }}
         className={[
           'rounded-lg py-3 px-4 self-start',
           canSubmit

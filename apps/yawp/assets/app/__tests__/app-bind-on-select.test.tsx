@@ -49,6 +49,11 @@ jest.mock('../identity-context', () => ({
   IdentityProvider: ({children}: {children: unknown}) => children,
   useIdentityState: jest.fn(),
   useWorkspaceServers: jest.fn(),
+  useDisplayName: () => ({
+    displayName: null,
+    setDisplayName: () => {},
+    effectiveDisplayName: null,
+  }),
 }));
 
 jest.mock('../bind', () => ({

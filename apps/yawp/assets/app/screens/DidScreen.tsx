@@ -2,7 +2,7 @@
 import React, {useEffect, useState} from 'react';
 import {Platform, Pressable, Text, View} from 'react-native';
 
-import {useIdentityState} from '../identity-context';
+import {useDisplayName, useIdentityState} from '../identity-context';
 import {runIdentityVectorCheck, type VectorResult} from '../identity-vector';
 
 type Props = {
@@ -18,6 +18,7 @@ const monospace = Platform.select({
 
 export function DidScreen({onOpenVectorTest}: Props) {
   const state = useIdentityState();
+  const {effectiveDisplayName} = useDisplayName();
   const [vector, setVector] = useState<VectorResult | null>(null);
 
   useEffect(() => {
@@ -61,6 +62,18 @@ export function DidScreen({onOpenVectorTest}: Props) {
       <Text className="text-3xl font-bold text-slate-50 mb-6">
         Yawp Identity
       </Text>
+
+      {effectiveDisplayName ? (
+        <View
+          className="bg-slate-800 rounded-lg p-4 mb-4"
+          testID="identity-display-name"
+          accessibilityLabel="display name">
+          <Text className="text-sm font-semibold text-slate-400 mb-1">
+            Display name
+          </Text>
+          <Text className="text-lg text-slate-50">{effectiveDisplayName}</Text>
+        </View>
+      ) : null}
 
       <View
         className="bg-slate-800 rounded-lg p-4 mb-4"

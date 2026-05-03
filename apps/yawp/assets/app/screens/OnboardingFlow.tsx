@@ -9,31 +9,26 @@ import {OnboardingMnemonicScreen} from './OnboardingMnemonicScreen';
 import {OnboardingPassphraseScreen} from './OnboardingPassphraseScreen';
 import {RestoreMnemonicScreen} from './RestoreMnemonicScreen';
 import {fingerprintFromPubkey} from '../identity/did';
+import {defaultDisplayName} from '../identity/word-pair';
 
 type Props = {
   /** Called when the user clicks "Go to home" on the complete screen. */
   onDone: () => void;
   /**
-   * Override of the default display name. will land a deterministic
-   * word-pair derivation; for we just show a stable placeholder
-   * derived from the master fingerprint so onboarding is self-contained.
+   * Override of the default display name. Defaults to the
+   * deterministic word-pair derivation (`defaultDisplayName`).
    */
   defaultDisplayNameFor?: (masterPk: Uint8Array) => string;
 };
 
-function placeholderDisplayName(masterPk: Uint8Array): string {
-  const fp = fingerprintFromPubkey(masterPk);
-  const m = fp.match(/^yp:([0-9a-f]{4})/);
-  return m ? `Yawp ${m[1]}` : 'New User';
-}
-
 export function OnboardingFlow({
   onDone,
-  defaultDisplayNameFor = placeholderDisplayName,
+  defaultDisplayNameFor = defaultDisplayName,
 }: Props) {
   const state = useIdentityState();
   const {advance, complete, finish, restore} = useOnboarding();
   const [pendingPassphrase, setPendingPassphrase] = useState<string | null>(null);
+  const [chosenOverride, setChosenOverride] = useState<string | null>(null);
 
   const defaultName = useMemo(() => {
     if (state.status !== 'onboarding') return '';
@@ -79,10 +74,11 @@ export function OnboardingFlow({
       return (
         <OnboardingDisplayNameScreen
           defaultDisplayName={defaultName}
-          onSubmit={async chosenName => {
+          onSubmit={async override => {
+            setChosenOverride(override);
             await complete({
               passphrase: pendingPassphrase,
-              displayName: chosenName,
+              displayName: override,
             });
           }}
         />
@@ -90,7 +86,7 @@ export function OnboardingFlow({
     case 'complete':
       return (
         <OnboardingCompleteScreen
-          displayName={defaultName}
+          displayName={chosenOverride ?? defaultName}
           fingerprint={fingerprintFromPubkey(state.draftIdentity.masterPk)}
           onGoHome={() => {
             finish();

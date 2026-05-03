@@ -11,6 +11,11 @@ import type {Identity} from '../identity-context';
 
 jest.mock('../identity-context', () => ({
   useIdentityState: jest.fn(),
+  useDisplayName: () => ({
+    displayName: null,
+    setDisplayName: () => {},
+    effectiveDisplayName: null,
+  }),
 }));
 jest.mock('../identity-vector', () => ({
   runIdentityVectorCheck: () => ({pass: true, details: {}}),

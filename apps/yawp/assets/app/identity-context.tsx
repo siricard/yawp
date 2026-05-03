@@ -8,6 +8,7 @@ import {generateDeviceSubkey, signWithDevice} from './identity/device';
 import {didFromPubkey, fingerprintFromPubkey} from './identity/did';
 import {masterFromMnemonicSeed, masterPkFromSk, signWithMaster} from './identity/master';
 import {loadIdentity, saveIdentity} from './identity/storage-bundle';
+import {defaultDisplayName} from './identity/word-pair';
 
 export type Identity = {
   /**
@@ -109,7 +110,11 @@ type Ctx = {
    */
   completeOnboarding: (opts: {
     passphrase: string | null;
-    displayName: string;
+    /**
+     * User-chosen override. `null` means "keep the deterministic word-pair
+     * default" — no override is persisted.
+     */
+    displayName: string | null;
   }) => Promise<void>;
   /** Transition from 'onboarding/complete' to 'ready'. */
   finishOnboarding: () => void;
@@ -313,7 +318,7 @@ export function IdentityProvider({children}: {children: React.ReactNode}) {
       displayName: chosenName,
     }: {
       passphrase: string | null;
-      displayName: string;
+      displayName: string | null;
     }) => {
       const draft = draftRef.current;
       if (!draft) {
@@ -331,8 +336,10 @@ export function IdentityProvider({children}: {children: React.ReactNode}) {
         },
       };
       await saveIdentity(bundle);
-      persistDisplayName(chosenName);
-      setDisplayNameState(chosenName);
+      if (chosenName !== null) {
+        persistDisplayName(chosenName);
+        setDisplayNameState(chosenName);
+      }
       setState(prev => {
         if (prev.status !== 'onboarding') return prev;
         return {...prev, step: 'complete'};
@@ -453,7 +460,10 @@ export function useWorkspaceServers(): {
  */
 export function useOnboarding(): {
   advance: (next: OnboardingStep) => void;
-  complete: (opts: {passphrase: string | null; displayName: string}) => Promise<void>;
+  complete: (opts: {
+    passphrase: string | null;
+    displayName: string | null;
+  }) => Promise<void>;
   finish: () => void;
   restore: (words: string[]) => Promise<RestoreResult>;
 } {
@@ -470,14 +480,35 @@ export function useOnboarding(): {
 }
 
 export function useDisplayName(): {
+  /**
+   * The user's chosen override, if any. `null` when no override is set
+   * callers that want the rendered name should use `effectiveDisplayName`
+   * instead, which falls back to the word-pair default.
+   */
   displayName: string | null;
   setDisplayName: (name: string) => void;
+  /**
+   * the override if set, otherwise the deterministic word-pair
+   * default derived from the master public key. Returns `null` only when
+   * the identity is not yet ready (loading / onboarding / error).
+   */
+  effectiveDisplayName: string | null;
 } {
   const ctx = useContext(IdentityContext);
   if (!ctx) {
     throw new Error('useDisplayName must be used inside an <IdentityProvider>');
   }
-  return {displayName: ctx.displayName, setDisplayName: ctx.setDisplayName};
+  let effective: string | null = null;
+  if (ctx.displayName && ctx.displayName.trim().length > 0) {
+    effective = ctx.displayName;
+  } else if (ctx.state.status === 'ready') {
+    effective = defaultDisplayName(ctx.state.identity.masterPk);
+  }
+  return {
+    displayName: ctx.displayName,
+    setDisplayName: ctx.setDisplayName,
+    effectiveDisplayName: effective,
+  };
 }
 
 /**
