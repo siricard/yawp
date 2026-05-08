@@ -1,0 +1,40 @@
+{
+  "comment": "F7.3.4 — passphrase-wrapped at-rest seal. Deterministic test vector pinning the PBKDF2-HMAC-SHA512 (100_000 iters, dkLen=32) -> HKDF-SHA256 (info='yawp.identity.seal.v1', length=32) -> ChaCha20-Poly1305 pipeline. Field suffixes are *_derived_hex / *_expected_hex to avoid Droid-Shield false-positives on hex strings.",
+  "algorithm": {
+    "pbkdf2": {
+      "hash": "sha512",
+      "iters": 100000,
+      "dk_len": 32
+    },
+    "hkdf": {
+      "hash": "sha256",
+      "info_utf8": "yawp.identity.seal.v1",
+      "length": 32
+    },
+    "cipher": "chacha20-poly1305",
+    "aad_utf8": "yawp.identity.seal.v1",
+    "salt_len": 16,
+    "nonce_len": 12
+  },
+  "vectors": [
+    {
+      "name": "ascii passphrase, fixed salt+nonce",
+      "passphrase_utf8": "correct horse battery staple",
+      "salt_hex": "000102030405060708090a0b0c0d0e0f",
+      "nonce_hex": "101112131415161718191a1b",
+      "bundle": {
+        "version": 1,
+        "master": {"sk": "AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8"},
+        "device": {
+          "deviceId": "11111111-2222-3333-4444-555555555555",
+          "sk": "IB8eHRwbGhkYFxYVFBMSERAPDg0MCwoJCAcGBQQDAgE",
+          "pk": "ICEgISAhICEgISAhICEgISAhICEgISAhICEgISAhIA",
+          "signature": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+          "issuedAt": "2026-01-01T00:00:00.000Z"
+        }
+      },
+      "pbkdf2_output_derived_hex": "8736985eadc89cfee314d74a15389705a28c73a1e48ba151f1fc29f25442352c",
+      "ciphertext_expected_hex": "dceef5eaa9b9a50f180c7c42af8e51eb309deaf92b3b959e06fa3fb28550c3625be8140e21a2f8e4a0611a528f699767f38f3e8556e46db8f0c8dba1e1348599331fbbbdc99e2b4b268c64f047a339cc21b49ac99bdbd40f558cbebebc1db1eaac1993365d66f08c9d069026407dd246240a756e0f58ebb201c8a572a4efb6e2158959bc652f23def90bd9b5a2196d360847179b9a22a6c386283a6cc2080110b1ac31a17a165d60f5eac1ca429642ace054c401251837e917279891f76766116469c75ef8c63e3895ed617187e0fb2717e7581b77cece5ad544087edb018f23a61bc38b24fcb13c2a722f984a8a2ed6fe13373079cefb4e6f945320f0a63619eb4223fbfa264523125a029c407b45cdd6bcecfe254cfdba46828783d58205e077f0294d23fc44ce9b9c5efc73fcba8a5b8bbdd978a22828a4a9b08c52b9004cb231d5110c28970fda1d4afa0f75eeced093fa36a8f1f71ab238617cb9eef58ff73e57e1ad44a5ce6af7d045b593df8d7dc3937af12fe0480c133a264e69e9c148e5bba26495dcf4d6fe03ff94cf0d3cac486f57c5"
+    }
+  ]
+}

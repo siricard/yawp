@@ -2,6 +2,11 @@
 import * as Keychain from 'react-native-keychain';
 
 import {STORAGE_KEY_V1, isIdentityBundleV1, type IdentityBundleV1} from './bundle';
+import {isSealedEnvelopeV2, type SealedEnvelopeV2} from './seal';
+
+export type StoredIdentityEntry =
+  | {kind: 'unsealed'; bundle: IdentityBundleV1}
+  | {kind: 'sealed'; envelope: SealedEnvelopeV2};
 
 export class KeychainReadError extends Error {
   readonly cause?: unknown;
@@ -12,7 +17,7 @@ export class KeychainReadError extends Error {
   }
 }
 
-export async function loadIdentity(): Promise<IdentityBundleV1 | null> {
+export async function loadStoredEntry(): Promise<StoredIdentityEntry | null> {
   let creds: Awaited<ReturnType<typeof Keychain.getGenericPassword>>;
   try {
     creds = await Keychain.getGenericPassword({service: STORAGE_KEY_V1});
@@ -32,16 +37,33 @@ export async function loadIdentity(): Promise<IdentityBundleV1 | null> {
       e,
     );
   }
-  if (!isIdentityBundleV1(parsed)) {
-    throw new KeychainReadError('Stored identity bundle failed shape validation');
+  if (isSealedEnvelopeV2(parsed)) {
+    return {kind: 'sealed', envelope: parsed};
   }
-  return parsed;
+  if (isIdentityBundleV1(parsed)) {
+    return {kind: 'unsealed', bundle: parsed};
+  }
+  throw new KeychainReadError('Stored identity payload failed shape validation');
+}
+
+export async function saveStoredEntry(entry: StoredIdentityEntry): Promise<void> {
+  const payload = entry.kind === 'unsealed' ? entry.bundle : entry.envelope;
+  await Keychain.setGenericPassword(STORAGE_KEY_V1, JSON.stringify(payload), {
+    service: STORAGE_KEY_V1,
+  });
+}
+
+export async function loadIdentity(): Promise<IdentityBundleV1 | null> {
+  const entry = await loadStoredEntry();
+  return entry && entry.kind === 'unsealed' ? entry.bundle : null;
 }
 
 export async function saveIdentity(bundle: IdentityBundleV1): Promise<void> {
-  await Keychain.setGenericPassword(STORAGE_KEY_V1, JSON.stringify(bundle), {
-    service: STORAGE_KEY_V1,
-  });
+  await saveStoredEntry({kind: 'unsealed', bundle});
+}
+
+export async function saveSealedEnvelope(envelope: SealedEnvelopeV2): Promise<void> {
+  await saveStoredEntry({kind: 'sealed', envelope});
 }
 
 export async function clearIdentityBundle(): Promise<void> {

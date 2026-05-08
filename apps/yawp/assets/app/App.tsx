@@ -13,7 +13,9 @@ import {
 import {AddServerScreen} from './screens/AddServerScreen';
 import {ChannelScreen} from './screens/ChannelScreen';
 import {DidScreen} from './screens/DidScreen';
+import {LockedScreen} from './screens/LockedScreen';
 import {OnboardingFlow} from './screens/OnboardingFlow';
+import {PassphraseSettingsScreen} from './screens/PassphraseSettingsScreen';
 import {VectorTestScreen} from './screens/VectorTestScreen';
 import {WorkspaceBar} from './screens/WorkspaceBar';
 import {getValidSessionToken} from './session';
@@ -41,6 +43,7 @@ type Screen =
   | {kind: 'home'}
   | {kind: 'vector'}
   | {kind: 'add-server'}
+  | {kind: 'passphrase-settings'}
   | {
       kind: 'channel';
       serverUrl: string;
@@ -110,11 +113,32 @@ function AppShell() {
     );
   }
 
+  if (identityState.status === 'locked') {
+    return (
+      <View className="flex-1 bg-slate-900" nativeID="app-root">
+        {Platform.OS !== 'web' ? <StatusBar barStyle="light-content" /> : null}
+        <LockedScreen />
+      </View>
+    );
+  }
+
   let body: React.ReactNode;
   switch (screen.kind) {
     case 'home':
       body = (
         <View style={{flex: 1}}>
+          <View className="flex-row justify-end px-4 pt-4">
+            <Pressable
+              testID="open-passphrase-settings-btn"
+              accessibilityRole="button"
+              accessibilityLabel="open passphrase settings"
+              onPress={() => setScreen({kind: 'passphrase-settings'})}
+              className="rounded-lg py-1 px-3 bg-slate-700 active:bg-slate-600 border border-slate-600">
+              <Text className="text-xs font-semibold text-slate-50">
+                Passphrase settings
+              </Text>
+            </Pressable>
+          </View>
           {bindError ? (
             <View
               testID="bind-error-banner"
@@ -149,6 +173,11 @@ function AppShell() {
           onCancel={() => setScreen({kind: 'home'})}
           onAdded={() => setScreen({kind: 'home'})}
         />
+      );
+      break;
+    case 'passphrase-settings':
+      body = (
+        <PassphraseSettingsScreen onBack={() => setScreen({kind: 'home'})} />
       );
       break;
     case 'channel':

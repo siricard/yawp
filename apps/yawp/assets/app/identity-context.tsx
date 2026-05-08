@@ -7,7 +7,18 @@ import {b64UrlToBytes, bytesToB64Url, type IdentityBundleV1} from './identity/bu
 import {generateDeviceSubkey, signWithDevice} from './identity/device';
 import {didFromPubkey, fingerprintFromPubkey} from './identity/did';
 import {masterFromMnemonicSeed, masterPkFromSk, signWithMaster} from './identity/master';
-import {loadIdentity, saveIdentity} from './identity/storage-bundle';
+import {
+  loadIdentity,
+  loadStoredEntry,
+  saveIdentity,
+  saveSealedEnvelope,
+} from './identity/storage-bundle';
+import {
+  UnsealError,
+  sealBundle,
+  unsealBundle,
+  type SealedEnvelopeV2,
+} from './identity/seal';
 import {defaultDisplayName} from './identity/word-pair';
 
 export type Identity = {
@@ -81,6 +92,24 @@ export type RestoreResult =
 const WORKSPACES_KEY = 'mook.workspaces';
 const DISPLAY_NAME_KEY = 'yawp.identity.display_name';
 
+/**
+ * outcome of an unlock attempt against a sealed envelope.
+ */
+export type UnlockResult =
+  | {ok: true}
+  | {ok: false; reason: 'wrong_passphrase' | 'tampered' | 'unknown'};
+
+/**
+ * outcome of changing (or setting / removing) the at-rest
+ * passphrase. `current` is the existing passphrase if the bundle is
+ * already sealed; pass `null` if the bundle is currently unsealed.
+ * `next` is the new passphrase; pass `null` to leave (or transition to)
+ * the unsealed state.
+ */
+export type ChangePassphraseResult =
+  | {ok: true}
+  | {ok: false; reason: 'wrong_passphrase' | 'invalid' | 'unknown'};
+
 type State =
   | {status: 'loading'; identity: null; error: null}
   | {
@@ -90,7 +119,14 @@ type State =
       identity: null;
       error: null;
     }
-  | {status: 'ready'; identity: Identity; error: null}
+  | {
+      status: 'locked';
+      /** Pinned at load time; used by `unlock()` and `changePassphrase()`. */
+      sealedEnvelope: SealedEnvelopeV2;
+      identity: null;
+      error: null;
+    }
+  | {status: 'ready'; identity: Identity; sealed: boolean; error: null}
   | {status: 'error'; identity: null; error: string};
 
 type Ctx = {
@@ -125,6 +161,21 @@ type Ctx = {
    * transitions directly to 'ready'. No network calls are made.
    */
   restoreFromMnemonic: (words: string[]) => Promise<RestoreResult>;
+  /**
+   * unlock a sealed envelope. Only valid in `status === 'locked'`.
+   * On success transitions to `status === 'ready'` with `sealed: true`.
+   */
+  unlock: (passphrase: string) => Promise<UnlockResult>;
+  /**
+   * set, change, or remove the at-rest passphrase. Re-seals the
+   * current identity under `next` (or persists it unsealed if `next` is
+   * `null`). `current` MUST match the existing passphrase if the bundle
+   * is currently sealed; pass `null` if it isn't.
+   */
+  changePassphrase: (opts: {
+    current: string | null;
+    next: string | null;
+  }) => Promise<ChangePassphraseResult>;
 };
 
 const IdentityContext = createContext<Ctx | null>(null);
@@ -253,17 +304,28 @@ export function IdentityProvider({children}: {children: React.ReactNode}) {
     loadDisplayName(),
   );
   const draftRef = useRef<DraftIdentity | null>(null);
+  const draftSealedRef = useRef<boolean>(false);
 
   useEffect(() => {
     let mounted = true;
     (async () => {
       try {
-        const existing = await loadIdentity();
+        const entry = await loadStoredEntry();
         if (!mounted) return;
-        if (existing) {
+        if (entry && entry.kind === 'sealed') {
+          setState({
+            status: 'locked',
+            sealedEnvelope: entry.envelope,
+            identity: null,
+            error: null,
+          });
+          return;
+        }
+        if (entry && entry.kind === 'unsealed') {
           setState({
             status: 'ready',
-            identity: buildIdentityFromBundle(existing),
+            identity: buildIdentityFromBundle(entry.bundle),
+            sealed: false,
             error: null,
           });
           return;
@@ -314,7 +376,7 @@ export function IdentityProvider({children}: {children: React.ReactNode}) {
 
   const completeOnboarding = useCallback(
     async ({
-      passphrase: _passphrase,
+      passphrase,
       displayName: chosenName,
     }: {
       passphrase: string | null;
@@ -335,7 +397,14 @@ export function IdentityProvider({children}: {children: React.ReactNode}) {
           issuedAt: draft.deviceIssuedAt,
         },
       };
-      await saveIdentity(bundle);
+      if (passphrase && passphrase.length > 0) {
+        const envelope = sealBundle(bundle, passphrase);
+        await saveSealedEnvelope(envelope);
+        draftSealedRef.current = true;
+      } else {
+        await saveIdentity(bundle);
+        draftSealedRef.current = false;
+      }
       if (chosenName !== null) {
         persistDisplayName(chosenName);
         setDisplayNameState(chosenName);
@@ -389,6 +458,7 @@ export function IdentityProvider({children}: {children: React.ReactNode}) {
       setState({
         status: 'ready',
         identity: buildIdentityFromDraft(draft),
+        sealed: false,
         error: null,
       });
       return {ok: true};
@@ -402,9 +472,91 @@ export function IdentityProvider({children}: {children: React.ReactNode}) {
     setState({
       status: 'ready',
       identity: buildIdentityFromDraft(draft),
+      sealed: draftSealedRef.current,
       error: null,
     });
   }, []);
+
+  const unlock = useCallback(
+    async (passphrase: string): Promise<UnlockResult> => {
+      let envelope: SealedEnvelopeV2 | null = null;
+      setState(prev => {
+        if (prev.status === 'locked') envelope = prev.sealedEnvelope;
+        return prev;
+      });
+      if (!envelope) return {ok: false, reason: 'unknown'};
+      try {
+        const bundle = unsealBundle(envelope, passphrase);
+        setState({
+          status: 'ready',
+          identity: buildIdentityFromBundle(bundle),
+          sealed: true,
+          error: null,
+        });
+        return {ok: true};
+      } catch (e) {
+        if (e instanceof UnsealError) {
+          if (e.reason === 'wrong_passphrase') {
+            return {ok: false, reason: 'wrong_passphrase'};
+          }
+          if (e.reason === 'tampered') {
+            return {ok: false, reason: 'tampered'};
+          }
+        }
+        return {ok: false, reason: 'unknown'};
+      }
+    },
+    [],
+  );
+
+  const changePassphrase = useCallback(
+    async ({
+      current,
+      next,
+    }: {
+      current: string | null;
+      next: string | null;
+    }): Promise<ChangePassphraseResult> => {
+      const entry = await loadStoredEntry();
+      if (!entry) return {ok: false, reason: 'unknown'};
+      let bundle: IdentityBundleV1;
+      if (entry.kind === 'sealed') {
+        if (current === null) return {ok: false, reason: 'wrong_passphrase'};
+        try {
+          bundle = unsealBundle(entry.envelope, current);
+        } catch (e) {
+          if (e instanceof UnsealError && e.reason === 'wrong_passphrase') {
+            return {ok: false, reason: 'wrong_passphrase'};
+          }
+          return {ok: false, reason: 'unknown'};
+        }
+      } else {
+        bundle = entry.bundle;
+      }
+      try {
+        if (next && next.length > 0) {
+          const envelope = sealBundle(bundle, next);
+          await saveSealedEnvelope(envelope);
+          setState(prev =>
+            prev.status === 'ready'
+              ? {...prev, sealed: true}
+              : prev,
+          );
+        } else {
+          await saveIdentity(bundle);
+          setState(prev =>
+            prev.status === 'ready'
+              ? {...prev, sealed: false}
+              : prev,
+          );
+        }
+        return {ok: true};
+      } catch {
+        return {ok: false, reason: 'unknown'};
+      }
+    },
+    [],
+  );
 
   return (
     <IdentityContext.Provider
@@ -418,6 +570,8 @@ export function IdentityProvider({children}: {children: React.ReactNode}) {
         completeOnboarding,
         finishOnboarding,
         restoreFromMnemonic,
+        unlock,
+        changePassphrase,
       }}>
       {children}
     </IdentityContext.Provider>
@@ -476,6 +630,37 @@ export function useOnboarding(): {
     complete: ctx.completeOnboarding,
     finish: ctx.finishOnboarding,
     restore: ctx.restoreFromMnemonic,
+  };
+}
+
+/**
+ * accessor for the passphrase-related actions.
+ *
+ * - `sealed`: whether the currently-loaded bundle is at-rest sealed.
+ * `false` when status is anything other than `ready`.
+ * - `unlock`: only meaningful when status === 'locked'.
+ * - `changePassphrase`: meaningful when status === 'ready'.
+ */
+export function usePassphrase(): {
+  sealed: boolean;
+  unlock: (passphrase: string) => Promise<UnlockResult>;
+  changePassphrase: (opts: {
+    current: string | null;
+    next: string | null;
+  }) => Promise<ChangePassphraseResult>;
+} {
+  const ctx = useContext(IdentityContext);
+  if (!ctx) {
+    throw new Error('usePassphrase must be used inside an <IdentityProvider>');
+  }
+  const sealed =
+    ctx.state.status === 'ready'
+      ? ctx.state.sealed
+      : ctx.state.status === 'locked';
+  return {
+    sealed,
+    unlock: ctx.unlock,
+    changePassphrase: ctx.changePassphrase,
   };
 }
 
