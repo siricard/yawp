@@ -17,7 +17,7 @@ recover it from storage. **No user-facing onboarding screens.**
 | `device.ts` | Generate a device subkey + master-signed delegation (`generateDeviceSubkey(masterPrivateKey, opts?)`); sign with the device subkey; expose the canonical-JSON delegation message for verifiers. |
 | `did.ts` | `didFromPubkey(pk)` → `did:yawp:<base58(sha256(pk))>`; `fingerprintFromPubkey(pk)` → `yp:8f3a · d21c · 47ee · 0b91`. |
 | `bundle.ts` | Persisted JSON shape (`IdentityBundleV1`) + base64url helpers. |
-| `storage-bundle.web.ts` / `storage-bundle.native.ts` | Platform-specific `loadIdentity` / `saveIdentity`. Web uses `localStorage` (origin-scoped); native uses `react-native-keychain` under service `yawp.identity.v1`. |
+| `storage-bundle.web.ts` / `storage-bundle.native.ts` | Platform-specific `loadIdentity` / `saveIdentity`. Web uses IndexedDB (origin-scoped, database + object store keyed on `yawp.identity.v1`, single record under key `'v1'`); native uses `react-native-keychain` under service `yawp.identity.v1`. |
 | `uuid.ts` | Cross-platform UUID v4 generator (uses `crypto.randomUUID` when available; falls back to `crypto.getRandomValues`). |
 | `index.ts` | Back-compat facade exposing the surface (`getOrCreateIdentity`, `signWithIdentity`, `clearIdentity`). New code should import from `../identity-context`. |
 
@@ -81,14 +81,9 @@ worker should pick them up here:
   shown to the user. The mnemonic gate screen ("write these 12 words down")
   lands here.
 - **Passphrase-wrapped at-rest seal on web.** Today the web backend stores
-  the master + device private keys as raw base64url JSON in IndexedDB /
-  localStorage. wraps the bundle under a user-supplied passphrase
-  (KEK derived via PBKDF2 / Argon2 — TBD in the ADR for that milestone).
-- **Switch web storage backend from `localStorage` to IndexedDB.** The
-  current implementation uses `localStorage` because (a) the bundle is
-  small, (b) `localStorage` is synchronous and origin-scoped, and (c) the
-  `fake-indexeddb` test fake is not yet in the assets/native devDeps. The
-  on-disk JSON shape is the same, so this is a no-data-migration switch.
+  the master + device private keys as raw base64url JSON in IndexedDB.
+   wraps the bundle under a user-supplied passphrase (KEK derived via
+  PBKDF2 / Argon2 — TBD in the ADR for that milestone).
 - **PPE (Public Profile Envelope) + PrivateBlob sync.** Per and
   , the user's profile and private state get synced across devices
   through the anchor. None of that is wired yet.

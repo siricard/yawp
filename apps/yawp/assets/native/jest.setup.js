@@ -1,3 +1,4 @@
+require('fake-indexeddb/auto');
 
 jest.mock('react-native-keychain', () => {
   const store = new Map();

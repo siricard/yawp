@@ -35,7 +35,7 @@ import {
   loadIdentity,
   saveIdentity,
   clearIdentityBundle,
-} from '../identity/storage-bundle';
+} from '../identity/storage-bundle.web';
 import vector from '../../../priv/test_vectors/identity.json';
 
 ed.hashes.sha512 = sha512;
