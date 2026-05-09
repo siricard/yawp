@@ -1,6 +1,6 @@
 
 import React, {useEffect, useState} from 'react';
-import {Platform, Pressable, StatusBar, Text, View, useWindowDimensions} from 'react-native';
+import {Platform, StatusBar, View, useWindowDimensions} from 'react-native';
 
 import {submitBindDevice} from './bind';
 import {discoverGeneralChannel} from './chat/discover';
@@ -12,7 +12,7 @@ import {
 } from './identity-context';
 import {AddServerScreen} from './screens/AddServerScreen';
 import {ChannelScreen} from './screens/ChannelScreen';
-import {DidScreen} from './screens/DidScreen';
+import {HomeScreen} from './screens/HomeScreen';
 import {LockedScreen} from './screens/LockedScreen';
 import {OnboardingFlow} from './screens/OnboardingFlow';
 import {PassphraseSettingsScreen} from './screens/PassphraseSettingsScreen';
@@ -126,42 +126,15 @@ function AppShell() {
   switch (screen.kind) {
     case 'home':
       body = (
-        <View style={{flex: 1}}>
-          <View className="flex-row justify-end px-4 pt-4">
-            <Pressable
-              testID="open-passphrase-settings-btn"
-              accessibilityRole="button"
-              accessibilityLabel="open passphrase settings"
-              onPress={() => setScreen({kind: 'passphrase-settings'})}
-              className="rounded-lg py-1 px-3 bg-slate-700 active:bg-slate-600 border border-slate-600">
-              <Text className="text-xs font-semibold text-slate-50">
-                Passphrase settings
-              </Text>
-            </Pressable>
-          </View>
-          {bindError ? (
-            <View
-              testID="bind-error-banner"
-              accessibilityLabel="bind error"
-              className="bg-rose-950 border border-rose-700 rounded-lg p-3 mx-4 mt-4">
-              <Text className="text-sm text-rose-100 mb-2">{bindError}</Text>
-              <Pressable
-                testID="bind-error-readd"
-                accessibilityRole="button"
-                accessibilityLabel="re-add server"
-                onPress={() => {
-                  setBindError(null);
-                  setScreen({kind: 'add-server'});
-                }}
-                className="self-start rounded-lg py-1 px-3 bg-indigo-500 active:bg-indigo-400">
-                <Text className="text-xs font-semibold text-slate-50">
-                  Re-add server
-                </Text>
-              </Pressable>
-            </View>
-          ) : null}
-          <DidScreen onOpenVectorTest={() => setScreen({kind: 'vector'})} />
-        </View>
+        <HomeScreen
+          bindError={bindError}
+          onOpenPassphraseSettings={() =>
+            setScreen({kind: 'passphrase-settings'})
+          }
+          onOpenAddServer={() => setScreen({kind: 'add-server'})}
+          onOpenVectorTest={() => setScreen({kind: 'vector'})}
+          onClearBindError={() => setBindError(null)}
+        />
       );
       break;
     case 'vector':

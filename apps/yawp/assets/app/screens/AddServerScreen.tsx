@@ -4,6 +4,7 @@ import {Platform, Pressable, Text, TextInput, View} from 'react-native';
 
 import {submitClaim} from '../claim';
 import {submitBindDevice} from '../bind';
+import {recordFirstBoundAtIfUnset} from '../nudge-store';
 import {
   useIdentityState,
   useWorkspaceServers,
@@ -70,6 +71,8 @@ export function AddServerScreen({onCancel, onAdded}: Props) {
         setErrorMessage(bind.message);
         return;
       }
+
+      recordFirstBoundAtIfUnset();
 
       const server: WorkspaceServer = {
         url: serverUrl.trim().replace(/\/+$/, ''),
