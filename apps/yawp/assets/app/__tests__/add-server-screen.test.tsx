@@ -142,6 +142,95 @@ describe('AddServerScreen', () => {
     fetchSpy.mockRestore();
   });
 
+  test('invite-kind toggle dispatches redeem_server_invite and adds Member', async () => {
+    let callIdx = 0;
+    const fetchSpy = jest
+      .spyOn(global, 'fetch')
+      .mockImplementation(async (_input, init) => {
+        const body = JSON.parse((init?.body as string) ?? '{}');
+        callIdx += 1;
+        if (body.action === 'redeem_server_invite') {
+          return {
+            ok: true,
+            status: 200,
+            statusText: 'OK',
+            json: async () => ({
+              success: true,
+              data: {serverId: 'server-uuid-1', role: 'Member'},
+            }),
+          } as unknown as Response;
+        }
+        return {
+          ok: true,
+          status: 200,
+          statusText: 'OK',
+          json: async () => ({
+            success: true,
+            data: {id: 'id-xyz', did: 'did:yawp:xyz', profileVersion: 1},
+            metadata: {
+              sessionToken: 'sess-' + callIdx,
+              refreshToken: 'refresh-' + callIdx,
+              expiresAt: '2099-01-01T00:00:00.000000Z',
+            },
+          }),
+        } as unknown as Response;
+      });
+
+    let added: unknown = null;
+
+    let root: ReactTestRenderer.ReactTestRenderer | null = null;
+    await ReactTestRenderer.act(async () => {
+      root = ReactTestRenderer.create(
+        <IdentityProvider>
+          <AddServerScreen
+            onCancel={() => {}}
+            onAdded={s => {
+              added = s;
+            }}
+          />
+        </IdentityProvider>,
+      );
+    });
+    await ReactTestRenderer.act(async () => {
+      await Promise.resolve();
+    });
+
+    const tree = root!.root;
+    await ReactTestRenderer.act(async () => {
+      findByTestId(tree, 'token-kind-invite').props.onPress();
+      findByTestId(tree, 'server-url-input').props.onChangeText(
+        'http://localhost:4000',
+      );
+      findByTestId(tree, 'claim-token-input').props.onChangeText(
+        'INVITETOKEN1234567890ABCDE',
+      );
+    });
+
+    await ReactTestRenderer.act(async () => {
+      findByTestId(tree, 'add-server-submit').props.onPress();
+    });
+    await ReactTestRenderer.act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(fetchSpy).toHaveBeenCalledTimes(2);
+    const firstBody = JSON.parse(
+      (fetchSpy.mock.calls[0][1]?.body as string) ?? '{}',
+    );
+    expect(firstBody.action).toBe('redeem_server_invite');
+    expect(firstBody.input.token).toBe('INVITETOKEN1234567890ABCDE');
+
+    expect(added).toMatchObject({
+      url: 'http://localhost:4000',
+      role: 'Member',
+    });
+
+    fetchSpy.mockRestore();
+  });
+
   test('4xx renders inline error message', async () => {
     const fetchSpy = jest
       .spyOn(global, 'fetch')

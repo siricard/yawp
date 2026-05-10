@@ -193,6 +193,60 @@ defmodule YawpWeb.AdminDashboardLiveTest do
     end
   end
 
+  describe "server-invites section" do
+    setup ctx, do: sign_in!(ctx)
+
+    setup do
+      :ok = Yawp.Servers.Seeder.run()
+      :ok
+    end
+
+    test "section renders with mint button and disables it when no chat owner",
+         %{conn: conn} do
+      {:ok, view, _html} = live(conn, "/admin")
+      assert has_element?(view, "#section-server-invites")
+      assert has_element?(view, "#server-invite-mint-btn[disabled]")
+    end
+
+    test "mint button enabled when chat owner exists; clicking mints + lists invite",
+         %{conn: conn} do
+      {pk, _sk} = :crypto.generate_key(:eddsa, :ed25519)
+      did = "did:yawp:" <> Yawp.Identity.did_from_pubkey(pk)
+      _identity = Ash.Seed.seed!(Yawp.Identity.Identity, %{did: did, master_public_key: pk})
+
+      {:ok, view, _html} = live(conn, "/admin")
+      refute has_element?(view, "#server-invite-mint-btn[disabled]")
+
+      view |> element("#server-invite-mint-btn") |> render_click()
+
+      {:ok, server} = Yawp.Servers.get_singleton_server()
+      {:ok, [invite | _]} = Yawp.Servers.list_active_server_invites(server.id)
+
+      assert has_element?(view, "#server-invite-token-#{invite.id}", invite.token)
+      assert has_element?(view, "#server-invite-revoke-btn-#{invite.id}")
+    end
+
+    test "revoke button removes the invite from the list", %{conn: conn} do
+      {pk, _sk} = :crypto.generate_key(:eddsa, :ed25519)
+      did = "did:yawp:" <> Yawp.Identity.did_from_pubkey(pk)
+      _identity = Ash.Seed.seed!(Yawp.Identity.Identity, %{did: did, master_public_key: pk})
+
+      {:ok, view, _html} = live(conn, "/admin")
+      view |> element("#server-invite-mint-btn") |> render_click()
+
+      {:ok, server} = Yawp.Servers.get_singleton_server()
+      {:ok, [invite | _]} = Yawp.Servers.list_active_server_invites(server.id)
+
+      view
+      |> element("#server-invite-revoke-btn-#{invite.id}")
+      |> render_click()
+
+      {:ok, reread} = Yawp.Servers.get_server_invite_by_id(invite.id)
+      assert reread.revoked_at != nil
+      refute has_element?(view, "#server-invite-token-#{invite.id}")
+    end
+  end
+
   describe "/admin/logout" do
     setup ctx, do: sign_in!(ctx)
 

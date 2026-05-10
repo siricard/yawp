@@ -4,12 +4,15 @@ import {Platform, Pressable, Text, TextInput, View} from 'react-native';
 
 import {submitClaim} from '../claim';
 import {submitBindDevice} from '../bind';
+import {submitRedeemInvite} from '../invite';
 import {recordFirstBoundAtIfUnset} from '../nudge-store';
 import {
   useIdentityState,
   useWorkspaceServers,
   type WorkspaceServer,
 } from '../identity-context';
+
+type TokenKind = 'claim' | 'invite';
 
 type Props = {
   onCancel: () => void;
@@ -37,7 +40,8 @@ export function AddServerScreen({onCancel, onAdded}: Props) {
   const {addServer} = useWorkspaceServers();
 
   const [serverUrl, setServerUrl] = useState('http://localhost:4000');
-  const [claimToken, setClaimToken] = useState('');
+  const [tokenKind, setTokenKind] = useState<TokenKind>('claim');
+  const [tokenValue, setTokenValue] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
@@ -46,16 +50,54 @@ export function AddServerScreen({onCancel, onAdded}: Props) {
     identityReady &&
     !submitting &&
     serverUrl.trim().length > 0 &&
-    claimToken.trim().length > 0;
+    tokenValue.trim().length > 0;
 
   async function handleSubmit() {
     if (!identityReady || submitting) return;
     setSubmitting(true);
     setErrorMessage(null);
 
+    if (tokenKind === 'invite') {
+      const redeem = await submitRedeemInvite({
+        serverUrl: serverUrl.trim(),
+        inviteToken: tokenValue.trim(),
+        identity: identityState.identity,
+      });
+
+      if (!redeem.ok) {
+        setSubmitting(false);
+        setErrorMessage(redeem.message);
+        return;
+      }
+
+      const bind = await submitBindDevice({
+        serverUrl: serverUrl.trim(),
+        identity: identityState.identity,
+      });
+
+      setSubmitting(false);
+
+      if (!bind.ok) {
+        setErrorMessage(bind.message);
+        return;
+      }
+
+      recordFirstBoundAtIfUnset();
+
+      const server: WorkspaceServer = {
+        url: serverUrl.trim().replace(/\/+$/, ''),
+        did: `did:yawp:${identityState.identity.did}`,
+        role: redeem.role,
+        label: labelFromUrl(serverUrl.trim()),
+      };
+      addServer(server);
+      onAdded(server);
+      return;
+    }
+
     const result = await submitClaim({
       serverUrl: serverUrl.trim(),
-      claimToken: claimToken.trim(),
+      claimToken: tokenValue.trim(),
       identity: identityState.identity,
     });
 
@@ -96,8 +138,9 @@ export function AddServerScreen({onCancel, onAdded}: Props) {
       testID="add-server-screen">
       <Text className="text-3xl font-bold text-slate-50 mb-2">Add server</Text>
       <Text className="text-sm text-slate-400 mb-6">
-        Paste the claim token your operator gave you and we&apos;ll bind this
-        device&apos;s identity to that server.
+        Paste a claim token (from the server operator) or an invite token
+        (from the chat owner) and we&apos;ll bind this device&apos;s identity
+        to that server.
       </Text>
 
       <View className="mb-4">
@@ -121,17 +164,63 @@ export function AddServerScreen({onCancel, onAdded}: Props) {
 
       <View className="mb-4">
         <Text className="text-sm font-semibold text-slate-300 mb-1">
-          Claim token
+          Token kind
+        </Text>
+        <View className="flex-row gap-2" testID="token-kind-toggle">
+          <Pressable
+            testID="token-kind-claim"
+            accessibilityRole="button"
+            accessibilityLabel="claim token kind"
+            onPress={() => setTokenKind('claim')}
+            disabled={submitting}
+            className={[
+              'rounded-lg py-2 px-3 border',
+              tokenKind === 'claim'
+                ? 'bg-indigo-500 border-indigo-400'
+                : 'bg-slate-800 border-slate-700',
+            ].join(' ')}>
+            <Text className="text-xs font-semibold text-slate-50">
+              Claim token (operator)
+            </Text>
+          </Pressable>
+          <Pressable
+            testID="token-kind-invite"
+            accessibilityRole="button"
+            accessibilityLabel="invite token kind"
+            onPress={() => setTokenKind('invite')}
+            disabled={submitting}
+            className={[
+              'rounded-lg py-2 px-3 border',
+              tokenKind === 'invite'
+                ? 'bg-indigo-500 border-indigo-400'
+                : 'bg-slate-800 border-slate-700',
+            ].join(' ')}>
+            <Text className="text-xs font-semibold text-slate-50">
+              Invite token
+            </Text>
+          </Pressable>
+        </View>
+      </View>
+
+      <View className="mb-4">
+        <Text className="text-sm font-semibold text-slate-300 mb-1">
+          {tokenKind === 'claim' ? 'Claim token' : 'Invite token'}
         </Text>
         <TextInput
           testID="claim-token-input"
-          accessibilityLabel="claim token"
-          value={claimToken}
-          onChangeText={setClaimToken}
+          accessibilityLabel={
+            tokenKind === 'claim' ? 'claim token' : 'invite token'
+          }
+          value={tokenValue}
+          onChangeText={setTokenValue}
           autoCapitalize="none"
           autoCorrect={false}
           editable={!submitting}
-          placeholder="Paste the operator-issued token"
+          placeholder={
+            tokenKind === 'claim'
+              ? 'Paste the operator-issued token'
+              : 'Paste the chat-owner invite token'
+          }
           placeholderTextColor="#64748b"
           className="bg-slate-800 text-slate-50 rounded-lg px-3 py-2 border border-slate-700"
           style={{fontFamily: monospace}}

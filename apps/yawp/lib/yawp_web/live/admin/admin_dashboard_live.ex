@@ -24,6 +24,8 @@ defmodule YawpWeb.AdminDashboardLive do
     {:ok, recent_entries} = Yawp.Admin.list_recent_audit_entries()
     {:ok, active_claim_token} = Yawp.Admin.get_active_claim_token()
     {:ok, chat_owner} = Yawp.Identity.get_chat_owner()
+    {:ok, server} = Yawp.Servers.get_singleton_server()
+    active_invites = load_active_invites(server)
 
     {:ok,
      socket
@@ -31,7 +33,18 @@ defmodule YawpWeb.AdminDashboardLive do
      |> assign(:active_server_key, active_key)
      |> assign(:active_claim_token, active_claim_token)
      |> assign(:chat_owner, chat_owner)
+     |> assign(:server, server)
+     |> stream(:server_invites, active_invites)
      |> stream(:audit_log, recent_entries)}
+  end
+
+  defp load_active_invites(nil), do: []
+
+  defp load_active_invites(server) do
+    case Yawp.Servers.list_active_server_invites(server.id) do
+      {:ok, invites} -> invites
+      _ -> []
+    end
   end
 
   @impl true
@@ -76,6 +89,57 @@ defmodule YawpWeb.AdminDashboardLive do
      socket
      |> stream_insert(:audit_log, entry, at: 0)
      |> put_flash(:info, "Per-server defaults acknowledged (stub — real settings land in M8).")}
+  end
+
+  def handle_event("mint_server_invite", _params, socket) do
+    account = socket.assigns.current_account
+
+    case {socket.assigns.server, socket.assigns.chat_owner} do
+      {nil, _} ->
+        {:noreply, put_flash(socket, :error, "No server yet — seed has not run.")}
+
+      {_server, nil} ->
+        {:noreply,
+         put_flash(
+           socket,
+           :error,
+           "No chat owner yet — generate a claim token and complete onboarding first."
+         )}
+
+      {server, chat_owner} ->
+        {:ok, invite} =
+          Yawp.Servers.mint_server_invite(%{
+            server_id: server.id,
+            created_by_identity_id: chat_owner.id
+          })
+
+        entry =
+          Yawp.Admin.audit!(account.id, "server_invite.mint", %{invite_id: invite.id})
+
+        {:noreply,
+         socket
+         |> stream_insert(:server_invites, invite, at: 0)
+         |> stream_insert(:audit_log, entry, at: 0)
+         |> put_flash(:info, "Server invite minted. Copy the token — it will not be shown again.")}
+    end
+  end
+
+  def handle_event("revoke_server_invite", %{"id" => invite_id}, socket) do
+    account = socket.assigns.current_account
+
+    with {:ok, invite} <- Yawp.Servers.get_server_invite_by_id(invite_id),
+         {:ok, _} <- Yawp.Servers.revoke_server_invite(invite) do
+      entry =
+        Yawp.Admin.audit!(account.id, "server_invite.revoke", %{invite_id: invite_id})
+
+      {:noreply,
+       socket
+       |> stream_delete(:server_invites, invite)
+       |> stream_insert(:audit_log, entry, at: 0)
+       |> put_flash(:info, "Server invite revoked.")}
+    else
+      _ -> {:noreply, put_flash(socket, :error, "Could not revoke server invite.")}
+    end
   end
 
   def handle_event("revoke_claim_token", _params, socket) do
@@ -290,6 +354,63 @@ defmodule YawpWeb.AdminDashboardLive do
                 </button>
               <% end %>
             </div>
+          </div>
+        </.section>
+
+        <.section id="server-invites" title="Server invites" icon="hero-ticket">
+          <div class="space-y-3">
+            <div>
+              <button
+                id="server-invite-mint-btn"
+                type="button"
+                phx-click="mint_server_invite"
+                class="btn btn-sm btn-primary"
+                disabled={is_nil(@chat_owner) or is_nil(@server)}
+              >
+                <.icon name="hero-plus" class="size-4" /> Mint server invite
+              </button>
+              <%= if is_nil(@chat_owner) do %>
+                <p class="text-xs text-base-content/70 mt-1">
+                  Chat owner must complete claim before invites can be minted.
+                </p>
+              <% end %>
+            </div>
+            <ul
+              id="server-invites-list"
+              phx-update="stream"
+              class="divide-y divide-base-300 text-sm"
+            >
+              <li
+                id="server-invites-empty"
+                class="only:block hidden py-2 text-base-content/70"
+              >
+                No active server invites.
+              </li>
+              <li
+                :for={{dom_id, invite} <- @streams.server_invites}
+                id={dom_id}
+                class="py-2 flex items-center gap-3"
+              >
+                <code
+                  id={"server-invite-token-#{invite.id}"}
+                  class="font-mono text-xs bg-base-200 px-2 py-1 rounded break-all flex-1"
+                >
+                  {invite.token}
+                </code>
+                <span class="text-xs text-base-content/70">
+                  {invite.kind}
+                </span>
+                <button
+                  id={"server-invite-revoke-btn-#{invite.id}"}
+                  type="button"
+                  phx-click="revoke_server_invite"
+                  phx-value-id={invite.id}
+                  class="btn btn-xs btn-soft"
+                >
+                  <.icon name="hero-trash" class="size-3" /> Revoke
+                </button>
+              </li>
+            </ul>
           </div>
         </.section>
 

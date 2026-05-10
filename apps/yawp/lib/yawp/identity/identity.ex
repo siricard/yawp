@@ -65,6 +65,23 @@ defmodule Yawp.Identity.Identity do
       change Yawp.Identity.Identity.Changes.WriteClaimAudit
     end
 
+    create :upsert_via_invite do
+      description """
+      bare upsert used by the `ServerInvite.redeem` action.
+      Signature verification, DID derivation, and invite consumption
+      happen in the surrounding redeem orchestration; this action only
+      persists the identity row keyed on `:unique_did`.
+
+      Callers MUST have already verified the ed25519 signature over
+      the canonical-JSON redeem payload — never call this from outside
+      the redeem pipeline.
+      """
+
+      accept [:did, :master_public_key]
+      upsert? true
+      upsert_identity :unique_did
+    end
+
     read :get_chat_owner do
       description "Returns the singleton chat-owner row (or nil)."
       get? true

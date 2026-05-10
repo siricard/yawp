@@ -84,6 +84,35 @@ export type ServerChannelAttributesOnlySchema = {
   type: "text" | "voice";
 };
 
+export type ServerInviteResourceSchema = {
+  __type: "Resource";
+  __primitiveFields: "id" | "token" | "kind" | "usesRemaining" | "expiresAt" | "consumedAt" | "revokedAt" | "serverId" | "createdByIdentityId";
+  id: UUID;
+  token: string;
+  kind: "multi_use" | "single_use";
+  usesRemaining: number | null;
+  expiresAt: UtcDateTimeUsec;
+  consumedAt: UtcDateTimeUsec | null;
+  revokedAt: UtcDateTimeUsec | null;
+  serverId: UUID;
+  createdByIdentityId: UUID;
+  createdByIdentity: { __type: "Relationship"; __resource: IdentityResourceSchema; };
+};
+
+export type ServerInviteAttributesOnlySchema = {
+  __type: "Resource";
+  __primitiveFields: "id" | "token" | "kind" | "usesRemaining" | "expiresAt" | "consumedAt" | "revokedAt" | "serverId" | "createdByIdentityId";
+  id: UUID;
+  token: string;
+  kind: "multi_use" | "single_use";
+  usesRemaining: number | null;
+  expiresAt: UtcDateTimeUsec;
+  consumedAt: UtcDateTimeUsec | null;
+  revokedAt: UtcDateTimeUsec | null;
+  serverId: UUID;
+  createdByIdentityId: UUID;
+};
+
 export type AdminAccountFilterInput = {
   and?: Array<AdminAccountFilterInput>;
   or?: Array<AdminAccountFilterInput>;
@@ -245,6 +274,87 @@ export type ServerChannelFilterInput = {
   };
 
 };
+export type ServerInviteFilterInput = {
+  and?: Array<ServerInviteFilterInput>;
+  or?: Array<ServerInviteFilterInput>;
+  not?: Array<ServerInviteFilterInput>;
+
+  id?: {
+    eq?: UUID;
+    notEq?: UUID;
+    in?: Array<UUID>;
+  };
+
+  token?: {
+    eq?: string;
+    notEq?: string;
+    in?: Array<string>;
+  };
+
+  kind?: {
+    eq?: "multi_use" | "single_use";
+    notEq?: "multi_use" | "single_use";
+    in?: Array<"multi_use" | "single_use">;
+  };
+
+  usesRemaining?: {
+    eq?: number;
+    notEq?: number;
+    greaterThan?: number;
+    greaterThanOrEqual?: number;
+    lessThan?: number;
+    lessThanOrEqual?: number;
+    in?: Array<number>;
+    isNil?: boolean;
+  };
+
+  expiresAt?: {
+    eq?: UtcDateTimeUsec;
+    notEq?: UtcDateTimeUsec;
+    greaterThan?: UtcDateTimeUsec;
+    greaterThanOrEqual?: UtcDateTimeUsec;
+    lessThan?: UtcDateTimeUsec;
+    lessThanOrEqual?: UtcDateTimeUsec;
+    in?: Array<UtcDateTimeUsec>;
+  };
+
+  consumedAt?: {
+    eq?: UtcDateTimeUsec;
+    notEq?: UtcDateTimeUsec;
+    greaterThan?: UtcDateTimeUsec;
+    greaterThanOrEqual?: UtcDateTimeUsec;
+    lessThan?: UtcDateTimeUsec;
+    lessThanOrEqual?: UtcDateTimeUsec;
+    in?: Array<UtcDateTimeUsec>;
+    isNil?: boolean;
+  };
+
+  revokedAt?: {
+    eq?: UtcDateTimeUsec;
+    notEq?: UtcDateTimeUsec;
+    greaterThan?: UtcDateTimeUsec;
+    greaterThanOrEqual?: UtcDateTimeUsec;
+    lessThan?: UtcDateTimeUsec;
+    lessThanOrEqual?: UtcDateTimeUsec;
+    in?: Array<UtcDateTimeUsec>;
+    isNil?: boolean;
+  };
+
+  serverId?: {
+    eq?: UUID;
+    notEq?: UUID;
+    in?: Array<UUID>;
+  };
+
+  createdByIdentityId?: {
+    eq?: UUID;
+    notEq?: UUID;
+    in?: Array<UUID>;
+  };
+
+  createdByIdentity?: IdentityFilterInput;
+
+};
 
 export const adminAccountFilterFields = ["id", "email", "lastLoginAt"] as const;
 export type AdminAccountFilterField = (typeof adminAccountFilterFields)[number];
@@ -258,6 +368,9 @@ export type RefreshTokenFilterField = (typeof refreshTokenFilterFields)[number];
 export const serverChannelFilterFields = ["id", "name", "type"] as const;
 export type ServerChannelFilterField = (typeof serverChannelFilterFields)[number];
 
+export const serverInviteFilterFields = ["id", "token", "kind", "usesRemaining", "expiresAt", "consumedAt", "revokedAt", "serverId", "createdByIdentityId", "server", "createdByIdentity"] as const;
+export type ServerInviteFilterField = (typeof serverInviteFilterFields)[number];
+
 export const adminAccountSortFields = ["id", "email", "lastLoginAt"] as const;
 export type AdminAccountSortField = (typeof adminAccountSortFields)[number];
 
@@ -269,6 +382,9 @@ export type RefreshTokenSortField = (typeof refreshTokenSortFields)[number];
 
 export const serverChannelSortFields = ["id", "name", "type"] as const;
 export type ServerChannelSortField = (typeof serverChannelSortFields)[number];
+
+export const serverInviteSortFields = ["id", "token", "kind", "usesRemaining", "expiresAt", "consumedAt", "revokedAt", "serverId", "createdByIdentityId"] as const;
+export type ServerInviteSortField = (typeof serverInviteSortFields)[number];
 
 export type SortString<T extends string> = T | `+${T}` | `-${T}` | `++${T}` | `--${T}`;
 

@@ -554,3 +554,76 @@ export async function validateListTextChannels(
   );
 }
 
+export type RedeemServerInviteInput = {
+  token: string;
+  did: string;
+  pk: string;
+  senderSignature: string;
+};
+
+export type RedeemServerInviteFields = UnifiedFieldSelection<{serverId: UUID | null, role: string | null, __type: "TypedMap", __primitiveFields: "serverId" | "role"}>[];
+
+export type InferRedeemServerInviteResult<
+  Fields extends RedeemServerInviteFields | undefined,
+> = InferResult<{serverId: UUID | null, role: string | null, __type: "TypedMap", __primitiveFields: "serverId" | "role"}, Fields>;
+
+export type RedeemServerInviteResult<Fields extends RedeemServerInviteFields | undefined = undefined> = | { success: true; data: InferRedeemServerInviteResult<Fields>; }
+| { success: false; errors: AshRpcError[]; }
+
+;
+
+/**
+ * Execute generic action on ServerInvite
+ *
+ * @ashActionType :action
+ */
+export async function redeemServerInvite<Fields extends RedeemServerInviteFields | undefined = undefined>(
+  config: {
+  tenant?: string;
+  input: RedeemServerInviteInput;
+  fields: Fields;
+  headers?: Record<string, string>;
+  fetchOptions?: RequestInit;
+  customFetch?: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
+}
+): Promise<RedeemServerInviteResult<Fields extends undefined ? [] : Fields>> {
+  const payload = {
+    action: "redeem_server_invite",
+    ...(config.tenant !== undefined && { tenant: config.tenant }),
+    input: config.input,
+    ...(config.fields !== undefined && { fields: config.fields })
+  };
+
+  return executeActionRpcRequest<RedeemServerInviteResult<Fields extends undefined ? [] : Fields>>(
+    payload,
+    config
+  );
+}
+
+/**
+ * Validate: Execute generic action on ServerInvite
+ *
+ * @ashActionType :action
+ * @validation true
+ */
+export async function validateRedeemServerInvite(
+  config: {
+  tenant?: string;
+  input: RedeemServerInviteInput;
+  headers?: Record<string, string>;
+  fetchOptions?: RequestInit;
+  customFetch?: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
+}
+): Promise<ValidationResult> {
+  const payload = {
+    action: "redeem_server_invite",
+    ...(config.tenant !== undefined && { tenant: config.tenant }),
+    input: config.input
+  };
+
+  return executeValidationRpcRequest<ValidationResult>(
+    payload,
+    config
+  );
+}
+

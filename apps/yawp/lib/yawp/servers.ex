@@ -16,6 +16,10 @@ defmodule Yawp.Servers do
     resource Yawp.Servers.Channel do
       rpc_action :list_text_channels, :list_text_channels
     end
+
+    resource Yawp.Servers.ServerInvite do
+      rpc_action :redeem_server_invite, :redeem
+    end
   end
 
   resources do
@@ -42,6 +46,19 @@ defmodule Yawp.Servers do
       define :assign_role,
         action: :create,
         args: [:identity_id, :server_id, :role_id]
+    end
+
+    resource Yawp.Servers.ServerInvite do
+      define :mint_server_invite, action: :mint
+      define :revoke_server_invite, action: :revoke
+      define :get_server_invite_by_id, action: :get_by_id, args: [:id]
+
+      define :get_server_invite_by_token,
+        action: :get_by_token,
+        args: [:token],
+        not_found_error?: false
+
+      define :list_active_server_invites, action: :list_active_for_server, args: [:server_id]
     end
   end
 
