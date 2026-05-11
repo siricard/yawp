@@ -77,6 +77,30 @@ demo-m7-2:
     @echo ""
     nix develop -c bash -c 'cd apps/yawp && mix phx.server'
 
+# M7.3 vertical slice: fresh DB + Phoenix; builds on M7.2 and adds
+# the mnemonic-gate onboarding ceremony, restore-from-mnemonic, and
+# server invites that let a SECOND identity join #general. See
+# docs/walkthroughs/m7-3.md.
+demo-m7-3:
+    nix develop -c mix ecto.reset
+    @echo ""
+    @echo "--- M7.3 walkthrough ---"
+    @echo "After Phoenix boots, look for: OPERATOR SETUP <url>"
+    @echo "1. Run M7.1 steps 1-5 (operator + chat-owner claim) — you"
+    @echo "   will walk through the mnemonic-gate ceremony as part of"
+    @echo "   the claim flow."
+    @echo "2. Follow M7.2 step 5 to send a few messages in #general"
+    @echo "   between two windows of the chat-owner identity."
+    @echo "3. In /admin → 'Server invites', click Mint and copy the"
+    @echo "   26-char base32 token."
+    @echo "4. Open a SECOND private/incognito browser at the same URL"
+    @echo "   (http://localhost:4000/), create a new identity, and use"
+    @echo "   '+ Add server' with token-kind = Invite to redeem."
+    @echo "5. Land in #general; send messages between the two users."
+    @echo "Full instructions: docs/walkthroughs/m7-3.md"
+    @echo ""
+    nix develop -c bash -c 'cd apps/yawp && mix phx.server'
+
 # Generate Ash migrations
 ash-migrate:
     nix develop -c mix ash.codegen

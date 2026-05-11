@@ -7,6 +7,9 @@
 - [`docs/walkthroughs/m7-2.md`](docs/walkthroughs/m7-2.md) — real-time
   `#general` messaging between two browser sessions bound to the same
   chat-owner identity (`just demo-m7-2`).
+- [`docs/walkthroughs/m7-3.md`](docs/walkthroughs/m7-3.md) — mnemonic
+  onboarding + restore + server invites: a second identity redeems an
+  invite and joins `#general` (`just demo-m7-3`).
 
 ## Running everything locally
 
