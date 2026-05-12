@@ -29,6 +29,7 @@ import {didFromPubkey, fingerprintFromPubkey} from '../identity/did';
 import {
   bytesToB64Url,
   b64UrlToBytes,
+  isIdentityBundleV1,
   type IdentityBundleV1,
 } from '../identity/bundle';
 import {
@@ -121,6 +122,45 @@ describe('slim identity', () => {
     expect(loaded).toEqual(bundle);
     expect(bytesEqual(b64UrlToBytes(loaded!.master.sk), master.sk)).toBe(true);
     expect(bytesEqual(b64UrlToBytes(loaded!.device.pk), device.pk)).toBe(true);
+  });
+
+  test('bundle with metadata.displayNameOverride round-trips and the guard accepts metadata-less bundles', async () => {
+    const master = generateMaster();
+    const device = generateDeviceSubkey(master.sk, {
+      deviceId: 'metadata-device-id',
+      issuedAt: '2026-02-03T04:05:06.000Z',
+    });
+    const bundleWithOverride: IdentityBundleV1 = {
+      version: 1,
+      master: {sk: bytesToB64Url(master.sk)},
+      device: {
+        deviceId: device.deviceId,
+        sk: bytesToB64Url(device.sk),
+        pk: bytesToB64Url(device.pk),
+        signature: bytesToB64Url(device.signature),
+        issuedAt: device.issuedAt,
+      },
+      metadata: {displayNameOverride: 'Captain Override'},
+    };
+
+    await saveIdentity(bundleWithOverride);
+    const loaded = await loadIdentity();
+    expect(loaded).not.toBeNull();
+    expect(loaded!.metadata?.displayNameOverride).toBe('Captain Override');
+    expect(loaded).toEqual(bundleWithOverride);
+
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const {metadata: _omit, ...bundleSansMetadata} = bundleWithOverride;
+    expect(isIdentityBundleV1(bundleSansMetadata)).toBe(true);
+    expect(
+      isIdentityBundleV1({...bundleSansMetadata, metadata: {}}),
+    ).toBe(true);
+    expect(
+      isIdentityBundleV1({
+        ...bundleSansMetadata,
+        metadata: {displayNameOverride: 42},
+      }),
+    ).toBe(false);
   });
 
   test('signWithDevice produces a 64-byte signature verifiable by the device pk', () => {

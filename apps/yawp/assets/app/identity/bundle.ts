@@ -13,6 +13,20 @@ export type IdentityBundleV1 = {
     signature: string; 
     issuedAt: string; 
   };
+  /**
+   * identity-scoped client metadata persisted inside the
+   * same bundle as the rest of the on-device state. Forward-compatible:
+   * the field is optional, and v1 bundles written before this fix (no
+   * `metadata` key) still pass the type guard. New keys MUST stay
+   * optional so older readers tolerate them.
+   */
+  metadata?: {
+    /**
+     * User-chosen display-name override. Absent ⇒ the deterministic
+     * word-pair default (derived from masterPk) is shown.
+     */
+    displayNameOverride?: string;
+  };
 };
 
 /** base64url (no padding) encode. */
@@ -51,11 +65,25 @@ export function isIdentityBundleV1(value: unknown): value is IdentityBundleV1 {
   const d = v.device as Record<string, unknown> | undefined;
   if (!m || typeof m.sk !== 'string') return false;
   if (!d) return false;
-  return (
-    typeof d.deviceId === 'string' &&
-    typeof d.sk === 'string' &&
-    typeof d.pk === 'string' &&
-    typeof d.signature === 'string' &&
-    typeof d.issuedAt === 'string'
-  );
+  if (
+    typeof d.deviceId !== 'string' ||
+    typeof d.sk !== 'string' ||
+    typeof d.pk !== 'string' ||
+    typeof d.signature !== 'string' ||
+    typeof d.issuedAt !== 'string'
+  ) {
+    return false;
+  }
+  if ('metadata' in v && v.metadata !== undefined) {
+    if (typeof v.metadata !== 'object' || v.metadata === null) return false;
+    const meta = v.metadata as Record<string, unknown>;
+    if (
+      'displayNameOverride' in meta &&
+      meta.displayNameOverride !== undefined &&
+      typeof meta.displayNameOverride !== 'string'
+    ) {
+      return false;
+    }
+  }
+  return true;
 }

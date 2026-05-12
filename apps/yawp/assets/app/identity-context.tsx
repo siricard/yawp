@@ -90,7 +90,6 @@ export type RestoreResult =
   | {ok: false; reason: 'wrong_word_count' | 'unknown_word' | 'bad_checksum'};
 
 const WORKSPACES_KEY = 'mook.workspaces';
-const DISPLAY_NAME_KEY = 'yawp.identity.display_name';
 
 /**
  * outcome of an unlock attempt against a sealed envelope.
@@ -133,8 +132,19 @@ type Ctx = {
   state: State;
   servers: WorkspaceServer[];
   addServer: (server: WorkspaceServer) => void;
+  /**
+   * User-chosen display-name override read from the persisted identity
+   * bundle's `metadata.displayNameOverride`. `null` when no override is
+   * set; callers that want the rendered name should use the
+   * `useDisplayName()` helper which falls back to the word-pair default.
+   */
   displayName: string | null;
-  setDisplayName: (name: string) => void;
+  /**
+   * set/clear the override inside the identity bundle. Pass
+   * `null` to remove the override (the word-pair default takes over).
+   * Mutates `metadata.displayNameOverride` and re-persists the bundle.
+   */
+  setDisplayNameOverride: (name: string | null) => Promise<void>;
   /** Advance to the next onboarding step (or to 'ready' if completing). */
   advanceOnboarding: (next: OnboardingStep) => void;
   /**
@@ -204,23 +214,6 @@ function persistServers(servers: WorkspaceServer[]): void {
   if (Platform.OS !== 'web') return;
   try {
     window.localStorage.setItem(WORKSPACES_KEY, JSON.stringify(servers));
-  } catch {
-  }
-}
-
-function loadDisplayName(): string | null {
-  if (Platform.OS !== 'web') return null;
-  try {
-    return window.localStorage.getItem(DISPLAY_NAME_KEY);
-  } catch {
-    return null;
-  }
-}
-
-function persistDisplayName(name: string): void {
-  if (Platform.OS !== 'web') return;
-  try {
-    window.localStorage.setItem(DISPLAY_NAME_KEY, name);
   } catch {
   }
 }
@@ -300,9 +293,7 @@ export function IdentityProvider({children}: {children: React.ReactNode}) {
     error: null,
   });
   const [servers, setServers] = useState<WorkspaceServer[]>(() => loadServers());
-  const [displayName, setDisplayNameState] = useState<string | null>(() =>
-    loadDisplayName(),
-  );
+  const [displayName, setDisplayNameState] = useState<string | null>(null);
   const draftRef = useRef<DraftIdentity | null>(null);
   const draftSealedRef = useRef<boolean>(false);
 
@@ -322,6 +313,9 @@ export function IdentityProvider({children}: {children: React.ReactNode}) {
           return;
         }
         if (entry && entry.kind === 'unsealed') {
+          setDisplayNameState(
+            entry.bundle.metadata?.displayNameOverride ?? null,
+          );
           setState({
             status: 'ready',
             identity: buildIdentityFromBundle(entry.bundle),
@@ -362,10 +356,44 @@ export function IdentityProvider({children}: {children: React.ReactNode}) {
     });
   }, []);
 
-  const setDisplayName = useCallback((name: string) => {
-    persistDisplayName(name);
-    setDisplayNameState(name);
-  }, []);
+  const setDisplayNameOverride = useCallback(
+    async (name: string | null): Promise<void> => {
+      const entry = await loadStoredEntry();
+      if (!entry) {
+        throw new Error('setDisplayNameOverride: no identity to update');
+      }
+      if (entry.kind === 'sealed') {
+        throw new Error(
+          'setDisplayNameOverride: cannot mutate metadata on a sealed bundle without the passphrase',
+        );
+      }
+      const trimmed = name === null ? null : name.trim();
+      const nextBundle: IdentityBundleV1 =
+        trimmed && trimmed.length > 0
+          ? {
+              ...entry.bundle,
+              metadata: {
+                ...(entry.bundle.metadata ?? {}),
+                displayNameOverride: trimmed,
+              },
+            }
+          : (() => {
+              const meta = {...(entry.bundle.metadata ?? {})};
+              delete meta.displayNameOverride;
+              const hasOtherKeys = Object.keys(meta).length > 0;
+              const cleaned: IdentityBundleV1 = hasOtherKeys
+                ? {...entry.bundle, metadata: meta}
+                : (() => {
+                    const {metadata: _omit, ...rest} = entry.bundle;
+                    return rest as IdentityBundleV1;
+                  })();
+              return cleaned;
+            })();
+      await saveIdentity(nextBundle);
+      setDisplayNameState(trimmed && trimmed.length > 0 ? trimmed : null);
+    },
+    [],
+  );
 
   const advanceOnboarding = useCallback((next: OnboardingStep) => {
     setState(prev => {
@@ -386,6 +414,10 @@ export function IdentityProvider({children}: {children: React.ReactNode}) {
       if (!draft) {
         throw new Error('completeOnboarding called outside onboarding flow');
       }
+      const trimmedName =
+        chosenName !== null && chosenName.trim().length > 0
+          ? chosenName.trim()
+          : null;
       const bundle: IdentityBundleV1 = {
         version: 1,
         master: {sk: bytesToB64Url(draft.masterSk)},
@@ -396,6 +428,7 @@ export function IdentityProvider({children}: {children: React.ReactNode}) {
           signature: bytesToB64Url(draft.deviceDelegationSignature),
           issuedAt: draft.deviceIssuedAt,
         },
+        ...(trimmedName ? {metadata: {displayNameOverride: trimmedName}} : {}),
       };
       if (passphrase && passphrase.length > 0) {
         const envelope = sealBundle(bundle, passphrase);
@@ -405,10 +438,7 @@ export function IdentityProvider({children}: {children: React.ReactNode}) {
         await saveIdentity(bundle);
         draftSealedRef.current = false;
       }
-      if (chosenName !== null) {
-        persistDisplayName(chosenName);
-        setDisplayNameState(chosenName);
-      }
+      setDisplayNameState(trimmedName);
       setState(prev => {
         if (prev.status !== 'onboarding') return prev;
         return {...prev, step: 'complete'};
@@ -455,6 +485,7 @@ export function IdentityProvider({children}: {children: React.ReactNode}) {
       };
       await saveIdentity(bundle);
       draftRef.current = draft;
+      setDisplayNameState(null);
       setState({
         status: 'ready',
         identity: buildIdentityFromDraft(draft),
@@ -487,6 +518,7 @@ export function IdentityProvider({children}: {children: React.ReactNode}) {
       if (!envelope) return {ok: false, reason: 'unknown'};
       try {
         const bundle = unsealBundle(envelope, passphrase);
+        setDisplayNameState(bundle.metadata?.displayNameOverride ?? null);
         setState({
           status: 'ready',
           identity: buildIdentityFromBundle(bundle),
@@ -565,7 +597,7 @@ export function IdentityProvider({children}: {children: React.ReactNode}) {
         servers,
         addServer,
         displayName,
-        setDisplayName,
+        setDisplayNameOverride,
         advanceOnboarding,
         completeOnboarding,
         finishOnboarding,
@@ -671,7 +703,11 @@ export function useDisplayName(): {
    * instead, which falls back to the word-pair default.
    */
   displayName: string | null;
-  setDisplayName: (name: string) => void;
+  /**
+   * set or clear the override inside the identity bundle.
+   * Pass `null` to remove the override; the word-pair default takes over.
+   */
+  setDisplayNameOverride: (name: string | null) => Promise<void>;
   /**
    * the override if set, otherwise the deterministic word-pair
    * default derived from the master public key. Returns `null` only when
@@ -691,7 +727,7 @@ export function useDisplayName(): {
   }
   return {
     displayName: ctx.displayName,
-    setDisplayName: ctx.setDisplayName,
+    setDisplayNameOverride: ctx.setDisplayNameOverride,
     effectiveDisplayName: effective,
   };
 }

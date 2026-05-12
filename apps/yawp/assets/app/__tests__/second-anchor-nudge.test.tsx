@@ -21,7 +21,7 @@ jest.mock('../identity-context', () => ({
   useWorkspaceServers: jest.fn(),
   useDisplayName: () => ({
     displayName: null,
-    setDisplayName: () => {},
+    setDisplayNameOverride: async () => {},
     effectiveDisplayName: null,
   }),
 }));

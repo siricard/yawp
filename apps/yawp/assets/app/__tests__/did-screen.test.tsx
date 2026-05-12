@@ -13,7 +13,7 @@ jest.mock('../identity-context', () => ({
   useIdentityState: jest.fn(),
   useDisplayName: () => ({
     displayName: null,
-    setDisplayName: () => {},
+    setDisplayNameOverride: async () => {},
     effectiveDisplayName: null,
   }),
 }));
