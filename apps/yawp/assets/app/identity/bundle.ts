@@ -26,6 +26,19 @@ export type IdentityBundleV1 = {
      * word-pair default (derived from masterPk) is shown.
      */
     displayNameOverride?: string;
+    /**
+     * ISO 8601 timestamp captured the first time the device
+     * successfully bound to a server. Drives the 7-day second-anchor
+     * nudge. Lives inside the identity bundle so the state resets cleanly
+     * across identity recovery/replacement and IndexedDB clears.
+     */
+    firstBoundAt?: string;
+    /**
+     * set to `true` once the user dismisses the
+     * second-anchor nudge. Persisted so the dismissal survives reloads
+     * (and so a fresh identity sees a fresh nudge).
+     */
+    secondAnchorNudgeDismissed?: boolean;
   };
 };
 
@@ -81,6 +94,20 @@ export function isIdentityBundleV1(value: unknown): value is IdentityBundleV1 {
       'displayNameOverride' in meta &&
       meta.displayNameOverride !== undefined &&
       typeof meta.displayNameOverride !== 'string'
+    ) {
+      return false;
+    }
+    if (
+      'firstBoundAt' in meta &&
+      meta.firstBoundAt !== undefined &&
+      typeof meta.firstBoundAt !== 'string'
+    ) {
+      return false;
+    }
+    if (
+      'secondAnchorNudgeDismissed' in meta &&
+      meta.secondAnchorNudgeDismissed !== undefined &&
+      typeof meta.secondAnchorNudgeDismissed !== 'boolean'
     ) {
       return false;
     }

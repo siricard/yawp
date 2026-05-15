@@ -82,7 +82,7 @@ export function AddServerScreen({onCancel, onAdded}: Props) {
         return;
       }
 
-      recordFirstBoundAtIfUnset();
+      await recordFirstBoundAtIfUnset();
 
       const server: WorkspaceServer = {
         url: serverUrl.trim().replace(/\/+$/, ''),
@@ -114,7 +114,7 @@ export function AddServerScreen({onCancel, onAdded}: Props) {
         return;
       }
 
-      recordFirstBoundAtIfUnset();
+      await recordFirstBoundAtIfUnset();
 
       const server: WorkspaceServer = {
         url: serverUrl.trim().replace(/\/+$/, ''),

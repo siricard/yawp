@@ -86,6 +86,21 @@ describe('storage-bundle.web (IndexedDB)', () => {
     }
   });
 
+  test('round-trips the nudge metadata (firstBoundAt + secondAnchorNudgeDismissed)', async () => {
+    const bundle: IdentityBundleV1 = {
+      ...makeBundle(),
+      metadata: {
+        firstBoundAt: '2026-03-01T00:00:00.000Z',
+        secondAnchorNudgeDismissed: true,
+      },
+    };
+    await saveIdentity(bundle);
+    const loaded = await loadIdentity();
+    expect(loaded).toEqual(bundle);
+    expect(loaded!.metadata?.firstBoundAt).toBe('2026-03-01T00:00:00.000Z');
+    expect(loaded!.metadata?.secondAnchorNudgeDismissed).toBe(true);
+  });
+
   test('concurrent saves are serialized by IndexedDB and the latest write wins', async () => {
     const first = makeBundle({deviceId: 'concurrent-a'});
     const second = makeBundle({deviceId: 'concurrent-b'});

@@ -1,50 +1,23 @@
 
 import {useCallback, useEffect, useState} from 'react';
-import {Platform} from 'react-native';
 
-const FIRST_BOUND_AT_KEY = 'yawp.nudge.first_bound_at';
+import type {IdentityBundleV1} from './identity/bundle';
+import {
+  clearIdentityBundle,
+  loadStoredEntry,
+  saveIdentity,
+} from './identity/storage-bundle';
+
 const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
 
-let nativeFirstBoundAt: string | null = null;
-
-export function loadFirstBoundAt(): string | null {
-  if (Platform.OS === 'web') {
-    if (typeof window === 'undefined' || !window.localStorage) return null;
-    try {
-      return window.localStorage.getItem(FIRST_BOUND_AT_KEY);
-    } catch {
-      return null;
-    }
-  }
-  return nativeFirstBoundAt;
-}
-
-export function recordFirstBoundAtIfUnset(now: Date = new Date()): void {
-  const existing = loadFirstBoundAt();
-  if (existing) return;
-  const iso = now.toISOString();
-  if (Platform.OS === 'web') {
-    if (typeof window === 'undefined' || !window.localStorage) return;
-    try {
-      window.localStorage.setItem(FIRST_BOUND_AT_KEY, iso);
-    } catch {
-    }
-    return;
-  }
-  nativeFirstBoundAt = iso;
-}
-
-/** Test-only reset. Not exported via index. */
-export function __resetNudgeStoreForTests(): void {
-  if (Platform.OS === 'web' && typeof window !== 'undefined' && window.localStorage) {
-    try {
-      window.localStorage.removeItem(FIRST_BOUND_AT_KEY);
-    } catch {
-    }
-  }
-  nativeFirstBoundAt = null;
-}
-
+/**
+ * Pure gate: given a snapshot of the relevant state, decide whether the
+ * banner should render. The banner is suppressed when:
+ *   - it has already been dismissed,
+ *   - the user has 0 or 2+ bound servers (only one == one anchor case),
+ *   - the first bind has never happened, or
+ *   - fewer than 7 days have elapsed since the first bind.
+ */
 export function shouldShowSecondAnchorNudge(opts: {
   serversCount: number;
   firstBoundAt: string | null;
@@ -60,34 +33,119 @@ export function shouldShowSecondAnchorNudge(opts: {
   return nowMs - boundAtMs >= SEVEN_DAYS_MS;
 }
 
+type NudgeState = {
+  firstBoundAt: string | null;
+  dismissed: boolean;
+};
+
+async function readNudgeState(): Promise<NudgeState> {
+  const entry = await loadStoredEntry();
+  if (!entry || entry.kind !== 'unsealed') {
+    return {firstBoundAt: null, dismissed: false};
+  }
+  return {
+    firstBoundAt: entry.bundle.metadata?.firstBoundAt ?? null,
+    dismissed: entry.bundle.metadata?.secondAnchorNudgeDismissed ?? false,
+  };
+}
+
+function withMetadata(
+  bundle: IdentityBundleV1,
+  patch: Partial<NonNullable<IdentityBundleV1['metadata']>>,
+): IdentityBundleV1 {
+  return {
+    ...bundle,
+    metadata: {...(bundle.metadata ?? {}), ...patch},
+  };
+}
+
 /**
- * React hook driving the banner. Reads `firstBoundAt` from storage
- * on mount and recomputes visibility on every render (so it reacts to
- * `serversCount` flipping to >1 the moment the user adds a second
- * anchor). Dismissal is in-memory only.
+ * Set `metadata.firstBoundAt` to `now.toISOString()` if it is not already
+ * set. No-op when no unsealed identity bundle exists (sealed bundles can't
+ * be mutated without the passphrase — the nudge simply won't fire until
+ * the bundle is unlocked, which is acceptable since the user must unlock
+ * to bind anyway).
+ */
+export async function recordFirstBoundAtIfUnset(
+  now: Date = new Date(),
+): Promise<void> {
+  const entry = await loadStoredEntry();
+  if (!entry || entry.kind !== 'unsealed') return;
+  if (entry.bundle.metadata?.firstBoundAt) return;
+  const next = withMetadata(entry.bundle, {firstBoundAt: now.toISOString()});
+  await saveIdentity(next);
+}
+
+/**
+ * Persist `metadata.secondAnchorNudgeDismissed = true`. No-op when there's
+ * no unsealed bundle to write to (same rationale as above).
+ */
+async function persistDismissal(): Promise<void> {
+  const entry = await loadStoredEntry();
+  if (!entry || entry.kind !== 'unsealed') return;
+  if (entry.bundle.metadata?.secondAnchorNudgeDismissed) return;
+  const next = withMetadata(entry.bundle, {secondAnchorNudgeDismissed: true});
+  await saveIdentity(next);
+}
+
+/** Test-only reset: wipes the entire identity bundle. */
+export async function __resetNudgeStoreForTests(): Promise<void> {
+  await clearIdentityBundle();
+}
+
+/**
+ * React hook driving the banner. Reads nudge state out of the
+ * identity bundle on mount; refreshes when `serversCount` flips from
+ * 0 to ≥1 so the home screen picks up the timestamp the moment
+ * AddServerScreen writes it after the first bind. Dismissal is
+ * persisted to the bundle.
  */
 export function useSecondAnchorNudge(serversCount: number): {
   visible: boolean;
   dismiss: () => void;
 } {
-  const [dismissed, setDismissed] = useState(false);
-  const [firstBoundAt, setFirstBoundAt] = useState<string | null>(() =>
-    loadFirstBoundAt(),
-  );
+  const [{firstBoundAt, dismissed}, setNudgeState] = useState<NudgeState>({
+    firstBoundAt: null,
+    dismissed: false,
+  });
+  const [loaded, setLoaded] = useState(false);
+
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      const state = await readNudgeState();
+      if (!mounted) return;
+      setNudgeState(state);
+      setLoaded(true);
+    })();
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   useEffect(() => {
     if (serversCount >= 1 && !firstBoundAt) {
-      setFirstBoundAt(loadFirstBoundAt());
+      let mounted = true;
+      (async () => {
+        const state = await readNudgeState();
+        if (!mounted) return;
+        setNudgeState(state);
+      })();
+      return () => {
+        mounted = false;
+      };
     }
+    return undefined;
   }, [serversCount, firstBoundAt]);
 
-  const dismiss = useCallback(() => setDismissed(true), []);
+  const dismiss = useCallback(() => {
+    setNudgeState(prev => ({...prev, dismissed: true}));
+    void persistDismissal();
+  }, []);
 
-  const visible = shouldShowSecondAnchorNudge({
-    serversCount,
-    firstBoundAt,
-    dismissed,
-  });
+  const visible =
+    loaded &&
+    shouldShowSecondAnchorNudge({serversCount, firstBoundAt, dismissed});
 
   return {visible, dismiss};
 }
