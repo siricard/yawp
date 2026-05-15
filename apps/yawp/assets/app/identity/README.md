@@ -17,7 +17,7 @@ recover it from storage. **No user-facing onboarding screens.**
 | `device.ts` | Generate a device subkey + master-signed delegation (`generateDeviceSubkey(masterPrivateKey, opts?)`); sign with the device subkey; expose the canonical-JSON delegation message for verifiers. |
 | `did.ts` | `didFromPubkey(pk)` → `did:yawp:<base58(sha256(pk))>`; `fingerprintFromPubkey(pk)` → `yp:8f3a · d21c · 47ee · 0b91`. |
 | `bundle.ts` | Persisted JSON shape (`IdentityBundleV1`) + base64url helpers. |
-| `storage-bundle.web.ts` / `storage-bundle.native.ts` | Platform-specific `loadIdentity` / `saveIdentity`. Web uses IndexedDB (origin-scoped, database + object store keyed on `yawp.identity.v1`, single record under key `'v1'`); native uses `react-native-keychain` under service `yawp.identity.v1`. |
+| `storage-bundle.web.ts` / `storage-bundle.native.ts` | Platform-specific `loadIdentity` / `saveIdentity`. Web uses IndexedDB (origin-scoped, database `yawp.identity`, object store `yawp.identity`, single record under key `'v1'`); native uses `react-native-keychain` under service `yawp.identity.v1`. The web backend includes a one-shot best-effort migration from a pre-fix `yawp.identity.v1` database. |
 | `uuid.ts` | Cross-platform UUID v4 generator (uses `crypto.randomUUID` when available; falls back to `crypto.getRandomValues`). |
 | `index.ts` | Back-compat facade exposing the surface (`getOrCreateIdentity`, `signWithIdentity`, `clearIdentity`). New code should import from `../identity-context`. |
 

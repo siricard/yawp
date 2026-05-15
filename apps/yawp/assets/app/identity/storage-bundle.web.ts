@@ -1,14 +1,17 @@
 
-import {STORAGE_KEY_V1, isIdentityBundleV1, type IdentityBundleV1} from './bundle';
+import {isIdentityBundleV1, type IdentityBundleV1} from './bundle';
 import {isSealedEnvelopeV2, type SealedEnvelopeV2} from './seal';
 
 export type StoredIdentityEntry =
   | {kind: 'unsealed'; bundle: IdentityBundleV1}
   | {kind: 'sealed'; envelope: SealedEnvelopeV2};
 
-const DB_NAME = STORAGE_KEY_V1;
-const STORE_NAME = STORAGE_KEY_V1;
+const DB_NAME = 'yawp.identity';
+const STORE_NAME = 'yawp.identity';
 const RECORD_KEY = 'v1';
+
+const LEGACY_DB_NAME = 'yawp.identity.v1';
+const LEGACY_STORE_NAME = 'yawp.identity.v1';
 
 function getIndexedDB(): IDBFactory | null {
   if (typeof indexedDB !== 'undefined') return indexedDB;
@@ -19,19 +22,89 @@ function getIndexedDB(): IDBFactory | null {
   return null;
 }
 
-function openDb(idb: IDBFactory): Promise<IDBDatabase> {
+function openDbRaw(
+  idb: IDBFactory,
+  name: string,
+  onUpgrade?: (db: IDBDatabase) => void,
+): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
-    const req = idb.open(DB_NAME, 1);
-    req.onupgradeneeded = () => {
-      const db = req.result;
-      if (!db.objectStoreNames.contains(STORE_NAME)) {
-        db.createObjectStore(STORE_NAME);
-      }
-    };
+    const req = idb.open(name, 1);
+    if (onUpgrade) {
+      req.onupgradeneeded = () => onUpgrade(req.result);
+    }
     req.onsuccess = () => resolve(req.result);
     req.onerror = () => reject(req.error);
     req.onblocked = () => reject(new Error('IndexedDB open blocked'));
   });
+}
+
+function deleteDb(idb: IDBFactory, name: string): Promise<void> {
+  return new Promise((resolve) => {
+    const req = idb.deleteDatabase(name);
+    req.onsuccess = () => resolve();
+    req.onerror = () => resolve();
+    req.onblocked = () => resolve();
+  });
+}
+
+async function migrateFromLegacy(idb: IDBFactory): Promise<void> {
+  try {
+    const legacyDb = await openDbRaw(idb, LEGACY_DB_NAME);
+    let payload: string | null = null;
+    try {
+      if (legacyDb.objectStoreNames.contains(LEGACY_STORE_NAME)) {
+        const tx = legacyDb.transaction(LEGACY_STORE_NAME, 'readonly');
+        const value = await awaitRequest(
+          tx.objectStore(LEGACY_STORE_NAME).get(RECORD_KEY),
+        );
+        await awaitTx(tx);
+        if (value != null) {
+          payload = typeof value === 'string' ? value : JSON.stringify(value);
+        }
+      }
+    } finally {
+      legacyDb.close();
+    }
+    if (payload != null) {
+      const newDb = await openDbRaw(idb, DB_NAME, (db) => {
+        if (!db.objectStoreNames.contains(STORE_NAME)) {
+          db.createObjectStore(STORE_NAME);
+        }
+      });
+      try {
+        const wtx = newDb.transaction(STORE_NAME, 'readwrite');
+        wtx.objectStore(STORE_NAME).put(payload, RECORD_KEY);
+        await awaitTx(wtx);
+      } finally {
+        newDb.close();
+      }
+    }
+    await deleteDb(idb, LEGACY_DB_NAME);
+  } catch {
+  }
+}
+
+let migrationPromise: Promise<void> | null = null;
+
+function ensureMigrated(idb: IDBFactory): Promise<void> {
+  if (!migrationPromise) {
+    migrationPromise = migrateFromLegacy(idb);
+  }
+  return migrationPromise;
+}
+
+async function openDb(idb: IDBFactory): Promise<IDBDatabase> {
+  await ensureMigrated(idb);
+  return openDbRaw(idb, DB_NAME, (db) => {
+    if (!db.objectStoreNames.contains(STORE_NAME)) {
+      db.createObjectStore(STORE_NAME);
+    }
+  });
+}
+
+/** @internal — test-only reset of the one-shot migration guard. */
+export function __resetMigrationGuardForTests(): void {
+  migrationPromise = null;
 }
 
 function awaitTx(tx: IDBTransaction): Promise<void> {

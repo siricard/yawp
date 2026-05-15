@@ -13,9 +13,40 @@ import {
   clearIdentityBundle,
   loadStoredEntry,
   saveSealedEnvelope,
+  __resetMigrationGuardForTests,
 } from '../identity/storage-bundle.web';
 import {bytesToB64Url, type IdentityBundleV1} from '../identity/bundle';
 import type {SealedEnvelopeV2} from '../identity/seal';
+
+const DB_NAME = 'yawp.identity';
+const STORE_NAME = 'yawp.identity';
+const RECORD_KEY = 'v1';
+const LEGACY_DB_NAME = 'yawp.identity.v1';
+const LEGACY_STORE_NAME = 'yawp.identity.v1';
+
+function awaitReq<T>(req: IDBRequest<T>): Promise<T> {
+  return new Promise((resolve, reject) => {
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+}
+
+function awaitTx(tx: IDBTransaction): Promise<void> {
+  return new Promise((resolve, reject) => {
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+    tx.onabort = () => reject(tx.error);
+  });
+}
+
+function deleteDb(name: string): Promise<void> {
+  return new Promise((resolve) => {
+    const req = indexedDB.deleteDatabase(name);
+    req.onsuccess = () => resolve();
+    req.onerror = () => resolve();
+    req.onblocked = () => resolve();
+  });
+}
 
 function makeBundle(overrides: Partial<IdentityBundleV1['device']> = {}): IdentityBundleV1 {
   const sk = new Uint8Array(32);
@@ -56,7 +87,9 @@ function makeSealedEnvelope(): SealedEnvelopeV2 {
 
 describe('storage-bundle.web (IndexedDB)', () => {
   beforeEach(async () => {
-    await clearIdentityBundle();
+    __resetMigrationGuardForTests();
+    await deleteDb(DB_NAME);
+    await deleteDb(LEGACY_DB_NAME);
   });
 
   test('saveIdentity → loadIdentity round-trips the bundle byte-for-byte', async () => {
@@ -99,6 +132,81 @@ describe('storage-bundle.web (IndexedDB)', () => {
     expect(loaded).toEqual(bundle);
     expect(loaded!.metadata?.firstBoundAt).toBe('2026-03-01T00:00:00.000Z');
     expect(loaded!.metadata?.secondAnchorNudgeDismissed).toBe(true);
+  });
+
+  test('uses the schema: DB `yawp.identity`, store `yawp.identity`, key `v1`', async () => {
+    const bundle = makeBundle();
+    await saveIdentity(bundle);
+
+    const openReq = indexedDB.open(DB_NAME);
+    const db = await awaitReq(openReq);
+    try {
+      expect(Array.from(db.objectStoreNames)).toContain(STORE_NAME);
+      const tx = db.transaction(STORE_NAME, 'readonly');
+      const keys = await awaitReq(tx.objectStore(STORE_NAME).getAllKeys());
+      await awaitTx(tx);
+      expect(keys).toEqual([RECORD_KEY]);
+    } finally {
+      db.close();
+    }
+
+    const legacyDbs = await (indexedDB as IDBFactory & {databases?: () => Promise<{name?: string}[]>})
+      .databases?.();
+    if (legacyDbs) {
+      expect(legacyDbs.find((d) => d.name === LEGACY_DB_NAME)).toBeUndefined();
+    }
+  });
+
+  test('one-shot migration: pre-fix `yawp.identity.v1` DB is read into new DB and dropped', async () => {
+    const bundle = makeBundle({deviceId: 'pre-fix-device'});
+    const legacyPayload = JSON.stringify(bundle);
+
+    const upgradeReq = indexedDB.open(LEGACY_DB_NAME, 1);
+    upgradeReq.onupgradeneeded = () => {
+      const db = upgradeReq.result;
+      db.createObjectStore(LEGACY_STORE_NAME);
+    };
+    const legacyDb = await awaitReq(upgradeReq);
+    const wtx = legacyDb.transaction(LEGACY_STORE_NAME, 'readwrite');
+    wtx.objectStore(LEGACY_STORE_NAME).put(legacyPayload, RECORD_KEY);
+    await awaitTx(wtx);
+    legacyDb.close();
+
+    {
+      const sanityDb = await awaitReq(indexedDB.open(LEGACY_DB_NAME));
+      expect(Array.from(sanityDb.objectStoreNames)).toContain(LEGACY_STORE_NAME);
+      sanityDb.close();
+    }
+
+    __resetMigrationGuardForTests();
+    const loaded = await loadIdentity();
+    expect(loaded).toEqual(bundle);
+
+    const newDb = await awaitReq(indexedDB.open(DB_NAME));
+    try {
+      expect(Array.from(newDb.objectStoreNames)).toContain(STORE_NAME);
+      const tx = newDb.transaction(STORE_NAME, 'readonly');
+      const keys = await awaitReq(tx.objectStore(STORE_NAME).getAllKeys());
+      const value = await awaitReq(tx.objectStore(STORE_NAME).get(RECORD_KEY));
+      await awaitTx(tx);
+      expect(keys).toEqual([RECORD_KEY]);
+      expect(typeof value).toBe('string');
+      expect(JSON.parse(value as string)).toEqual(bundle);
+    } finally {
+      newDb.close();
+    }
+
+    const dbsFn = (indexedDB as IDBFactory & {databases?: () => Promise<{name?: string}[]>}).databases;
+    if (dbsFn) {
+      const dbs = await dbsFn.call(indexedDB);
+      expect(dbs.find((d) => d.name === LEGACY_DB_NAME)).toBeUndefined();
+    } else {
+      const probeReq = indexedDB.open(LEGACY_DB_NAME);
+      const probeDb = await awaitReq(probeReq);
+      expect(Array.from(probeDb.objectStoreNames)).toEqual([]);
+      probeDb.close();
+      await deleteDb(LEGACY_DB_NAME);
+    }
   });
 
   test('concurrent saves are serialized by IndexedDB and the latest write wins', async () => {
