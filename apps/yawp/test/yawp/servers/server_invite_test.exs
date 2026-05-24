@@ -28,6 +28,8 @@ defmodule Yawp.Servers.ServerInviteTest do
     owner = Ash.Seed.seed!(Yawp.Identity.Identity, %{did: did, master_public_key: pk})
 
     {:ok, server} = Servers.get_singleton_server()
+    {:ok, owner_role} = Servers.get_system_role_for_server("Owner", server.id)
+    {:ok, _} = Servers.assign_role(owner.id, server.id, owner_role.id)
 
     %{server: server, owner: owner}
   end
@@ -102,6 +104,43 @@ defmodule Yawp.Servers.ServerInviteTest do
 
       assert invite.kind == :multi_use
       assert invite.uses_remaining == 3
+    end
+
+    test "rejects mint by non-owner identity", %{server: server} do
+            {pk2, _sk2} = :crypto.generate_key(:eddsa, :ed25519)
+      did2 = "did:yawp:" <> Identity.did_from_pubkey(pk2)
+      non_owner = Ash.Seed.seed!(Yawp.Identity.Identity, %{did: did2, master_public_key: pk2})
+
+      assert {:error, error} =
+               Servers.mint_server_invite(%{
+                 server_id: server.id,
+                 created_by_identity_id: non_owner.id
+               })
+
+      assert error_type(error) == "not_server_owner"
+    end
+
+    test "rejects multi-use without uses_remaining", %{server: server, owner: owner} do
+      assert {:error, error} =
+               Servers.mint_server_invite(%{
+                 server_id: server.id,
+                 created_by_identity_id: owner.id,
+                 kind: :multi_use
+               })
+
+      assert match?(%Ash.Error.Invalid{}, error)
+    end
+
+    test "rejects multi-use with uses_remaining = 0", %{server: server, owner: owner} do
+      assert {:error, error} =
+               Servers.mint_server_invite(%{
+                 server_id: server.id,
+                 created_by_identity_id: owner.id,
+                 kind: :multi_use,
+                 uses_remaining: 0
+               })
+
+      assert match?(%Ash.Error.Invalid{}, error)
     end
   end
 

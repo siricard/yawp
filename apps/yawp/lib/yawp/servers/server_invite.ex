@@ -67,6 +67,8 @@ defmodule Yawp.Servers.ServerInvite do
       argument :ttl_seconds, :integer, default: 24 * 60 * 60
             argument :uses_remaining, :integer, allow_nil?: true
 
+      change Yawp.Servers.ServerInvite.Changes.VerifyServerOwnership
+      change Yawp.Servers.ServerInvite.Changes.ValidateMintKind
       change Yawp.Servers.ServerInvite.Changes.MintToken
     end
 

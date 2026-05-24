@@ -91,7 +91,7 @@ defmodule YawpWeb.AdminDashboardLive do
      |> put_flash(:info, "Per-server defaults acknowledged (stub — real settings land in M8).")}
   end
 
-  def handle_event("mint_server_invite", _params, socket) do
+  def handle_event("mint_server_invite", params, socket) do
     account = socket.assigns.current_account
 
     case {socket.assigns.server, socket.assigns.chat_owner} do
@@ -107,20 +107,25 @@ defmodule YawpWeb.AdminDashboardLive do
          )}
 
       {server, chat_owner} ->
-        {:ok, invite} =
-          Yawp.Servers.mint_server_invite(%{
-            server_id: server.id,
-            created_by_identity_id: chat_owner.id
-          })
+        mint_attrs = build_mint_attrs(server, chat_owner, params)
 
-        entry =
-          Yawp.Admin.audit!(account.id, "server_invite.mint", %{invite_id: invite.id})
+        case Yawp.Servers.mint_server_invite(mint_attrs) do
+          {:ok, invite} ->
+            entry =
+              Yawp.Admin.audit!(account.id, "server_invite.mint", %{invite_id: invite.id})
 
-        {:noreply,
-         socket
-         |> stream_insert(:server_invites, invite, at: 0)
-         |> stream_insert(:audit_log, entry, at: 0)
-         |> put_flash(:info, "Server invite minted. Copy the token — it will not be shown again.")}
+            {:noreply,
+             socket
+             |> stream_insert(:server_invites, invite, at: 0)
+             |> stream_insert(:audit_log, entry, at: 0)
+             |> put_flash(
+               :info,
+               "Server invite minted. Copy the token — it will not be shown again."
+             )}
+
+          {:error, _error} ->
+            {:noreply, put_flash(socket, :error, "Could not mint server invite.")}
+        end
     end
   end
 
@@ -359,7 +364,7 @@ defmodule YawpWeb.AdminDashboardLive do
 
         <.section id="server-invites" title="Server invites" icon="hero-ticket">
           <div class="space-y-3">
-            <div>
+            <div class="flex flex-wrap items-end gap-3">
               <button
                 id="server-invite-mint-btn"
                 type="button"
@@ -369,6 +374,34 @@ defmodule YawpWeb.AdminDashboardLive do
               >
                 <.icon name="hero-plus" class="size-4" /> Mint server invite
               </button>
+
+              <form
+                id="server-invite-mint-multi-form"
+                phx-submit="mint_server_invite"
+                class="flex items-end gap-2"
+              >
+                <input type="hidden" name="kind" value="multi_use" />
+                <label class="text-xs flex flex-col">
+                  <span class="text-base-content/70">Uses</span>
+                  <input
+                    id="server-invite-mint-multi-uses"
+                    type="number"
+                    name="uses_remaining"
+                    min="2"
+                    max="100"
+                    value="5"
+                    class="input input-bordered input-sm w-20"
+                  />
+                </label>
+                <button
+                  id="server-invite-mint-multi-btn"
+                  type="submit"
+                  class="btn btn-sm btn-soft"
+                  disabled={is_nil(@chat_owner) or is_nil(@server)}
+                >
+                  <.icon name="hero-plus" class="size-4" /> Mint multi-use invite
+                </button>
+              </form>
               <%= if is_nil(@chat_owner) do %>
                 <p class="text-xs text-base-content/70 mt-1">
                   Chat owner must complete claim before invites can be minted.
@@ -398,7 +431,7 @@ defmodule YawpWeb.AdminDashboardLive do
                   {invite.token}
                 </code>
                 <span class="text-xs text-base-content/70">
-                  {invite.kind}
+                  {invite_kind_label(invite)}
                 </span>
                 <button
                   id={"server-invite-revoke-btn-#{invite.id}"}
@@ -453,6 +486,47 @@ defmodule YawpWeb.AdminDashboardLive do
     </section>
     """
   end
+
+  defp invite_kind_label(%{kind: :multi_use, uses_remaining: ur}) when is_integer(ur) do
+    "multi_use (#{ur} uses left)"
+  end
+
+  defp invite_kind_label(%{kind: kind}), do: to_string(kind)
+
+  defp build_mint_attrs(server, chat_owner, %{"kind" => "multi_use"} = params) do
+    uses =
+      params
+      |> Map.get("uses_remaining", "5")
+      |> parse_uses_remaining()
+
+    %{
+      server_id: server.id,
+      created_by_identity_id: chat_owner.id,
+      kind: :multi_use,
+      uses_remaining: uses
+    }
+  end
+
+  defp build_mint_attrs(server, chat_owner, _params) do
+    %{
+      server_id: server.id,
+      created_by_identity_id: chat_owner.id
+    }
+  end
+
+  defp parse_uses_remaining(value) when is_binary(value) do
+    case Integer.parse(value) do
+      {int, _} -> clamp_uses(int)
+      :error -> 5
+    end
+  end
+
+  defp parse_uses_remaining(value) when is_integer(value), do: clamp_uses(value)
+  defp parse_uses_remaining(_), do: 5
+
+  defp clamp_uses(int) when int < 2, do: 2
+  defp clamp_uses(int) when int > 100, do: 100
+  defp clamp_uses(int), do: int
 
       defp truncate_did(did) when is_binary(did) do
     if String.length(did) <= 28 do

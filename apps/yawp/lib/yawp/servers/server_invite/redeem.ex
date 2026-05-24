@@ -215,8 +215,8 @@ defmodule Yawp.Servers.ServerInvite.Redeem do
       {:ok, %ServerInvite{kind: :single_use, consumed_at: ca}} when not is_nil(ca) ->
         rpc("invite_token_consumed")
 
-      {:ok, %ServerInvite{kind: :multi_use, uses_remaining: ur}} when ur in [0, nil] ->
-        if ur == 0, do: rpc("invite_token_exhausted"), else: rpc("internal_error")
+      {:ok, %ServerInvite{kind: :multi_use, uses_remaining: 0}} ->
+        rpc("invite_token_exhausted")
 
       {:ok, %ServerInvite{expires_at: ea}} ->
         if DateTime.compare(ea, DateTime.utc_now()) != :gt do

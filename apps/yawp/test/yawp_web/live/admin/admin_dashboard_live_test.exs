@@ -193,6 +193,16 @@ defmodule YawpWeb.AdminDashboardLiveTest do
     end
   end
 
+  defp seed_chat_owner! do
+    {pk, _sk} = :crypto.generate_key(:eddsa, :ed25519)
+    did = "did:yawp:" <> Yawp.Identity.did_from_pubkey(pk)
+    identity = Ash.Seed.seed!(Yawp.Identity.Identity, %{did: did, master_public_key: pk})
+    {:ok, server} = Yawp.Servers.get_singleton_server()
+    {:ok, owner_role} = Yawp.Servers.get_system_role_for_server("Owner", server.id)
+    {:ok, _} = Yawp.Servers.assign_role(identity.id, server.id, owner_role.id)
+    identity
+  end
+
   describe "server-invites section" do
     setup ctx, do: sign_in!(ctx)
 
@@ -210,9 +220,7 @@ defmodule YawpWeb.AdminDashboardLiveTest do
 
     test "mint button enabled when chat owner exists; clicking mints + lists invite",
          %{conn: conn} do
-      {pk, _sk} = :crypto.generate_key(:eddsa, :ed25519)
-      did = "did:yawp:" <> Yawp.Identity.did_from_pubkey(pk)
-      _identity = Ash.Seed.seed!(Yawp.Identity.Identity, %{did: did, master_public_key: pk})
+      seed_chat_owner!()
 
       {:ok, view, _html} = live(conn, "/admin")
       refute has_element?(view, "#server-invite-mint-btn[disabled]")
@@ -226,10 +234,30 @@ defmodule YawpWeb.AdminDashboardLiveTest do
       assert has_element?(view, "#server-invite-revoke-btn-#{invite.id}")
     end
 
+    test "multi-use mint button mints a multi_use invite with the entered uses_remaining",
+         %{conn: conn} do
+      seed_chat_owner!()
+
+      {:ok, view, _html} = live(conn, "/admin")
+
+      assert has_element?(view, "#server-invite-mint-multi-btn")
+      assert has_element?(view, "#server-invite-mint-multi-uses")
+
+      view
+      |> form("#server-invite-mint-multi-form", %{"uses_remaining" => "3"})
+      |> render_submit()
+
+      {:ok, server} = Yawp.Servers.get_singleton_server()
+      {:ok, [invite | _]} = Yawp.Servers.list_active_server_invites(server.id)
+
+      assert invite.kind == :multi_use
+      assert invite.uses_remaining == 3
+      assert has_element?(view, "#server-invite-token-#{invite.id}", invite.token)
+            assert render(view) =~ "multi_use (3 uses left)"
+    end
+
     test "revoke button removes the invite from the list", %{conn: conn} do
-      {pk, _sk} = :crypto.generate_key(:eddsa, :ed25519)
-      did = "did:yawp:" <> Yawp.Identity.did_from_pubkey(pk)
-      _identity = Ash.Seed.seed!(Yawp.Identity.Identity, %{did: did, master_public_key: pk})
+      seed_chat_owner!()
 
       {:ok, view, _html} = live(conn, "/admin")
       view |> element("#server-invite-mint-btn") |> render_click()

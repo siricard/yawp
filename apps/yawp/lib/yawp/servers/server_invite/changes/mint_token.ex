@@ -6,9 +6,8 @@ defmodule Yawp.Servers.ServerInvite.Changes.MintToken do
 
     * `:single_use` — `uses_remaining` stays nil (the singleton
       `consumed_at` stamp is what marks consumption).
-    * `:multi_use` — `uses_remaining` defaults to the value passed in
-      (caller may also leave it `nil` for an uncapped multi-use, in
-      which case the redeem action treats it as effectively infinite).
+    * `:multi_use` — `uses_remaining` is the positive cap passed in.
+      `ValidateMintKind` rejects nil / non-positive caps upstream.
   """
 
   use Ash.Resource.Change
