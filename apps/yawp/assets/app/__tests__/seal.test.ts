@@ -25,7 +25,9 @@ import {
   deriveSealKey,
   isSealedEnvelopeV2,
   sealBundle,
+  sealBundleWithKey,
   unsealBundle,
+  unsealEnvelope,
 } from '../identity/seal';
 import {b64UrlToBytes, type IdentityBundleV1} from '../identity/bundle';
 import vectors from '../../../priv/test_vectors/seal.json';
@@ -153,6 +155,38 @@ describe('seal', () => {
       );
       expect(unsealBundle(fixedEnv, v.passphrase_utf8)).toEqual(v.bundle);
     }
+  });
+
+  test('sealBundleWithKey: round-trip with a pre-derived key + salt', () => {
+    const salt = new Uint8Array(SEAL_SALT_BYTES);
+    salt.fill(11);
+    const sealKey = deriveSealKey(PASSPHRASE, salt, FAST);
+    const env1 = sealBundleWithKey(SAMPLE_BUNDLE, sealKey, salt);
+    const env2 = sealBundleWithKey(SAMPLE_BUNDLE, sealKey, salt);
+    expect(env1.salt).toBe(env2.salt); 
+    expect(env1.nonce).not.toBe(env2.nonce); 
+    expect(unsealBundle(env1, PASSPHRASE, FAST)).toEqual(SAMPLE_BUNDLE);
+    expect(unsealBundle(env2, PASSPHRASE, FAST)).toEqual(SAMPLE_BUNDLE);
+  });
+
+  test('sealBundleWithKey: bit-flipping the key produces an unseal failure', () => {
+    const salt = new Uint8Array(SEAL_SALT_BYTES);
+    salt.fill(13);
+    const sealKey = deriveSealKey(PASSPHRASE, salt, FAST);
+    const tampered = new Uint8Array(sealKey);
+    tampered[0] ^= 0x01;
+    const env = sealBundleWithKey(SAMPLE_BUNDLE, tampered, salt);
+    expect(() => unsealBundle(env, PASSPHRASE, FAST)).toThrow(UnsealError);
+  });
+
+  test('unsealEnvelope: returns bundle + derived sealKey + salt', () => {
+    const env = sealBundle(SAMPLE_BUNDLE, PASSPHRASE, FAST);
+    const out = unsealEnvelope(env, PASSPHRASE, FAST);
+    expect(out.bundle).toEqual(SAMPLE_BUNDLE);
+    expect(out.sealKey.length).toBe(32);
+    expect(out.salt.length).toBe(SEAL_SALT_BYTES);
+    const reSealed = sealBundleWithKey(SAMPLE_BUNDLE, out.sealKey, out.salt);
+    expect(unsealBundle(reSealed, PASSPHRASE, FAST)).toEqual(SAMPLE_BUNDLE);
   });
 
   test('shared fixture: PBKDF2 intermediate output matches', () => {

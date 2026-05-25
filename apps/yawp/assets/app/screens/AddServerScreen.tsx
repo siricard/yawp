@@ -5,7 +5,7 @@ import {Platform, Pressable, Text, TextInput, View} from 'react-native';
 import {submitClaim} from '../claim';
 import {submitBindDevice} from '../bind';
 import {submitRedeemInvite} from '../invite';
-import {recordFirstBoundAtIfUnset} from '../nudge-store';
+import {useRecordFirstBoundAt} from '../nudge-store';
 import {
   useIdentityState,
   useWorkspaceServers,
@@ -38,6 +38,7 @@ function labelFromUrl(raw: string): string {
 export function AddServerScreen({onCancel, onAdded}: Props) {
   const identityState = useIdentityState();
   const {addServer} = useWorkspaceServers();
+  const {recordFirstBound} = useRecordFirstBoundAt();
 
   const [serverUrl, setServerUrl] = useState('http://localhost:4000');
   const [tokenKind, setTokenKind] = useState<TokenKind>('claim');
@@ -82,7 +83,7 @@ export function AddServerScreen({onCancel, onAdded}: Props) {
         return;
       }
 
-      await recordFirstBoundAtIfUnset();
+      await recordFirstBound();
 
       const server: WorkspaceServer = {
         url: serverUrl.trim().replace(/\/+$/, ''),
@@ -114,7 +115,7 @@ export function AddServerScreen({onCancel, onAdded}: Props) {
         return;
       }
 
-      await recordFirstBoundAtIfUnset();
+      await recordFirstBound();
 
       const server: WorkspaceServer = {
         url: serverUrl.trim().replace(/\/+$/, ''),

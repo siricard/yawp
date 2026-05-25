@@ -3,8 +3,14 @@ import React from 'react';
 import ReactTestRenderer from 'react-test-renderer';
 
 import {clearIdentity} from '../identity';
-import {IdentityProvider, useDisplayName} from '../identity-context';
-import {loadIdentity} from '../identity/storage-bundle';
+import {
+  IdentityProvider,
+  useDisplayName,
+  useIdentityState,
+  useOnboarding,
+  usePassphrase,
+} from '../identity-context';
+import {loadIdentity, loadStoredEntry} from '../identity/storage-bundle';
 import {defaultDisplayName} from '../identity/word-pair';
 
 describe('useDisplayName effectiveDisplayName', () => {
@@ -272,6 +278,85 @@ describe('useDisplayName effectiveDisplayName', () => {
 
     await ReactTestRenderer.act(async () => {
       root!.unmount();
+    });
+  });
+
+  test('rename a sealed identity, lock + unlock, the rename persists and the bundle is still sealed', async () => {
+    const PASSPHRASE = 'correct horse battery staple';
+
+    type Handles = {
+      state: ReturnType<typeof useIdentityState>;
+      complete: ReturnType<typeof useOnboarding>['complete'];
+      finish: ReturnType<typeof useOnboarding>['finish'];
+      unlock: ReturnType<typeof usePassphrase>['unlock'];
+      sealed: boolean;
+      display: ReturnType<typeof useDisplayName>;
+    };
+    const handles: {current: Handles | null} = {current: null};
+    function Probe() {
+      const display = useDisplayName();
+      const state = useIdentityState();
+      const {complete, finish} = useOnboarding();
+      const {unlock, sealed} = usePassphrase();
+      handles.current = {state, complete, finish, unlock, sealed, display};
+      return null;
+    }
+
+    let root: ReactTestRenderer.ReactTestRenderer | null = null;
+    await ReactTestRenderer.act(async () => {
+      root = ReactTestRenderer.create(
+        <IdentityProvider>
+          <Probe />
+        </IdentityProvider>,
+      );
+    });
+    await settle();
+
+    await ReactTestRenderer.act(async () => {
+      await handles.current!.complete({
+        passphrase: PASSPHRASE,
+        displayName: null,
+      });
+    });
+    await ReactTestRenderer.act(async () => {
+      handles.current!.finish();
+    });
+    await settle();
+    expect(handles.current!.sealed).toBe(true);
+
+    await ReactTestRenderer.act(async () => {
+      await handles.current!.display.setDisplayNameOverride('Sealed Name');
+    });
+    await settle();
+    expect(handles.current!.display.displayName).toBe('Sealed Name');
+    const sealedEntry = await loadStoredEntry();
+    expect(sealedEntry!.kind).toBe('sealed');
+
+    await ReactTestRenderer.act(async () => {
+      root!.unmount();
+    });
+
+    let root2: ReactTestRenderer.ReactTestRenderer | null = null;
+    await ReactTestRenderer.act(async () => {
+      root2 = ReactTestRenderer.create(
+        <IdentityProvider>
+          <Probe />
+        </IdentityProvider>,
+      );
+    });
+    await settle();
+    expect(handles.current!.state.status).toBe('locked');
+
+    await ReactTestRenderer.act(async () => {
+      const result = await handles.current!.unlock(PASSPHRASE);
+      expect(result.ok).toBe(true);
+    });
+    await settle();
+    expect(handles.current!.state.status).toBe('ready');
+    expect(handles.current!.display.displayName).toBe('Sealed Name');
+
+    await ReactTestRenderer.act(async () => {
+      root2!.unmount();
     });
   });
 });

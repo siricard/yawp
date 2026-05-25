@@ -54,6 +54,16 @@ jest.mock('../identity-context', () => ({
     setDisplayNameOverride: async () => {},
     effectiveDisplayName: null,
   }),
+  useBundleMetadata: () => ({
+    metadata: {},
+    ready: true,
+    mutate: async () => undefined,
+  }),
+  usePassphrase: () => ({
+    sealed: false,
+    unlock: async () => ({ok: true}),
+    changePassphrase: async () => ({ok: true}),
+  }),
 }));
 
 jest.mock('../bind', () => ({

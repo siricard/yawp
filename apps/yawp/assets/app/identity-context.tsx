@@ -14,9 +14,11 @@ import {
   saveSealedEnvelope,
 } from './identity/storage-bundle';
 import {
+  SEAL_SALT_BYTES,
   UnsealError,
-  sealBundle,
-  unsealBundle,
+  deriveSealKey,
+  sealBundleWithKey,
+  unsealEnvelope,
   type SealedEnvelopeV2,
 } from './identity/seal';
 import {defaultDisplayName} from './identity/word-pair';
@@ -125,7 +127,28 @@ type State =
       identity: null;
       error: null;
     }
-  | {status: 'ready'; identity: Identity; sealed: boolean; error: null}
+  | {
+      status: 'ready';
+      identity: Identity;
+      sealed: boolean;
+      /**
+       * the in-memory unlocked bundle. Always present
+       * when `status === 'ready'`. Mutations to identity-scoped metadata
+       * (display name, nudge) go through this in-memory bundle via
+       * `mutateBundleMetadata`, which then re-persists (sealed or
+       * unsealed) without losing the seal.
+       */
+      unlockedBundle: IdentityBundleV1;
+      /**
+       * Cached 32-byte HKDF-derived seal key. Present iff `sealed: true`.
+       * Captured at unlock / set-passphrase time so re-seals after
+       * metadata writes skip PBKDF2. Wiped when the seal is removed.
+       */
+      sealKey: Uint8Array | null;
+      /** Salt that pairs with `sealKey`. Same lifetime as `sealKey`. */
+      sealSalt: Uint8Array | null;
+      error: null;
+    }
   | {status: 'error'; identity: null; error: string};
 
 type Ctx = {
@@ -145,6 +168,25 @@ type Ctx = {
    * Mutates `metadata.displayNameOverride` and re-persists the bundle.
    */
   setDisplayNameOverride: (name: string | null) => Promise<void>;
+  /**
+   * single entry point for any identity-scoped metadata
+   * mutation (display-name override, nudge state, future identity-bundle
+   * additions). Reads the in-memory unlocked bundle, applies `mut`, and
+   * re-persists — re-sealing under the cached key when the identity is
+   * sealed, or writing the raw bundle when it isn't. Throws when
+   * `state.status !== 'ready'`.
+   */
+  mutateBundleMetadata: (
+    mut: (
+      prev: NonNullable<IdentityBundleV1['metadata']>,
+    ) => NonNullable<IdentityBundleV1['metadata']>,
+  ) => Promise<IdentityBundleV1>;
+  /**
+   * read-only view of the live in-memory bundle metadata.
+   * Consumers (e.g. `useNudgeStore`) snapshot this on render to derive
+   * UI state without re-reading from disk.
+   */
+  bundleMetadata: NonNullable<IdentityBundleV1['metadata']>;
   /** Advance to the next onboarding step (or to 'ready' if completing). */
   advanceOnboarding: (next: OnboardingStep) => void;
   /**
@@ -190,6 +232,10 @@ type Ctx = {
 
 const IdentityContext = createContext<Ctx | null>(null);
 
+const EMPTY_METADATA: NonNullable<IdentityBundleV1['metadata']> = Object.freeze(
+  {},
+) as NonNullable<IdentityBundleV1['metadata']>;
+
 function loadServers(): WorkspaceServer[] {
   if (Platform.OS !== 'web') return [];
   try {
@@ -216,6 +262,25 @@ function persistServers(servers: WorkspaceServer[]): void {
     window.localStorage.setItem(WORKSPACES_KEY, JSON.stringify(servers));
   } catch {
   }
+}
+
+function constantTimeEqual(a: Uint8Array, b: Uint8Array): boolean {
+  if (a.length !== b.length) return false;
+  let diff = 0;
+  for (let i = 0; i < a.length; i++) diff |= a[i] ^ b[i];
+  return diff === 0;
+}
+
+function randomSaltBytes(): Uint8Array {
+  const out = new Uint8Array(SEAL_SALT_BYTES);
+  if (typeof crypto !== 'undefined' && crypto.getRandomValues) {
+    crypto.getRandomValues(out);
+    return out;
+  }
+  for (let i = 0; i < out.length; i++) {
+    out[i] = Math.floor(Math.random() * 256);
+  }
+  return out;
 }
 
 function buildIdentityFromBundle(bundle: IdentityBundleV1): Identity {
@@ -296,6 +361,19 @@ export function IdentityProvider({children}: {children: React.ReactNode}) {
   const [displayName, setDisplayNameState] = useState<string | null>(null);
   const draftRef = useRef<DraftIdentity | null>(null);
   const draftSealedRef = useRef<boolean>(false);
+  const draftSealRef = useRef<{
+    sealKey: Uint8Array;
+    salt: Uint8Array;
+  } | null>(null);
+  const stateRef = useRef<State>({
+    status: 'loading',
+    identity: null,
+    error: null,
+  });
+  const applyState = useCallback((next: State) => {
+    stateRef.current = next;
+    setState(next);
+  }, []);
 
   useEffect(() => {
     let mounted = true;
@@ -304,7 +382,7 @@ export function IdentityProvider({children}: {children: React.ReactNode}) {
         const entry = await loadStoredEntry();
         if (!mounted) return;
         if (entry && entry.kind === 'sealed') {
-          setState({
+          applyState({
             status: 'locked',
             sealedEnvelope: entry.envelope,
             identity: null,
@@ -316,17 +394,20 @@ export function IdentityProvider({children}: {children: React.ReactNode}) {
           setDisplayNameState(
             entry.bundle.metadata?.displayNameOverride ?? null,
           );
-          setState({
+          applyState({
             status: 'ready',
             identity: buildIdentityFromBundle(entry.bundle),
             sealed: false,
+            unlockedBundle: entry.bundle,
+            sealKey: null,
+            sealSalt: null,
             error: null,
           });
           return;
         }
         const draft = generateDraftIdentity();
         draftRef.current = draft;
-        setState({
+        applyState({
           status: 'onboarding',
           step: 'choose_path',
           draftIdentity: draft,
@@ -339,7 +420,7 @@ export function IdentityProvider({children}: {children: React.ReactNode}) {
           e && typeof e === 'object' && 'message' in e
             ? String((e as {message: unknown}).message)
             : String(e);
-        setState({status: 'error', identity: null, error: msg});
+        applyState({status: 'error', identity: null, error: msg});
       }
     })();
     return () => {
@@ -356,43 +437,75 @@ export function IdentityProvider({children}: {children: React.ReactNode}) {
     });
   }, []);
 
+  /**
+   * single entry point for identity-scoped metadata
+   * mutations. Reads the in-memory unlocked bundle out of `stateRef`,
+   * applies `mut` to compute the next metadata map (we always pass a
+   * concrete object; the mutator returns the new one), and re-persists.
+   *
+   * Sealed identities are re-sealed under the cached `sealKey + salt`
+   * (no PBKDF2 — the user already paid that cost at unlock / set-
+   * passphrase time). Unsealed identities are written raw.
+   *
+   * Returns the new bundle so callers (display-name, nudge) can update
+   * their local state synchronously after the write.
+   */
+  const mutateBundleMetadata = useCallback(
+    async (
+      mut: (
+        prev: NonNullable<IdentityBundleV1['metadata']>,
+      ) => NonNullable<IdentityBundleV1['metadata']>,
+    ): Promise<IdentityBundleV1> => {
+      const current = stateRef.current;
+      if (current.status !== 'ready') {
+        throw new Error('mutateBundleMetadata: identity is not ready');
+      }
+      const prevMeta = current.unlockedBundle.metadata ?? {};
+      const nextMeta = mut(prevMeta);
+      const hasKeys = Object.keys(nextMeta).length > 0;
+      let nextBundle: IdentityBundleV1;
+      if (hasKeys) {
+        nextBundle = {...current.unlockedBundle, metadata: nextMeta};
+      } else {
+        const {metadata: _omit, ...rest} = current.unlockedBundle;
+        nextBundle = rest as IdentityBundleV1;
+      }
+      if (current.sealed) {
+        if (!current.sealKey || !current.sealSalt) {
+          throw new Error(
+            'mutateBundleMetadata: sealed identity is missing its cached seal key',
+          );
+        }
+        const envelope = sealBundleWithKey(
+          nextBundle,
+          current.sealKey,
+          current.sealSalt,
+        );
+        await saveSealedEnvelope(envelope);
+      } else {
+        await saveIdentity(nextBundle);
+      }
+      applyState({...current, unlockedBundle: nextBundle});
+      return nextBundle;
+    },
+    [applyState],
+  );
+
   const setDisplayNameOverride = useCallback(
     async (name: string | null): Promise<void> => {
-      const entry = await loadStoredEntry();
-      if (!entry) {
-        throw new Error('setDisplayNameOverride: no identity to update');
-      }
-      if (entry.kind === 'sealed') {
-        throw new Error(
-          'setDisplayNameOverride: cannot mutate metadata on a sealed bundle without the passphrase',
-        );
-      }
       const trimmed = name === null ? null : name.trim();
-      const nextBundle: IdentityBundleV1 =
-        trimmed && trimmed.length > 0
-          ? {
-              ...entry.bundle,
-              metadata: {
-                ...(entry.bundle.metadata ?? {}),
-                displayNameOverride: trimmed,
-              },
-            }
-          : (() => {
-              const meta = {...(entry.bundle.metadata ?? {})};
-              delete meta.displayNameOverride;
-              const hasOtherKeys = Object.keys(meta).length > 0;
-              const cleaned: IdentityBundleV1 = hasOtherKeys
-                ? {...entry.bundle, metadata: meta}
-                : (() => {
-                    const {metadata: _omit, ...rest} = entry.bundle;
-                    return rest as IdentityBundleV1;
-                  })();
-              return cleaned;
-            })();
-      await saveIdentity(nextBundle);
+      await mutateBundleMetadata(prev => {
+        const next = {...prev};
+        if (trimmed && trimmed.length > 0) {
+          next.displayNameOverride = trimmed;
+        } else {
+          delete next.displayNameOverride;
+        }
+        return next;
+      });
       setDisplayNameState(trimmed && trimmed.length > 0 ? trimmed : null);
     },
-    [],
+    [mutateBundleMetadata],
   );
 
   const advanceOnboarding = useCallback((next: OnboardingStep) => {
@@ -431,12 +544,16 @@ export function IdentityProvider({children}: {children: React.ReactNode}) {
         ...(trimmedName ? {metadata: {displayNameOverride: trimmedName}} : {}),
       };
       if (passphrase && passphrase.length > 0) {
-        const envelope = sealBundle(bundle, passphrase);
+        const salt = randomSaltBytes();
+        const sealKey = deriveSealKey(passphrase, salt);
+        const envelope = sealBundleWithKey(bundle, sealKey, salt);
         await saveSealedEnvelope(envelope);
         draftSealedRef.current = true;
+        draftSealRef.current = {sealKey, salt};
       } else {
         await saveIdentity(bundle);
         draftSealedRef.current = false;
+        draftSealRef.current = null;
       }
       setDisplayNameState(trimmedName);
       setState(prev => {
@@ -486,43 +603,64 @@ export function IdentityProvider({children}: {children: React.ReactNode}) {
       await saveIdentity(bundle);
       draftRef.current = draft;
       setDisplayNameState(null);
-      setState({
+      draftSealedRef.current = false;
+      draftSealRef.current = null;
+      applyState({
         status: 'ready',
         identity: buildIdentityFromDraft(draft),
         sealed: false,
+        unlockedBundle: bundle,
+        sealKey: null,
+        sealSalt: null,
         error: null,
       });
       return {ok: true};
     },
-    [],
+    [applyState],
   );
 
   const finishOnboarding = useCallback(() => {
     const draft = draftRef.current;
     if (!draft) return;
-    setState({
+    const cached = draftSealRef.current;
+    const unlockedBundle: IdentityBundleV1 = {
+      version: 1,
+      master: {sk: bytesToB64Url(draft.masterSk)},
+      device: {
+        deviceId: draft.deviceId,
+        sk: bytesToB64Url(draft.deviceSk),
+        pk: bytesToB64Url(draft.devicePk),
+        signature: bytesToB64Url(draft.deviceDelegationSignature),
+        issuedAt: draft.deviceIssuedAt,
+      },
+      ...(displayName ? {metadata: {displayNameOverride: displayName}} : {}),
+    };
+    applyState({
       status: 'ready',
       identity: buildIdentityFromDraft(draft),
       sealed: draftSealedRef.current,
+      unlockedBundle,
+      sealKey: cached?.sealKey ?? null,
+      sealSalt: cached?.salt ?? null,
       error: null,
     });
-  }, []);
+  }, [applyState, displayName]);
 
   const unlock = useCallback(
     async (passphrase: string): Promise<UnlockResult> => {
-      let envelope: SealedEnvelopeV2 | null = null;
-      setState(prev => {
-        if (prev.status === 'locked') envelope = prev.sealedEnvelope;
-        return prev;
-      });
-      if (!envelope) return {ok: false, reason: 'unknown'};
+      const current = stateRef.current;
+      if (current.status !== 'locked') return {ok: false, reason: 'unknown'};
+      const envelope = current.sealedEnvelope;
       try {
-        const bundle = unsealBundle(envelope, passphrase);
+        const {bundle, sealKey, salt} = unsealEnvelope(envelope, passphrase);
         setDisplayNameState(bundle.metadata?.displayNameOverride ?? null);
-        setState({
+        applyState({
           status: 'ready',
           identity: buildIdentityFromBundle(bundle),
           sealed: true,
+          unlockedBundle: bundle,
+          sealKey,
+          sealSalt: salt,
           error: null,
         });
         return {ok: true};
@@ -538,7 +676,7 @@ export function IdentityProvider({children}: {children: React.ReactNode}) {
         return {ok: false, reason: 'unknown'};
       }
     },
-    [],
+    [applyState],
   );
 
   const changePassphrase = useCallback(
@@ -549,45 +687,47 @@ export function IdentityProvider({children}: {children: React.ReactNode}) {
       current: string | null;
       next: string | null;
     }): Promise<ChangePassphraseResult> => {
-      const entry = await loadStoredEntry();
-      if (!entry) return {ok: false, reason: 'unknown'};
-      let bundle: IdentityBundleV1;
-      if (entry.kind === 'sealed') {
-        if (current === null) return {ok: false, reason: 'wrong_passphrase'};
-        try {
-          bundle = unsealBundle(entry.envelope, current);
-        } catch (e) {
-          if (e instanceof UnsealError && e.reason === 'wrong_passphrase') {
-            return {ok: false, reason: 'wrong_passphrase'};
-          }
-          return {ok: false, reason: 'unknown'};
-        }
-      } else {
-        bundle = entry.bundle;
+      const currentState = stateRef.current;
+      if (currentState.status !== 'ready') {
+        return {ok: false, reason: 'unknown'};
       }
+      if (currentState.sealed) {
+        if (current === null) return {ok: false, reason: 'wrong_passphrase'};
+        if (!currentState.sealSalt) return {ok: false, reason: 'unknown'};
+        const candidate = deriveSealKey(current, currentState.sealSalt);
+        const cached = currentState.sealKey;
+        if (!cached || !constantTimeEqual(candidate, cached)) {
+          return {ok: false, reason: 'wrong_passphrase'};
+        }
+      }
+      const bundle = currentState.unlockedBundle;
       try {
         if (next && next.length > 0) {
-          const envelope = sealBundle(bundle, next);
+          const salt = randomSaltBytes();
+          const sealKey = deriveSealKey(next, salt);
+          const envelope = sealBundleWithKey(bundle, sealKey, salt);
           await saveSealedEnvelope(envelope);
-          setState(prev =>
-            prev.status === 'ready'
-              ? {...prev, sealed: true}
-              : prev,
-          );
+          applyState({
+            ...currentState,
+            sealed: true,
+            sealKey,
+            sealSalt: salt,
+          });
         } else {
           await saveIdentity(bundle);
-          setState(prev =>
-            prev.status === 'ready'
-              ? {...prev, sealed: false}
-              : prev,
-          );
+          applyState({
+            ...currentState,
+            sealed: false,
+            sealKey: null,
+            sealSalt: null,
+          });
         }
         return {ok: true};
       } catch {
         return {ok: false, reason: 'unknown'};
       }
     },
-    [],
+    [applyState],
   );
 
   return (
@@ -598,6 +738,11 @@ export function IdentityProvider({children}: {children: React.ReactNode}) {
         addServer,
         displayName,
         setDisplayNameOverride,
+        mutateBundleMetadata,
+        bundleMetadata:
+          state.status === 'ready'
+            ? state.unlockedBundle.metadata ?? EMPTY_METADATA
+            : EMPTY_METADATA,
         advanceOnboarding,
         completeOnboarding,
         finishOnboarding,
@@ -693,6 +838,32 @@ export function usePassphrase(): {
     sealed,
     unlock: ctx.unlock,
     changePassphrase: ctx.changePassphrase,
+  };
+}
+
+/**
+ * accessor for the live identity-bundle metadata + the
+ * `mutateBundleMetadata` writer. Used by `useSecondAnchorNudge` (and any
+ * future identity-scoped metadata consumer) so that mutations go through
+ * the in-memory unlocked bundle + re-seal path instead of touching
+ * storage directly.
+ *
+ * The returned `metadata` reference is the same object that lives inside
+ * the unlocked bundle; treat it as read-only.
+ */
+export function useBundleMetadata(): {
+  metadata: NonNullable<IdentityBundleV1['metadata']>;
+  ready: boolean;
+  mutate: Ctx['mutateBundleMetadata'];
+} {
+  const ctx = useContext(IdentityContext);
+  if (!ctx) {
+    throw new Error('useBundleMetadata must be used inside an <IdentityProvider>');
+  }
+  return {
+    metadata: ctx.bundleMetadata,
+    ready: ctx.state.status === 'ready',
+    mutate: ctx.mutateBundleMetadata,
   };
 }
 

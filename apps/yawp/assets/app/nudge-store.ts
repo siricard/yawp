@@ -1,12 +1,8 @@
 
 import {useCallback, useEffect, useState} from 'react';
 
-import type {IdentityBundleV1} from './identity/bundle';
-import {
-  clearIdentityBundle,
-  loadStoredEntry,
-  saveIdentity,
-} from './identity/storage-bundle';
+import {useBundleMetadata} from './identity-context';
+import {clearIdentityBundle} from './identity/storage-bundle';
 
 const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
 
@@ -33,59 +29,34 @@ export function shouldShowSecondAnchorNudge(opts: {
   return nowMs - boundAtMs >= SEVEN_DAYS_MS;
 }
 
-type NudgeState = {
+/**
+ * hook returning a `recordFirstBound` function that writes
+ * `metadata.firstBoundAt = now.toISOString` if not already set. Goes
+ * through `mutateBundleMetadata`, so sealed identities are re-sealed
+ * under the cached key and unsealed identities get a raw bundle write.
+ *
+ * The hook also returns the live `firstBoundAt` value out of the
+ * in-memory bundle metadata, which the dismiss path needs for
+ * `shouldShowSecondAnchorNudge`.
+ */
+export function useRecordFirstBoundAt(): {
   firstBoundAt: string | null;
-  dismissed: boolean;
-};
-
-async function readNudgeState(): Promise<NudgeState> {
-  const entry = await loadStoredEntry();
-  if (!entry || entry.kind !== 'unsealed') {
-    return {firstBoundAt: null, dismissed: false};
-  }
-  return {
-    firstBoundAt: entry.bundle.metadata?.firstBoundAt ?? null,
-    dismissed: entry.bundle.metadata?.secondAnchorNudgeDismissed ?? false,
-  };
-}
-
-function withMetadata(
-  bundle: IdentityBundleV1,
-  patch: Partial<NonNullable<IdentityBundleV1['metadata']>>,
-): IdentityBundleV1 {
-  return {
-    ...bundle,
-    metadata: {...(bundle.metadata ?? {}), ...patch},
-  };
-}
-
-/**
- * Set `metadata.firstBoundAt` to `now.toISOString()` if it is not already
- * set. No-op when no unsealed identity bundle exists (sealed bundles can't
- * be mutated without the passphrase — the nudge simply won't fire until
- * the bundle is unlocked, which is acceptable since the user must unlock
- * to bind anyway).
- */
-export async function recordFirstBoundAtIfUnset(
-  now: Date = new Date(),
-): Promise<void> {
-  const entry = await loadStoredEntry();
-  if (!entry || entry.kind !== 'unsealed') return;
-  if (entry.bundle.metadata?.firstBoundAt) return;
-  const next = withMetadata(entry.bundle, {firstBoundAt: now.toISOString()});
-  await saveIdentity(next);
-}
-
-/**
- * Persist `metadata.secondAnchorNudgeDismissed = true`. No-op when there's
- * no unsealed bundle to write to (same rationale as above).
- */
-async function persistDismissal(): Promise<void> {
-  const entry = await loadStoredEntry();
-  if (!entry || entry.kind !== 'unsealed') return;
-  if (entry.bundle.metadata?.secondAnchorNudgeDismissed) return;
-  const next = withMetadata(entry.bundle, {secondAnchorNudgeDismissed: true});
-  await saveIdentity(next);
+  ready: boolean;
+  recordFirstBound: (now?: Date) => Promise<void>;
+} {
+  const {metadata, ready, mutate} = useBundleMetadata();
+  const firstBoundAt = metadata.firstBoundAt ?? null;
+  const recordFirstBound = useCallback(
+    async (now: Date = new Date()): Promise<void> => {
+      if (!ready) return;
+      await mutate(prev => {
+        if (prev.firstBoundAt) return prev;
+        return {...prev, firstBoundAt: now.toISOString()};
+      });
+    },
+    [mutate, ready],
+  );
+  return {firstBoundAt, ready, recordFirstBound};
 }
 
 /** Test-only reset: wipes the entire identity bundle. */
@@ -95,57 +66,35 @@ export async function __resetNudgeStoreForTests(): Promise<void> {
 
 /**
  * React hook driving the banner. Reads nudge state out of the
- * identity bundle on mount; refreshes when `serversCount` flips from
- * 0 to ≥1 so the home screen picks up the timestamp the moment
- * AddServerScreen writes it after the first bind. Dismissal is
- * persisted to the bundle.
+ * in-memory identity bundle metadata via the context (no disk read).
+ * Dismissal is persisted through `mutateBundleMetadata`, which handles
+ * the sealed re-seal path transparently.
  */
 export function useSecondAnchorNudge(serversCount: number): {
   visible: boolean;
   dismiss: () => void;
 } {
-  const [{firstBoundAt, dismissed}, setNudgeState] = useState<NudgeState>({
-    firstBoundAt: null,
-    dismissed: false,
-  });
-  const [loaded, setLoaded] = useState(false);
+  const {metadata, ready, mutate} = useBundleMetadata();
+  const firstBoundAt = metadata.firstBoundAt ?? null;
+  const dismissed = metadata.secondAnchorNudgeDismissed ?? false;
 
+  const [optimisticDismissed, setOptimisticDismissed] = useState(false);
   useEffect(() => {
-    let mounted = true;
-    (async () => {
-      const state = await readNudgeState();
-      if (!mounted) return;
-      setNudgeState(state);
-      setLoaded(true);
-    })();
-    return () => {
-      mounted = false;
-    };
-  }, []);
-
-  useEffect(() => {
-    if (serversCount >= 1 && !firstBoundAt) {
-      let mounted = true;
-      (async () => {
-        const state = await readNudgeState();
-        if (!mounted) return;
-        setNudgeState(state);
-      })();
-      return () => {
-        mounted = false;
-      };
-    }
-    return undefined;
-  }, [serversCount, firstBoundAt]);
+    if (!dismissed) setOptimisticDismissed(false);
+  }, [dismissed]);
 
   const dismiss = useCallback(() => {
-    setNudgeState(prev => ({...prev, dismissed: true}));
-    void persistDismissal();
-  }, []);
+    setOptimisticDismissed(true);
+    void mutate(prev => ({...prev, secondAnchorNudgeDismissed: true}));
+  }, [mutate]);
 
   const visible =
-    loaded &&
-    shouldShowSecondAnchorNudge({serversCount, firstBoundAt, dismissed});
+    ready &&
+    shouldShowSecondAnchorNudge({
+      serversCount,
+      firstBoundAt,
+      dismissed: dismissed || optimisticDismissed,
+    });
 
   return {visible, dismiss};
 }

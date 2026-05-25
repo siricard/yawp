@@ -91,7 +91,9 @@ function randomBytes(length: number): Uint8Array {
 }
 
 /**
- * Seal a bundle under a passphrase. Generates fresh salt + nonce per call.
+ * Seal a bundle under a passphrase. Generates fresh salt + nonce per call,
+ * and runs the full PBKDF2-HMAC-SHA512 stretching cost. Use this when the
+ * user is setting or changing a passphrase.
  *
  * Optional `_internal` is used by tests to pin the salt + nonce; production
  * code must never pass it.
@@ -105,17 +107,44 @@ export function sealBundle(
     throw new Error('sealBundle: passphrase must not be empty');
   }
   const salt = _internal?.salt ?? randomBytes(SEAL_SALT_BYTES);
-  const nonce = _internal?.nonce ?? randomBytes(SEAL_NONCE_BYTES);
   if (salt.length !== SEAL_SALT_BYTES) {
     throw new Error(`sealBundle: salt must be ${SEAL_SALT_BYTES} bytes`);
   }
-  if (nonce.length !== SEAL_NONCE_BYTES) {
-    throw new Error(`sealBundle: nonce must be ${SEAL_NONCE_BYTES} bytes`);
-  }
   const key = deriveSealKey(passphrase, salt, {iters: _internal?.iters});
+  return sealBundleWithKey(bundle, key, salt, {nonce: _internal?.nonce});
+}
+
+/**
+ * re-seal a bundle with a pre-derived key + existing salt.
+ *
+ * Used when the user mutates identity-bundle metadata (display-name
+ * override, second-anchor nudge state, …) on an already-unlocked but
+ * sealed identity. We have the derived key cached from the original
+ * unlock, so we skip PBKDF2 entirely and only generate a fresh nonce.
+ * The salt is reused because it's per-passphrase, not per-write — fresh
+ * salts only matter when the passphrase itself changes (`sealBundle`).
+ */
+export function sealBundleWithKey(
+  bundle: IdentityBundleV1,
+  sealKey: Uint8Array,
+  salt: Uint8Array,
+  _internal?: {nonce?: Uint8Array},
+): SealedEnvelopeV2 {
+  if (sealKey.length !== 32) {
+    throw new Error('sealBundleWithKey: sealKey must be 32 bytes');
+  }
+  if (salt.length !== SEAL_SALT_BYTES) {
+    throw new Error(`sealBundleWithKey: salt must be ${SEAL_SALT_BYTES} bytes`);
+  }
+  const nonce = _internal?.nonce ?? randomBytes(SEAL_NONCE_BYTES);
+  if (nonce.length !== SEAL_NONCE_BYTES) {
+    throw new Error(
+      `sealBundleWithKey: nonce must be ${SEAL_NONCE_BYTES} bytes`,
+    );
+  }
   const plaintext = new TextEncoder().encode(JSON.stringify(bundle));
   const aad = new TextEncoder().encode(SEAL_INFO);
-  const cipher = chacha20poly1305(key, nonce, aad);
+  const cipher = chacha20poly1305(sealKey, nonce, aad);
   const ciphertext = cipher.encrypt(plaintext);
   return {
     version: 2,
@@ -127,15 +156,20 @@ export function sealBundle(
 }
 
 /**
- * Unseal an envelope with a passphrase. Throws `UnsealError` with a
- * specific reason on any failure (wrong passphrase, tampered ciphertext,
- * malformed envelope, payload not a v1 bundle).
+ * unseal an envelope and return both the bundle and the
+ * derived seal key + salt that produced it. The context caches the key +
+ * salt so that subsequent metadata mutations (display-name override,
+ * nudge state) can re-seal without re-running PBKDF2.
+ *
+ * Throws `UnsealError` with a specific reason on any failure (wrong
+ * passphrase, tampered ciphertext, malformed envelope, payload not a v1
+ * bundle).
  */
-export function unsealBundle(
+export function unsealEnvelope(
   envelope: SealedEnvelopeV2,
   passphrase: string,
   _internal?: {iters?: number},
-): IdentityBundleV1 {
+): {bundle: IdentityBundleV1; sealKey: Uint8Array; salt: Uint8Array} {
   if (!isSealedEnvelopeV2(envelope)) {
     throw new UnsealError('malformed_envelope');
   }
@@ -170,5 +204,17 @@ export function unsealBundle(
   if (!isIdentityBundleV1(parsed)) {
     throw new UnsealError('invalid_bundle');
   }
-  return parsed;
+  return {bundle: parsed, sealKey: key, salt};
+}
+
+/**
+ * Convenience wrapper around `unsealEnvelope` that returns only the
+ * bundle. Kept for callers that don't need the derived key.
+ */
+export function unsealBundle(
+  envelope: SealedEnvelopeV2,
+  passphrase: string,
+  _internal?: {iters?: number},
+): IdentityBundleV1 {
+  return unsealEnvelope(envelope, passphrase, _internal).bundle;
 }
