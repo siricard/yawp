@@ -58,7 +58,6 @@ defmodule Yawp.Servers.ServerInvite do
       accept []
 
       argument :server_id, :uuid, allow_nil?: false
-      argument :created_by_identity_id, :uuid, allow_nil?: false
 
       argument :kind, :atom,
         default: :single_use,

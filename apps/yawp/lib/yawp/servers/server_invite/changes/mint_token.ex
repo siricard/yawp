@@ -18,7 +18,6 @@ defmodule Yawp.Servers.ServerInvite.Changes.MintToken do
     ttl = Ash.Changeset.get_argument(changeset, :ttl_seconds) || 24 * 60 * 60
     uses_remaining = Ash.Changeset.get_argument(changeset, :uses_remaining)
     server_id = Ash.Changeset.get_argument(changeset, :server_id)
-    created_by_identity_id = Ash.Changeset.get_argument(changeset, :created_by_identity_id)
 
     now = DateTime.utc_now()
     expires_at = DateTime.add(now, ttl, :second)
@@ -33,6 +32,5 @@ defmodule Yawp.Servers.ServerInvite.Changes.MintToken do
     |> Ash.Changeset.force_change_attribute(:uses_remaining, uses_remaining)
     |> Ash.Changeset.force_change_attribute(:expires_at, expires_at)
     |> Ash.Changeset.force_change_attribute(:server_id, server_id)
-    |> Ash.Changeset.force_change_attribute(:created_by_identity_id, created_by_identity_id)
   end
 end

@@ -218,6 +218,17 @@ defmodule YawpWeb.AdminDashboardLiveTest do
       assert has_element?(view, "#server-invite-mint-btn[disabled]")
     end
 
+    test "defense-in-depth: forcing a mint_server_invite event with no chat owner is a no-op",
+         %{conn: conn} do
+                              {:ok, view, _html} = live(conn, "/admin")
+
+      render_hook(view, "mint_server_invite", %{})
+
+      {:ok, server} = Yawp.Servers.get_singleton_server()
+      assert {:ok, []} = Yawp.Servers.list_active_server_invites(server.id)
+      assert render(view) =~ "No chat owner yet"
+    end
+
     test "mint button enabled when chat owner exists; clicking mints + lists invite",
          %{conn: conn} do
       seed_chat_owner!()

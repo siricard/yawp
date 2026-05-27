@@ -75,10 +75,7 @@ defmodule Yawp.Servers.ServerInviteTest do
       owner: owner
     } do
       {:ok, invite} =
-        Servers.mint_server_invite(%{
-          server_id: server.id,
-          created_by_identity_id: owner.id
-        })
+        Servers.mint_server_invite(%{server_id: server.id}, actor: owner)
 
       assert is_binary(invite.token)
       assert String.length(invite.token) == 26
@@ -87,7 +84,7 @@ defmodule Yawp.Servers.ServerInviteTest do
       assert invite.consumed_at == nil
       assert invite.revoked_at == nil
       assert invite.server_id == server.id
-      assert invite.created_by_identity_id == owner.id
+                  assert invite.created_by_identity_id == owner.id
 
       ttl_seconds = DateTime.diff(invite.expires_at, DateTime.utc_now())
       assert ttl_seconds in (24 * 60 * 60 - 60)..(24 * 60 * 60)
@@ -95,50 +92,61 @@ defmodule Yawp.Servers.ServerInviteTest do
 
     test "multi-use with uses_remaining cap", %{server: server, owner: owner} do
       {:ok, invite} =
-        Servers.mint_server_invite(%{
-          server_id: server.id,
-          created_by_identity_id: owner.id,
-          kind: :multi_use,
-          uses_remaining: 3
-        })
+        Servers.mint_server_invite(
+          %{
+            server_id: server.id,
+            kind: :multi_use,
+            uses_remaining: 3
+          },
+          actor: owner
+        )
 
       assert invite.kind == :multi_use
       assert invite.uses_remaining == 3
+      assert invite.created_by_identity_id == owner.id
     end
 
-    test "rejects mint by non-owner identity", %{server: server} do
+    test "rejects mint without an actor (not_authenticated)", %{server: server} do
+      assert {:error, error} =
+               Servers.mint_server_invite(%{server_id: server.id})
+
+      assert error_type(error) == "not_authenticated"
+    end
+
+    test "rejects mint with non-Identity actor (not_authenticated)", %{server: server} do
+      assert {:error, error} =
+               Servers.mint_server_invite(%{server_id: server.id}, actor: %{id: "bogus"})
+
+      assert error_type(error) == "not_authenticated"
+    end
+
+    test "rejects mint by non-owner identity (not_server_owner)", %{server: server} do
             {pk2, _sk2} = :crypto.generate_key(:eddsa, :ed25519)
       did2 = "did:yawp:" <> Identity.did_from_pubkey(pk2)
       non_owner = Ash.Seed.seed!(Yawp.Identity.Identity, %{did: did2, master_public_key: pk2})
 
       assert {:error, error} =
-               Servers.mint_server_invite(%{
-                 server_id: server.id,
-                 created_by_identity_id: non_owner.id
-               })
+               Servers.mint_server_invite(%{server_id: server.id}, actor: non_owner)
 
       assert error_type(error) == "not_server_owner"
     end
 
     test "rejects multi-use without uses_remaining", %{server: server, owner: owner} do
       assert {:error, error} =
-               Servers.mint_server_invite(%{
-                 server_id: server.id,
-                 created_by_identity_id: owner.id,
-                 kind: :multi_use
-               })
+               Servers.mint_server_invite(
+                 %{server_id: server.id, kind: :multi_use},
+                 actor: owner
+               )
 
       assert match?(%Ash.Error.Invalid{}, error)
     end
 
     test "rejects multi-use with uses_remaining = 0", %{server: server, owner: owner} do
       assert {:error, error} =
-               Servers.mint_server_invite(%{
-                 server_id: server.id,
-                 created_by_identity_id: owner.id,
-                 kind: :multi_use,
-                 uses_remaining: 0
-               })
+               Servers.mint_server_invite(
+                 %{server_id: server.id, kind: :multi_use, uses_remaining: 0},
+                 actor: owner
+               )
 
       assert match?(%Ash.Error.Invalid{}, error)
     end
@@ -148,10 +156,7 @@ defmodule Yawp.Servers.ServerInviteTest do
     test "single-use: assigns Member, marks consumed, returns server_id+role",
          %{server: server, owner: owner} do
       {:ok, invite} =
-        Servers.mint_server_invite(%{
-          server_id: server.id,
-          created_by_identity_id: owner.id
-        })
+        Servers.mint_server_invite(%{server_id: server.id}, actor: owner)
 
       args = build_redeem_args(invite.token)
 
@@ -181,12 +186,9 @@ defmodule Yawp.Servers.ServerInviteTest do
     test "multi-use: decrements uses_remaining and consumes on zero",
          %{server: server, owner: owner} do
       {:ok, invite} =
-        Servers.mint_server_invite(%{
-          server_id: server.id,
-          created_by_identity_id: owner.id,
-          kind: :multi_use,
-          uses_remaining: 2
-        })
+        Servers.mint_server_invite(%{server_id: server.id, kind: :multi_use, uses_remaining: 2},
+          actor: owner
+        )
 
       assert {:ok, _} = do_redeem(build_redeem_args(invite.token))
       {:ok, after_first} = Servers.get_server_invite_by_id(invite.id)
@@ -212,10 +214,7 @@ defmodule Yawp.Servers.ServerInviteTest do
 
     test "invite_token_consumed on replay", %{server: server, owner: owner} do
       {:ok, invite} =
-        Servers.mint_server_invite(%{
-          server_id: server.id,
-          created_by_identity_id: owner.id
-        })
+        Servers.mint_server_invite(%{server_id: server.id}, actor: owner)
 
       args = build_redeem_args(invite.token)
       assert {:ok, _} = do_redeem(args)
@@ -227,10 +226,7 @@ defmodule Yawp.Servers.ServerInviteTest do
 
     test "invite_token_expired", %{server: server, owner: owner} do
       {:ok, invite} =
-        Servers.mint_server_invite(%{
-          server_id: server.id,
-          created_by_identity_id: owner.id
-        })
+        Servers.mint_server_invite(%{server_id: server.id}, actor: owner)
 
       past = DateTime.add(DateTime.utc_now(), -3600, :second)
 
@@ -246,10 +242,7 @@ defmodule Yawp.Servers.ServerInviteTest do
 
     test "invite_token_revoked", %{server: server, owner: owner} do
       {:ok, invite} =
-        Servers.mint_server_invite(%{
-          server_id: server.id,
-          created_by_identity_id: owner.id
-        })
+        Servers.mint_server_invite(%{server_id: server.id}, actor: owner)
 
       {:ok, _} = Servers.revoke_server_invite(invite)
 
@@ -261,10 +254,7 @@ defmodule Yawp.Servers.ServerInviteTest do
     test "invalid_signature when sender_signature does not verify",
          %{server: server, owner: owner} do
       {:ok, invite} =
-        Servers.mint_server_invite(%{
-          server_id: server.id,
-          created_by_identity_id: owner.id
-        })
+        Servers.mint_server_invite(%{server_id: server.id}, actor: owner)
 
       args = build_redeem_args(invite.token)
       {_pk2, sk2} = :crypto.generate_key(:eddsa, :ed25519)
@@ -282,10 +272,7 @@ defmodule Yawp.Servers.ServerInviteTest do
     test "exactly one of N concurrent redeemers wins; rest get invite_token_consumed",
          %{server: server, owner: owner} do
       {:ok, invite} =
-        Servers.mint_server_invite(%{
-          server_id: server.id,
-          created_by_identity_id: owner.id
-        })
+        Servers.mint_server_invite(%{server_id: server.id}, actor: owner)
 
       parent = self()
       n = 4

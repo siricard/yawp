@@ -107,9 +107,9 @@ defmodule YawpWeb.AdminDashboardLive do
          )}
 
       {server, chat_owner} ->
-        mint_attrs = build_mint_attrs(server, chat_owner, params)
+        mint_attrs = build_mint_attrs(server, params)
 
-        case Yawp.Servers.mint_server_invite(mint_attrs) do
+        case Yawp.Servers.mint_server_invite(mint_attrs, actor: chat_owner) do
           {:ok, invite} ->
             entry =
               Yawp.Admin.audit!(account.id, "server_invite.mint", %{invite_id: invite.id})
@@ -493,7 +493,7 @@ defmodule YawpWeb.AdminDashboardLive do
 
   defp invite_kind_label(%{kind: kind}), do: to_string(kind)
 
-  defp build_mint_attrs(server, chat_owner, %{"kind" => "multi_use"} = params) do
+  defp build_mint_attrs(server, %{"kind" => "multi_use"} = params) do
     uses =
       params
       |> Map.get("uses_remaining", "5")
@@ -501,17 +501,13 @@ defmodule YawpWeb.AdminDashboardLive do
 
     %{
       server_id: server.id,
-      created_by_identity_id: chat_owner.id,
       kind: :multi_use,
       uses_remaining: uses
     }
   end
 
-  defp build_mint_attrs(server, chat_owner, _params) do
-    %{
-      server_id: server.id,
-      created_by_identity_id: chat_owner.id
-    }
+  defp build_mint_attrs(server, _params) do
+    %{server_id: server.id}
   end
 
   defp parse_uses_remaining(value) when is_binary(value) do
