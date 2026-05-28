@@ -135,6 +135,10 @@ rn-macos:
 rn-metro:
     nix develop -c bash -c 'cd apps/yawp/assets/native && npx react-native start --port 8081'
 
+# Serve the shared component library via Ladle (web) at :61000.
+ladle:
+    nix develop -c bash -c 'cd apps/yawp/assets/native && npx ladle serve'
+
 # Verify that singleton-required packages (react, react-native-css-interop,
 # nativewind, …) appear exactly once in each platform's bundle. Guards the
 # Metro `resolveRequest` dedup rules in apps/yawp/assets/native/metro.config.js.
