@@ -11,6 +11,7 @@ export type AutocompleteProps = Omit<InputProps, 'onChangeText'> & {
   maxVisible?: number;
   inputTestID?: string;
   overlayTestID?: string;
+  optionTestID?: (suggestion: string, index: number) => string;
 };
 
 export function Autocomplete({
@@ -21,6 +22,7 @@ export function Autocomplete({
   maxVisible = 6,
   inputTestID,
   overlayTestID = 'autocomplete-overlay',
+  optionTestID,
   ...inputProps
 }: AutocompleteProps) {
   const [focused, setFocused] = React.useState(false);
@@ -58,7 +60,7 @@ export function Autocomplete({
             {shown.map((s, i) => (
               <Pressable
                 key={`${s}-${i}`}
-                testID={`autocomplete-option-${i}`}
+                testID={optionTestID ? optionTestID(s, i) : `autocomplete-option-${i}`}
                 accessibilityRole="button"
                 onPress={() => {
                   onSelect(s);

@@ -1,13 +1,8 @@
 
 import React, {useState} from 'react';
-import {Platform, Pressable, ScrollView, Text, TextInput, View} from 'react-native';
+import {ScrollView, Text, View} from 'react-native';
 
-const monospace = Platform.select({
-  ios: 'Menlo',
-  macos: 'Menlo',
-  android: 'monospace',
-  default: 'monospace',
-});
+import {Button, Field, Input} from '../ui';
 
 export const MIN_PASSPHRASE_LENGTH = 8;
 
@@ -38,101 +33,78 @@ export function OnboardingPassphraseScreen({onSubmit}: Props) {
     feedback = {text: 'Looks good.', tone: 'ok'};
   }
 
+  const feedbackColor =
+    feedback.tone === 'ok'
+      ? 'text-success'
+      : feedback.tone === 'warn'
+        ? 'text-warning'
+        : 'text-text-tertiary';
+
   return (
     <ScrollView
-      className="flex-1 bg-slate-900"
+      className="flex-1 bg-bg"
       contentContainerStyle={{padding: 24, paddingTop: 48}}
       nativeID="onboarding-passphrase-screen"
       testID="onboarding-passphrase-screen">
-      <Text className="text-3xl font-bold text-slate-50 mb-2">
+      <Text className="font-display text-3xl font-bold text-text mb-1">
         Protect this device (optional)
       </Text>
-      <Text className="text-sm text-slate-400 mb-6">
+      <Text className="text-sm text-text-secondary mb-6">
         Add a passphrase to encrypt your identity on this device. You will need
         it every time you load Yawp here. Skip if you don&apos;t want one yet —
         you can add it later in settings.
       </Text>
 
-      <View className="mb-4">
-        <Text className="text-sm font-semibold text-slate-300 mb-1">
-          Passphrase
-        </Text>
-        <TextInput
+      <Field label="Passphrase">
+        <Input
           testID="passphrase-input"
           accessibilityLabel="passphrase"
           value={passphrase}
           onChangeText={setPassphrase}
           autoCapitalize="none"
           autoCorrect={false}
-          secureTextEntry
+          variant="password"
           placeholder="At least 8 characters"
-          placeholderTextColor="#64748b"
-          className="bg-slate-800 text-slate-50 rounded-lg px-3 py-2 border border-slate-700"
-          style={{fontFamily: monospace}}
         />
-      </View>
+      </Field>
 
-      <View className="mb-2">
-        <Text className="text-sm font-semibold text-slate-300 mb-1">
-          Confirm passphrase
-        </Text>
-        <TextInput
+      <Field label="Confirm passphrase">
+        <Input
           testID="passphrase-confirm-input"
           accessibilityLabel="confirm passphrase"
           value={confirm}
           onChangeText={setConfirm}
           autoCapitalize="none"
           autoCorrect={false}
-          secureTextEntry
+          variant="password"
           placeholder="Repeat your passphrase"
-          placeholderTextColor="#64748b"
-          className="bg-slate-800 text-slate-50 rounded-lg px-3 py-2 border border-slate-700"
-          style={{fontFamily: monospace}}
         />
-      </View>
+      </Field>
 
       <Text
         testID="passphrase-feedback"
-        className={[
-          'text-xs mb-6',
-          feedback.tone === 'ok'
-            ? 'text-emerald-300'
-            : feedback.tone === 'warn'
-              ? 'text-amber-300'
-              : 'text-slate-400',
-        ].join(' ')}>
+        className={`text-xs mb-6 ${feedbackColor}`}>
         {feedback.text}
       </Text>
 
-      <View className="flex-row gap-3">
-        <Pressable
+      <View className="flex-row" style={{gap: 12}}>
+        <Button
           testID="passphrase-submit-btn"
-          accessibilityRole="button"
           accessibilityLabel="use passphrase"
-          accessibilityState={{disabled: !canSubmit}}
+          variant="primary"
+          size="md"
           disabled={!canSubmit}
+          label="Use this passphrase"
           onPress={() => onSubmit({passphrase})}
-          className={[
-            'rounded-lg py-2 px-4',
-            canSubmit
-              ? 'bg-indigo-500 active:bg-indigo-400'
-              : 'bg-slate-700 opacity-60',
-          ].join(' ')}>
-          <Text className="text-sm font-semibold text-slate-50">
-            Use this passphrase
-          </Text>
-        </Pressable>
-
-        <Pressable
+        />
+        <Button
           testID="passphrase-skip-btn"
-          accessibilityRole="button"
           accessibilityLabel="skip passphrase"
+          variant="secondary"
+          size="md"
+          label="Skip for now"
           onPress={() => onSubmit({passphrase: null})}
-          className="rounded-lg py-2 px-4 bg-slate-700 border border-slate-600 active:bg-slate-600">
-          <Text className="text-sm font-semibold text-slate-50">
-            Skip for now
-          </Text>
-        </Pressable>
+        />
       </View>
     </ScrollView>
   );

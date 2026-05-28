@@ -16,6 +16,7 @@ export type ButtonProps = {
   onPress?: PressableProps['onPress'];
   testID?: string;
   accessibilityLabel?: string;
+  accessibilityState?: PressableProps['accessibilityState'];
   children?: React.ReactNode;
 };
 
@@ -57,6 +58,7 @@ export function Button({
   onPress,
   testID,
   accessibilityLabel,
+  accessibilityState,
   children,
 }: ButtonProps) {
   const isIconOnly = iconOnly !== undefined;
@@ -75,7 +77,7 @@ export function Button({
       testID={testID}
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel ?? label}
-      accessibilityState={{disabled}}
+      accessibilityState={accessibilityState ?? {disabled}}
       disabled={disabled}
       onPress={onPress}
       className={baseClass}>

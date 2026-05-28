@@ -1,25 +1,15 @@
 
-import React, {useEffect, useMemo, useState} from 'react';
-import {Platform, Pressable, ScrollView, Text, TextInput, View} from 'react-native';
+import React, {useEffect, useState} from 'react';
+import {ScrollView, Text, View} from 'react-native';
 
-const monospace = Platform.select({
-  ios: 'Menlo',
-  macos: 'Menlo',
-  android: 'monospace',
-  default: 'monospace',
-});
+import {Button, Card, Field, Input} from '../ui';
 
 export const COUNTDOWN_SECONDS = 5;
 export const VERIFY_WORD_COUNT = 3;
 
 type Props = {
   mnemonic: string[];
-  /** Called after the user successfully verifies 3 random words. */
   onVerified: () => void;
-  /**
-   * Picker for the verify-step word positions. Injected for tests so we
-   * can pin the positions deterministically. Defaults to Math.random.
-   */
   pickPositions?: (totalWords: number, take: number) => number[];
 };
 
@@ -86,14 +76,14 @@ export function OnboardingMnemonicScreen({
 
   return (
     <ScrollView
-      className="flex-1 bg-slate-900"
+      className="flex-1 bg-bg"
       contentContainerStyle={{padding: 24, paddingTop: 48}}
       nativeID="onboarding-mnemonic-screen"
       testID="onboarding-mnemonic-screen">
-      <Text className="text-3xl font-bold text-slate-50 mb-2">
+      <Text className="font-display text-3xl font-bold text-text mb-1">
         Your recovery phrase
       </Text>
-      <Text className="text-sm text-slate-400 mb-6">
+      <Text className="text-sm text-text-secondary mb-6">
         Write these 12 words down in order, on paper, somewhere safe. They are
         the only way to recover your identity if this device is lost. We can
         never see them — they never leave this device.
@@ -101,64 +91,57 @@ export function OnboardingMnemonicScreen({
 
       {step === 'display' ? (
         <>
-          <View
-            testID="mnemonic-grid"
-            accessibilityLabel="mnemonic words"
-            className="flex-row flex-wrap mb-6 -mx-1">
-            {mnemonic.map((word, idx) => (
-              <View
-                key={idx}
-                testID={`mnemonic-word-${idx}`}
-                className="w-1/4 px-1 py-1">
-                <View className="bg-slate-800 border border-slate-700 rounded-lg py-2 px-2">
-                  <Text className="text-xs text-slate-500">{idx + 1}</Text>
-                  <Text
-                    className="text-base text-slate-50"
-                    style={{fontFamily: monospace}}
-                    selectable>
-                    {word}
-                  </Text>
+          <Card variant="default" style={{marginBottom: 24}}>
+            <View
+              testID="mnemonic-grid"
+              accessibilityLabel="mnemonic words"
+              className="flex-row flex-wrap -mx-1">
+              {mnemonic.map((word, idx) => (
+                <View
+                  key={idx}
+                  testID={`mnemonic-word-${idx}`}
+                  className="w-1/4 px-1 py-1">
+                  <View className="bg-surface-2 rounded-md py-2 px-2">
+                    <Text className="text-xs text-text-tertiary font-mono">
+                      {idx + 1}
+                    </Text>
+                    <Text className="text-base text-text font-mono" selectable>
+                      {word}
+                    </Text>
+                  </View>
                 </View>
-              </View>
-            ))}
-          </View>
+              ))}
+            </View>
+          </Card>
 
-          <Pressable
+          <Button
             testID="mnemonic-confirm-btn"
-            accessibilityRole="button"
             accessibilityLabel="i have written these down"
             accessibilityState={{disabled: !confirmEnabled}}
+            variant="primary"
+            size="md"
             disabled={!confirmEnabled}
-            onPress={handleConfirm}
-            className={[
-              'rounded-lg py-3 px-4 self-start',
+            label={
               confirmEnabled
-                ? 'bg-indigo-500 active:bg-indigo-400'
-                : 'bg-slate-700 opacity-60',
-            ].join(' ')}>
-            <Text className="text-sm font-semibold text-slate-50">
-              {confirmEnabled
                 ? 'I have written these down'
-                : `I have written these down (${remaining}s)`}
-            </Text>
-          </Pressable>
+                : `I have written these down (${remaining}s)`
+            }
+            onPress={handleConfirm}
+          />
         </>
       ) : (
         <>
-          <Text className="text-base font-semibold text-slate-200 mb-2">
+          <Text className="text-base font-semibold text-text mb-2">
             Confirm your recovery phrase
           </Text>
-          <Text className="text-sm text-slate-400 mb-4">
+          <Text className="text-sm text-text-secondary mb-4">
             Type the words at the positions below — exactly as they appear on
             your written copy.
           </Text>
 
           {positions.map((pos, i) => (
-            <View key={pos} className="mb-3">
-              <Text className="text-xs text-slate-400 mb-1">
-                Word #{pos + 1}
-              </Text>
-              <TextInput
+            <Field key={pos} label={`Word #${pos + 1}`}>
+              <Input
                 testID={`verify-input-${i}`}
                 accessibilityLabel={`verify word position ${pos + 1}`}
                 value={inputs[i]}
@@ -172,39 +155,31 @@ export function OnboardingMnemonicScreen({
                 autoCapitalize="none"
                 autoCorrect={false}
                 placeholder="word"
-                placeholderTextColor="#64748b"
-                className="bg-slate-800 text-slate-50 rounded-lg px-3 py-2 border border-slate-700"
-                style={{fontFamily: monospace}}
               />
-            </View>
+            </Field>
           ))}
 
           {verifyError ? (
             <View
               testID="verify-error"
               accessibilityLabel="verify error"
-              className="bg-rose-950 border border-rose-700 rounded-lg p-3 my-2">
-              <Text className="text-sm text-rose-100">{verifyError}</Text>
+              className="bg-danger/20 border border-danger rounded-md p-3 my-2">
+              <Text className="text-sm text-danger">{verifyError}</Text>
             </View>
           ) : null}
 
-          <Pressable
-            testID="verify-submit-btn"
-            accessibilityRole="button"
-            accessibilityLabel="verify words"
-            accessibilityState={{disabled: !verifyReady}}
-            disabled={!verifyReady}
-            onPress={handleVerifySubmit}
-            className={[
-              'rounded-lg py-3 px-4 self-start mt-2',
-              verifyReady
-                ? 'bg-indigo-500 active:bg-indigo-400'
-                : 'bg-slate-700 opacity-60',
-            ].join(' ')}>
-            <Text className="text-sm font-semibold text-slate-50">
-              Verify
-            </Text>
-          </Pressable>
+          <View style={{marginTop: 8}}>
+            <Button
+              testID="verify-submit-btn"
+              accessibilityLabel="verify words"
+              accessibilityState={{disabled: !verifyReady}}
+              variant="primary"
+              size="md"
+              disabled={!verifyReady}
+              label="Verify"
+              onPress={handleVerifySubmit}
+            />
+          </View>
         </>
       )}
     </ScrollView>

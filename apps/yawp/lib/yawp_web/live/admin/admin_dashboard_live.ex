@@ -377,8 +377,8 @@ defmodule YawpWeb.AdminDashboardLive do
         </.section>
 
         <.section id="server-invites" title="Server invites" icon="hero-ticket">
-          <div class="space-y-3">
-            <div class="flex flex-wrap items-end gap-3">
+          <div class="space-y-4">
+            <div class="flex flex-col gap-3 sm:flex-row sm:items-end sm:flex-wrap">
               <button
                 id="server-invite-mint-btn"
                 type="button"
@@ -386,17 +386,19 @@ defmodule YawpWeb.AdminDashboardLive do
                 class={admin_primary_btn_class()}
                 disabled={is_nil(@chat_owner) or is_nil(@server)}
               >
-                <.icon name="hero-plus" class="size-4" /> Mint server invite
+                <.icon name="hero-plus" class="size-4" /> Mint single-use invite
               </button>
 
               <form
                 id="server-invite-mint-multi-form"
                 phx-submit="mint_server_invite"
-                class="flex items-end gap-2"
+                class="flex flex-wrap items-end gap-3 rounded-md bg-surface-2 p-3"
               >
                 <input type="hidden" name="kind" value="multi_use" />
-                <label class="text-xs flex flex-col">
-                  <span class="text-text-tertiary mb-1">Uses</span>
+                <label class="flex flex-col text-xs">
+                  <span class="mb-1 font-semibold uppercase tracking-wide text-text-tertiary">
+                    Uses
+                  </span>
                   <input
                     id="server-invite-mint-multi-uses"
                     type="number"
@@ -404,7 +406,7 @@ defmodule YawpWeb.AdminDashboardLive do
                     min="2"
                     max="100"
                     value="5"
-                    class="w-20 rounded-md bg-surface-2 text-text text-sm px-2 py-1 border border-transparent focus:border-primary outline-none"
+                    class="w-20 rounded-md border border-transparent bg-surface text-text text-sm px-2 py-1 focus:border-primary outline-none"
                   />
                 </label>
                 <button
@@ -417,34 +419,35 @@ defmodule YawpWeb.AdminDashboardLive do
                 </button>
               </form>
               <%= if is_nil(@chat_owner) do %>
-                <p class="text-xs text-text-tertiary mt-1">
+                <p class="basis-full text-xs text-text-tertiary">
                   Chat owner must complete claim before invites can be minted.
                 </p>
               <% end %>
             </div>
+
             <ul
               id="server-invites-list"
               phx-update="stream"
-              class="divide-y divide-border-soft text-sm"
+              class="flex flex-col gap-2 text-sm"
             >
               <li
                 id="server-invites-empty"
-                class="only:block hidden py-2 text-text-secondary"
+                class="only:block hidden rounded-md bg-surface-2 px-3 py-3 text-text-secondary"
               >
                 No active server invites.
               </li>
               <li
                 :for={{dom_id, invite} <- @streams.server_invites}
                 id={dom_id}
-                class="py-2 flex items-center gap-3"
+                class="flex items-center gap-3 rounded-md bg-surface-2 px-3 py-2"
               >
                 <code
                   id={"server-invite-token-#{invite.id}"}
-                  class="font-mono text-xs bg-surface-2 text-text px-2 py-1 rounded break-all flex-1"
+                  class="font-mono text-xs bg-surface text-text px-2 py-1 rounded break-all flex-1"
                 >
                   {invite.token}
                 </code>
-                <span class="text-xs text-text-tertiary">
+                <span class="text-xs font-semibold text-text-tertiary">
                   {invite_kind_label(invite)}
                 </span>
                 <button
@@ -452,7 +455,7 @@ defmodule YawpWeb.AdminDashboardLive do
                   type="button"
                   phx-click="revoke_server_invite"
                   phx-value-id={invite.id}
-                  class="inline-flex items-center gap-1 rounded-pill bg-surface-2 text-text text-xs font-semibold px-2 py-1 hover:bg-surface-3"
+                  class="inline-flex items-center gap-1 rounded-pill bg-surface text-text text-xs font-semibold px-2 py-1 hover:bg-surface-3"
                 >
                   <.icon name="hero-trash" class="size-3" /> Revoke
                 </button>

@@ -1,15 +1,9 @@
 
 import React, {useState} from 'react';
-import {Platform, Pressable, ScrollView, Text, TextInput, View} from 'react-native';
+import {ScrollView, Text, View} from 'react-native';
 
 import {usePassphrase} from '../identity-context';
-
-const monospace = Platform.select({
-  ios: 'Menlo',
-  macos: 'Menlo',
-  android: 'monospace',
-  default: 'monospace',
-});
+import {Button, Card, Field, Input} from '../ui';
 
 export function LockedScreen() {
   const {unlock} = usePassphrase();
@@ -36,62 +30,63 @@ export function LockedScreen() {
 
   return (
     <ScrollView
-      className="flex-1 bg-slate-900"
-      contentContainerStyle={{padding: 24, paddingTop: 48}}
+      className="flex-1 bg-bg"
+      contentContainerStyle={{
+        padding: 24,
+        paddingTop: 96,
+        alignItems: 'center',
+      }}
       nativeID="locked-screen"
       testID="locked-screen">
-      <Text className="text-3xl font-bold text-slate-50 mb-2">
-        Unlock Yawp
-      </Text>
-      <Text className="text-sm text-slate-400 mb-6">
-        This device is protected by a passphrase. Enter it to continue.
-      </Text>
+      <View style={{width: '100%', maxWidth: 420}}>
+        <Card variant="elevated">
+          <Text className="font-display text-2xl font-bold text-text mb-1">
+            Unlock Yawp
+          </Text>
+          <Text className="text-sm text-text-secondary mb-6">
+            This device is protected by a passphrase. Enter it to continue.
+          </Text>
 
-      <View className="mb-4">
-        <Text className="text-sm font-semibold text-slate-300 mb-1">
-          Passphrase
-        </Text>
-        <TextInput
-          testID="locked-passphrase-input"
-          accessibilityLabel="passphrase"
-          value={passphrase}
-          onChangeText={setPassphrase}
-          autoCapitalize="none"
-          autoCorrect={false}
-          secureTextEntry
-          placeholder="Your passphrase"
-          placeholderTextColor="#64748b"
-          className="bg-slate-800 text-slate-50 rounded-lg px-3 py-2 border border-slate-700"
-          style={{fontFamily: monospace}}
-          onSubmitEditing={onSubmit}
-        />
+          <Field
+            label="Passphrase"
+            error={error ?? undefined}
+            testID="locked-passphrase-field">
+            <Input
+              testID="locked-passphrase-input"
+              accessibilityLabel="passphrase"
+              value={passphrase}
+              onChangeText={setPassphrase}
+              autoCapitalize="none"
+              autoCorrect={false}
+              variant="password"
+              placeholder="Your passphrase"
+              onSubmitEditing={onSubmit}
+              error={!!error}
+            />
+          </Field>
+
+          {error ? (
+            <Text
+              testID="locked-error"
+              className="text-xs mb-2 text-danger">
+              {error}
+            </Text>
+          ) : null}
+
+          <View style={{marginTop: 8}}>
+            <Button
+              testID="locked-unlock-btn"
+              accessibilityLabel="unlock"
+              variant="primary"
+              size="md"
+              block
+              disabled={!passphrase || pending}
+              label={pending ? 'Unlocking…' : 'Unlock'}
+              onPress={onSubmit}
+            />
+          </View>
+        </Card>
       </View>
-
-      {error ? (
-        <Text
-          testID="locked-error"
-          className="text-xs mb-4 text-rose-300">
-          {error}
-        </Text>
-      ) : null}
-
-      <Pressable
-        testID="locked-unlock-btn"
-        accessibilityRole="button"
-        accessibilityLabel="unlock"
-        accessibilityState={{disabled: !passphrase || pending}}
-        disabled={!passphrase || pending}
-        onPress={onSubmit}
-        className={[
-          'rounded-lg py-2 px-4 self-start',
-          !passphrase || pending
-            ? 'bg-slate-700 opacity-60'
-            : 'bg-indigo-500 active:bg-indigo-400',
-        ].join(' ')}>
-        <Text className="text-sm font-semibold text-slate-50">
-          {pending ? 'Unlocking…' : 'Unlock'}
-        </Text>
-      </Pressable>
     </ScrollView>
   );
 }
