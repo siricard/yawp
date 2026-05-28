@@ -55,7 +55,7 @@ export function OnboardingChoiceScreen({onCreate, onRestore}: Props) {
       <View className="mt-8">
         <Text className="text-xs text-slate-500">
           Lost both your phrase and your devices? Recovery isn&rsquo;t
-          possible yet — that&rsquo;s a later milestone.
+          possible yet.
         </Text>
       </View>
     </ScrollView>

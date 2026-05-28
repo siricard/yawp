@@ -190,13 +190,13 @@ defmodule YawpWeb.AdminDashboardLive do
       <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
         <.section id="attachment-backend" title="Attachment backend" icon="hero-paper-clip">
           <p class="text-sm text-base-content/70">
-            Local disk (default). S3 backend lands with ADR 022 in M8.
+            Local disk (default). S3 backend not yet available.
           </p>
         </.section>
 
         <.section id="turn-coturn" title="TURN / coturn" icon="hero-signal">
           <p class="text-sm text-base-content/70">
-            Voice channels and coturn configuration land in M8 (ADR 020). No TURN servers configured.
+            Voice channels not yet available. No TURN servers configured.
           </p>
         </.section>
 
@@ -206,7 +206,7 @@ defmodule YawpWeb.AdminDashboardLive do
           icon="hero-adjustments-horizontal"
         >
           <p class="text-sm text-base-content/70">
-            Retention policy, attachment size limit, voice participant cap. Read-only stub for now.
+            Retention policy, attachment size limit, voice participant cap. Read-only for now.
           </p>
           <button
             id="per-server-defaults-acknowledge-btn"
@@ -214,13 +214,13 @@ defmodule YawpWeb.AdminDashboardLive do
             phx-click="acknowledge_per_server_defaults"
             class="btn btn-sm btn-soft mt-2"
           >
-            Acknowledge defaults (stub — lands in M8)
+            Acknowledge defaults
           </button>
         </.section>
 
         <.section id="body-archive" title="Body archive" icon="hero-archive-box">
           <p class="text-sm text-base-content/70">
-            Disabled. Body-archive enforcement lands with ADR 019 in M8.
+            Disabled. Body-archive enforcement not yet available.
           </p>
         </.section>
 
@@ -230,7 +230,7 @@ defmodule YawpWeb.AdminDashboardLive do
               Active server key id: <code class="font-mono text-xs">{@active_server_key.key_id}</code>
             </p>
             <p class="text-xs text-base-content/70 mt-1">
-              No peer servers known yet — federation sync lands in M7.4.
+              No peer servers known yet.
             </p>
           <% else %>
             <p class="text-sm text-warning">No active server key.</p>
@@ -239,7 +239,7 @@ defmodule YawpWeb.AdminDashboardLive do
 
         <.section id="key-rotation" title="Key rotation" icon="hero-key">
           <button id="key-rotate-button" type="button" class="btn btn-soft" disabled>
-            <.icon name="hero-arrow-path" class="size-4" /> Rotate key (M7.4)
+            <.icon name="hero-arrow-path" class="size-4" /> Rotate key
           </button>
         </.section>
 
