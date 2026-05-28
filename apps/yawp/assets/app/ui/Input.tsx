@@ -1,0 +1,53 @@
+import React from 'react';
+import {
+  TextInput,
+  View,
+  type TextInputProps,
+  type ViewStyle,
+} from 'react-native';
+
+export type InputVariant = 'text' | 'password' | 'textarea';
+
+export type InputProps = Omit<TextInputProps, 'style'> & {
+  variant?: InputVariant;
+  error?: boolean;
+  rightSlot?: React.ReactNode;
+  containerStyle?: ViewStyle;
+  testID?: string;
+};
+
+export function Input({
+  variant = 'text',
+  error = false,
+  rightSlot,
+  containerStyle,
+  testID,
+  ...rest
+}: InputProps) {
+  const isTextarea = variant === 'textarea';
+  const secure = variant === 'password';
+  return (
+    <View
+      className={[
+        'flex-row items-center bg-surface-2',
+        isTextarea ? 'rounded-md py-md px-md' : 'rounded-md px-md py-sm',
+        error ? 'border border-danger' : 'border border-transparent',
+      ].join(' ')}
+      style={containerStyle}>
+      <TextInput
+        testID={testID}
+        secureTextEntry={secure}
+        multiline={isTextarea}
+        placeholderTextColor="#7a8290"
+        className="flex-1 text-text text-sm"
+        style={
+          isTextarea
+            ? {minHeight: 96, textAlignVertical: 'top', color: '#f0efea'}
+            : {color: '#f0efea'}
+        }
+        {...rest}
+      />
+      {rightSlot ? <View className="ml-sm">{rightSlot}</View> : null}
+    </View>
+  );
+}
