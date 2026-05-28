@@ -51,6 +51,23 @@ defmodule YawpWeb.AdminSetupControllerTest do
       assert conn.resp_body =~ "Invalid or missing setup token"
     end
 
+    test "GET /admin/setup?token=bogus renders a centered card using design tokens",
+         %{conn: conn} do
+      {:ok, _token} = SetupToken.generate()
+      conn = get(conn, "/admin/setup?token=bogus")
+      assert conn.status == 403
+
+      body = conn.resp_body
+      assert body =~ ~s(id="admin-setup-forbidden")
+      assert body =~ "Invalid or missing setup token"
+
+      assert body =~ "min-h-screen"
+      assert body =~ "bg-bg"
+      assert body =~ "flex items-center justify-center"
+      assert body =~ "max-w-md"
+      assert body =~ "bg-surface"
+    end
+
     test "POST /admin/setup with a valid token creates the account and redirects to /admin",
          %{conn: conn} do
       {:ok, token} = SetupToken.generate()

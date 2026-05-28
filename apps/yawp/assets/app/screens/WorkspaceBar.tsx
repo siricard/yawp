@@ -69,7 +69,7 @@ export function WorkspaceBar({
             testID="workspace-self-tile"
             accessibilityLabel={`you ${effectiveDisplayName}`}
             className="w-12 h-12 rounded-lg bg-success items-center justify-center mb-sm">
-            <Text className="text-base font-bold text-slate-50">
+            <Text className="text-base font-bold text-on-primary">
               {selfInitial}
             </Text>
           </View>
@@ -86,10 +86,10 @@ export function WorkspaceBar({
               onPress={() => onSelectServer?.(server)}
               disabled={isBinding}
               className={[
-                'w-12 h-12 rounded-2xl bg-indigo-700 items-center justify-center active:bg-indigo-600',
+                'w-12 h-12 rounded-lg bg-surface-2 items-center justify-center active:bg-surface-3',
                 isBinding ? 'opacity-60 animate-pulse' : '',
               ].join(' ')}>
-              <Text className="text-base font-bold text-slate-50">
+              <Text className="text-base font-bold text-text">
                 {initials(server.label)}
               </Text>
               {isBinding ? (
@@ -98,7 +98,7 @@ export function WorkspaceBar({
                   accessibilityLabel={`binding ${server.label}`}
                   pointerEvents="none"
                   style={{position: 'absolute', right: 4, bottom: 4}}
-                  className="w-2 h-2 rounded-full bg-emerald-400"
+                  className="w-2 h-2 rounded-full bg-success"
                 />
               ) : null}
             </Pressable>
@@ -110,8 +110,8 @@ export function WorkspaceBar({
           accessibilityRole="button"
           accessibilityLabel="add server"
           onPress={onAddServer}
-          className="w-12 h-12 rounded-2xl bg-slate-800 border border-slate-700 items-center justify-center active:bg-slate-700">
-          <Text className="text-2xl font-bold text-emerald-400">+</Text>
+          className="w-12 h-12 rounded-lg bg-surface-2 border border-border-soft items-center justify-center active:bg-surface-3">
+          <Text className="text-2xl font-bold text-primary">+</Text>
         </Pressable>
       </ScrollView>
     </View>

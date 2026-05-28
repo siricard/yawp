@@ -1,6 +1,6 @@
 
 import React, {useState} from 'react';
-import {Platform, Pressable, Text, TextInput, View} from 'react-native';
+import {Pressable, Text, View} from 'react-native';
 
 import {submitClaim} from '../claim';
 import {submitBindDevice} from '../bind';
@@ -11,6 +11,7 @@ import {
   useWorkspaceServers,
   type WorkspaceServer,
 } from '../identity-context';
+import {Banner, Button, Field, Input} from '../ui';
 
 type TokenKind = 'claim' | 'invite';
 
@@ -27,13 +28,6 @@ type Props = {
    */
   onNavigateToServer?: (server: WorkspaceServer) => void;
 };
-
-const monospace = Platform.select({
-  ios: 'Menlo',
-  macos: 'Menlo',
-  android: 'monospace',
-  default: 'monospace',
-});
 
 function labelFromUrl(raw: string): string {
   try {
@@ -147,21 +141,20 @@ export function AddServerScreen({onCancel, onAdded, onNavigateToServer}: Props) 
 
   return (
     <View
-      className="flex-1 bg-slate-900 px-6 pt-12 pb-6"
+      className="flex-1 bg-bg px-xl pt-2xl pb-lg"
       nativeID="add-server-screen"
       testID="add-server-screen">
-      <Text className="text-3xl font-bold text-slate-50 mb-2">Add server</Text>
-      <Text className="text-sm text-slate-400 mb-6">
+      <Text className="font-display text-3xl font-bold text-text mb-xs">
+        Add server
+      </Text>
+      <Text className="text-sm text-text-secondary mb-lg">
         Paste a claim token (from the server operator) or an invite token
         (from the chat owner) and we&apos;ll bind this device&apos;s identity
         to that server.
       </Text>
 
-      <View className="mb-4">
-        <Text className="text-sm font-semibold text-slate-300 mb-1">
-          Server URL
-        </Text>
-        <TextInput
+      <Field label="Server URL">
+        <Input
           testID="server-url-input"
           accessibilityLabel="server url"
           value={serverUrl}
@@ -170,17 +163,13 @@ export function AddServerScreen({onCancel, onAdded, onNavigateToServer}: Props) 
           autoCorrect={false}
           editable={!submitting}
           placeholder="http://localhost:4000"
-          placeholderTextColor="#64748b"
-          className="bg-slate-800 text-slate-50 rounded-lg px-3 py-2 border border-slate-700"
-          style={{fontFamily: monospace}}
         />
-      </View>
+      </Field>
 
-      <View className="mb-4">
-        <Text className="text-sm font-semibold text-slate-300 mb-1">
-          Token kind
-        </Text>
-        <View className="flex-row gap-2" testID="token-kind-toggle">
+      <Field label="Token kind">
+        <View
+          className="flex-row bg-surface-2 rounded-pill p-xs self-start"
+          testID="token-kind-toggle">
           <Pressable
             testID="token-kind-claim"
             accessibilityRole="button"
@@ -188,12 +177,14 @@ export function AddServerScreen({onCancel, onAdded, onNavigateToServer}: Props) 
             onPress={() => setTokenKind('claim')}
             disabled={submitting}
             className={[
-              'rounded-lg py-2 px-3 border',
-              tokenKind === 'claim'
-                ? 'bg-indigo-500 border-indigo-400'
-                : 'bg-slate-800 border-slate-700',
+              'rounded-pill py-sm px-md',
+              tokenKind === 'claim' ? 'bg-primary' : 'bg-transparent',
             ].join(' ')}>
-            <Text className="text-xs font-semibold text-slate-50">
+            <Text
+              className={[
+                'text-xs font-semibold',
+                tokenKind === 'claim' ? 'text-on-primary' : 'text-text',
+              ].join(' ')}>
               Claim token (operator)
             </Text>
           </Pressable>
@@ -204,23 +195,22 @@ export function AddServerScreen({onCancel, onAdded, onNavigateToServer}: Props) 
             onPress={() => setTokenKind('invite')}
             disabled={submitting}
             className={[
-              'rounded-lg py-2 px-3 border',
-              tokenKind === 'invite'
-                ? 'bg-indigo-500 border-indigo-400'
-                : 'bg-slate-800 border-slate-700',
+              'rounded-pill py-sm px-md',
+              tokenKind === 'invite' ? 'bg-primary' : 'bg-transparent',
             ].join(' ')}>
-            <Text className="text-xs font-semibold text-slate-50">
+            <Text
+              className={[
+                'text-xs font-semibold',
+                tokenKind === 'invite' ? 'text-on-primary' : 'text-text',
+              ].join(' ')}>
               Invite token
             </Text>
           </Pressable>
         </View>
-      </View>
+      </Field>
 
-      <View className="mb-4">
-        <Text className="text-sm font-semibold text-slate-300 mb-1">
-          {tokenKind === 'claim' ? 'Claim token' : 'Invite token'}
-        </Text>
-        <TextInput
+      <Field label={tokenKind === 'claim' ? 'Claim token' : 'Invite token'}>
+        <Input
           testID="claim-token-input"
           accessibilityLabel={
             tokenKind === 'claim' ? 'claim token' : 'invite token'
@@ -235,49 +225,38 @@ export function AddServerScreen({onCancel, onAdded, onNavigateToServer}: Props) 
               ? 'Paste the operator-issued token'
               : 'Paste the chat-owner invite token'
           }
-          placeholderTextColor="#64748b"
-          className="bg-slate-800 text-slate-50 rounded-lg px-3 py-2 border border-slate-700"
-          style={{fontFamily: monospace}}
         />
-      </View>
+      </Field>
 
       {errorMessage ? (
-        <View
-          className="bg-rose-950 border border-rose-700 rounded-lg p-3 mb-4"
-          testID="add-server-error"
-          accessibilityLabel="add server error">
-          <Text className="text-sm text-rose-100">{errorMessage}</Text>
+        <View className="mb-lg">
+          <Banner
+            kind="danger"
+            message={errorMessage}
+            testID="add-server-error"
+          />
         </View>
       ) : null}
 
-      <View className="flex-row gap-3">
-        <Pressable
+      <View className="flex-row" style={{gap: 12}}>
+        <Button
           testID="add-server-submit"
-          accessibilityRole="button"
           accessibilityLabel="add server"
-          accessibilityState={{disabled: !canSubmit}}
+          variant="primary"
+          size="lg"
           disabled={!canSubmit}
+          label={submitting ? 'Adding…' : 'Add server'}
           onPress={handleSubmit}
-          className={[
-            'rounded-lg py-2 px-4',
-            canSubmit
-              ? 'bg-indigo-500 active:bg-indigo-400'
-              : 'bg-slate-700 opacity-60',
-          ].join(' ')}>
-          <Text className="text-sm font-semibold text-slate-50">
-            {submitting ? 'Adding…' : 'Add server'}
-          </Text>
-        </Pressable>
-
-        <Pressable
+        />
+        <Button
           testID="add-server-cancel"
-          accessibilityRole="button"
           accessibilityLabel="cancel"
-          onPress={onCancel}
+          variant="secondary"
+          size="lg"
           disabled={submitting}
-          className="rounded-lg py-2 px-4 bg-slate-700 border border-slate-600 active:bg-slate-600">
-          <Text className="text-sm font-semibold text-slate-50">Cancel</Text>
-        </Pressable>
+          label="Cancel"
+          onPress={onCancel}
+        />
       </View>
     </View>
   );

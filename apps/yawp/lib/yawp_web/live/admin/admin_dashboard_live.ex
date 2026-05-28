@@ -182,20 +182,23 @@ defmodule YawpWeb.AdminDashboardLive do
             <span id="operator-email">{@current_account.email}</span>
           </p>
         </div>
-        <.link href={~p"/admin/logout"} class="btn btn-ghost">
+        <.link
+          href={~p"/admin/logout"}
+          class="inline-flex items-center gap-2 rounded-pill bg-surface-2 hover:bg-surface-3 text-text text-sm font-semibold px-4 py-2"
+        >
           <.icon name="hero-arrow-right-on-rectangle" class="size-4" /> Log out
         </.link>
       </header>
 
       <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
         <.section id="attachment-backend" title="Attachment backend" icon="hero-paper-clip">
-          <p class="text-sm text-base-content/70">
+          <p class="text-sm text-text-secondary">
             Local disk (default). S3 backend not yet available.
           </p>
         </.section>
 
         <.section id="turn-coturn" title="TURN / coturn" icon="hero-signal">
-          <p class="text-sm text-base-content/70">
+          <p class="text-sm text-text-secondary">
             Voice channels not yet available. No TURN servers configured.
           </p>
         </.section>
@@ -205,31 +208,34 @@ defmodule YawpWeb.AdminDashboardLive do
           title="Per-server defaults"
           icon="hero-adjustments-horizontal"
         >
-          <p class="text-sm text-base-content/70">
+          <p class="text-sm text-text-secondary">
             Retention policy, attachment size limit, voice participant cap. Read-only for now.
           </p>
           <button
             id="per-server-defaults-acknowledge-btn"
             type="button"
             phx-click="acknowledge_per_server_defaults"
-            class="btn btn-sm btn-soft mt-2"
+            class={admin_secondary_btn_class("mt-3")}
           >
             Acknowledge defaults
           </button>
         </.section>
 
         <.section id="body-archive" title="Body archive" icon="hero-archive-box">
-          <p class="text-sm text-base-content/70">
+          <p class="text-sm text-text-secondary">
             Disabled. Body-archive enforcement not yet available.
           </p>
         </.section>
 
         <.section id="federation-status" title="Federation status" icon="hero-globe-alt">
           <%= if @active_server_key do %>
-            <p class="text-sm">
-              Active server key id: <code class="font-mono text-xs">{@active_server_key.key_id}</code>
+            <p class="text-sm text-text">
+              Active server key id:
+              <code class="font-mono text-xs bg-surface-2 px-1.5 py-0.5 rounded">
+                {@active_server_key.key_id}
+              </code>
             </p>
-            <p class="text-xs text-base-content/70 mt-1">
+            <p class="text-xs text-text-tertiary mt-1">
               No peer servers known yet.
             </p>
           <% else %>
@@ -238,7 +244,12 @@ defmodule YawpWeb.AdminDashboardLive do
         </.section>
 
         <.section id="key-rotation" title="Key rotation" icon="hero-key">
-          <button id="key-rotate-button" type="button" class="btn btn-soft" disabled>
+          <button
+            id="key-rotate-button"
+            type="button"
+            class={admin_secondary_btn_class() <> " opacity-50 cursor-not-allowed"}
+            disabled
+          >
             <.icon name="hero-arrow-path" class="size-4" /> Rotate key
           </button>
         </.section>
@@ -250,27 +261,27 @@ defmodule YawpWeb.AdminDashboardLive do
         <.section id="chat-owner-management" title="Chat-owner management" icon="hero-user-circle">
           <div class="space-y-4">
             <div>
-              <h3 class="text-sm font-semibold mb-1">Chat owner</h3>
+              <h3 class="text-sm font-semibold text-text mb-1">Chat owner</h3>
               <%= if @chat_owner do %>
                 <p
                   id="chat-owner-did"
-                  class="text-sm font-mono"
+                  class="text-sm font-mono text-text"
                   title={@chat_owner.did}
                 >
                   Chat owner: {truncate_did(@chat_owner.did)}
                 </p>
               <% else %>
-                <p class="text-sm text-base-content/70">No chat owner yet</p>
+                <p class="text-sm text-text-secondary">No chat owner yet</p>
               <% end %>
             </div>
 
             <div>
-              <h3 class="text-sm font-semibold mb-2">Claim token</h3>
+              <h3 class="text-sm font-semibold text-text mb-2">Claim token</h3>
               <%= if @active_claim_token do %>
                 <div class="space-y-2">
                   <code
                     id="claim-token-value"
-                    class="block font-mono text-xs bg-base-200 px-2 py-1 rounded break-all"
+                    class="block font-mono text-xs bg-surface-2 text-text px-2 py-1 rounded break-all"
                   >
                     {@active_claim_token.token}
                   </code>
@@ -279,7 +290,7 @@ defmodule YawpWeb.AdminDashboardLive do
                     phx-hook=".Countdown"
                     phx-update="ignore"
                     data-expires-at={DateTime.to_iso8601(@active_claim_token.expires_at)}
-                    class="text-xs text-base-content/70 font-mono"
+                    class="text-xs text-text-tertiary font-mono"
                   >
                     expires in …
                   </div>
@@ -311,13 +322,13 @@ defmodule YawpWeb.AdminDashboardLive do
                       }
                     }
                   </script>
-                  <div class="flex gap-2">
+                  <div class="flex gap-2 flex-wrap">
                     <button
                       id="claim-token-copy-btn"
                       type="button"
                       phx-hook=".CopyToClipboard"
                       data-token={@active_claim_token.token}
-                      class="btn btn-sm btn-soft"
+                      class={admin_secondary_btn_class()}
                     >
                       <.icon name="hero-clipboard" class="size-4" /> Copy
                     </button>
@@ -325,7 +336,7 @@ defmodule YawpWeb.AdminDashboardLive do
                       id="claim-token-replace-btn"
                       type="button"
                       phx-click="generate_claim_token"
-                      class="btn btn-sm btn-soft"
+                      class={admin_secondary_btn_class()}
                     >
                       <.icon name="hero-arrow-path" class="size-4" /> Replace
                     </button>
@@ -333,7 +344,7 @@ defmodule YawpWeb.AdminDashboardLive do
                       id="claim-token-revoke-btn"
                       type="button"
                       phx-click="revoke_claim_token"
-                      class="btn btn-sm btn-soft"
+                      class={admin_secondary_btn_class()}
                     >
                       <.icon name="hero-trash" class="size-4" /> Revoke
                     </button>
@@ -356,7 +367,7 @@ defmodule YawpWeb.AdminDashboardLive do
                   id="claim-token-generate-btn"
                   type="button"
                   phx-click="generate_claim_token"
-                  class="btn btn-sm btn-primary"
+                  class={admin_primary_btn_class()}
                 >
                   <.icon name="hero-key" class="size-4" /> Generate claim token
                 </button>
@@ -372,7 +383,7 @@ defmodule YawpWeb.AdminDashboardLive do
                 id="server-invite-mint-btn"
                 type="button"
                 phx-click="mint_server_invite"
-                class="btn btn-sm btn-primary"
+                class={admin_primary_btn_class()}
                 disabled={is_nil(@chat_owner) or is_nil(@server)}
               >
                 <.icon name="hero-plus" class="size-4" /> Mint server invite
@@ -385,7 +396,7 @@ defmodule YawpWeb.AdminDashboardLive do
               >
                 <input type="hidden" name="kind" value="multi_use" />
                 <label class="text-xs flex flex-col">
-                  <span class="text-base-content/70">Uses</span>
+                  <span class="text-text-tertiary mb-1">Uses</span>
                   <input
                     id="server-invite-mint-multi-uses"
                     type="number"
@@ -393,20 +404,20 @@ defmodule YawpWeb.AdminDashboardLive do
                     min="2"
                     max="100"
                     value="5"
-                    class="input input-bordered input-sm w-20"
+                    class="w-20 rounded-md bg-surface-2 text-text text-sm px-2 py-1 border border-transparent focus:border-primary outline-none"
                   />
                 </label>
                 <button
                   id="server-invite-mint-multi-btn"
                   type="submit"
-                  class="btn btn-sm btn-soft"
+                  class={admin_secondary_btn_class()}
                   disabled={is_nil(@chat_owner) or is_nil(@server)}
                 >
                   <.icon name="hero-plus" class="size-4" /> Mint multi-use invite
                 </button>
               </form>
               <%= if is_nil(@chat_owner) do %>
-                <p class="text-xs text-base-content/70 mt-1">
+                <p class="text-xs text-text-tertiary mt-1">
                   Chat owner must complete claim before invites can be minted.
                 </p>
               <% end %>
@@ -414,11 +425,11 @@ defmodule YawpWeb.AdminDashboardLive do
             <ul
               id="server-invites-list"
               phx-update="stream"
-              class="divide-y divide-base-300 text-sm"
+              class="divide-y divide-border-soft text-sm"
             >
               <li
                 id="server-invites-empty"
-                class="only:block hidden py-2 text-base-content/70"
+                class="only:block hidden py-2 text-text-secondary"
               >
                 No active server invites.
               </li>
@@ -429,11 +440,11 @@ defmodule YawpWeb.AdminDashboardLive do
               >
                 <code
                   id={"server-invite-token-#{invite.id}"}
-                  class="font-mono text-xs bg-base-200 px-2 py-1 rounded break-all flex-1"
+                  class="font-mono text-xs bg-surface-2 text-text px-2 py-1 rounded break-all flex-1"
                 >
                   {invite.token}
                 </code>
-                <span class="text-xs text-base-content/70">
+                <span class="text-xs text-text-tertiary">
                   {invite_kind_label(invite)}
                 </span>
                 <button
@@ -441,7 +452,7 @@ defmodule YawpWeb.AdminDashboardLive do
                   type="button"
                   phx-click="revoke_server_invite"
                   phx-value-id={invite.id}
-                  class="btn btn-xs btn-soft"
+                  class="inline-flex items-center gap-1 rounded-pill bg-surface-2 text-text text-xs font-semibold px-2 py-1 hover:bg-surface-3"
                 >
                   <.icon name="hero-trash" class="size-3" /> Revoke
                 </button>
@@ -454,16 +465,16 @@ defmodule YawpWeb.AdminDashboardLive do
           <ul
             id="audit-log"
             phx-update="stream"
-            class="divide-y divide-base-300 text-sm"
+            class="divide-y divide-border-soft text-sm"
           >
             <li
               id="audit-log-empty"
-              class="only:block hidden py-2 text-base-content/70"
+              class="only:block hidden py-2 text-text-secondary"
             >
               No operator actions logged yet.
             </li>
-            <li :for={{dom_id, entry} <- @streams.audit_log} id={dom_id} class="py-2">
-              <span class="font-mono text-xs text-base-content/70">{entry.inserted_at}</span>
+            <li :for={{dom_id, entry} <- @streams.audit_log} id={dom_id} class="py-2 text-text">
+              <span class="font-mono text-xs text-text-tertiary">{entry.inserted_at}</span>
               <span class="ml-2">{entry.action}</span>
             </li>
           </ul>
@@ -480,14 +491,31 @@ defmodule YawpWeb.AdminDashboardLive do
 
   defp section(assigns) do
     ~H"""
-    <section id={"section-#{@id}"} class="card bg-base-100 border border-base-300 p-4">
-      <div class="flex items-center gap-2 mb-3">
-        <.icon name={@icon} class="size-4 text-base-content/70" />
-        <h2 class="font-semibold">{@title}</h2>
+    <section
+      id={"section-#{@id}"}
+      class="rounded-lg bg-surface border border-border-soft p-lg shadow-card"
+    >
+      <div class="flex items-center gap-2 mb-3 pb-2 border-b border-border-soft">
+        <.icon name={@icon} class="size-4 text-text-tertiary" />
+        <h2 class="font-semibold text-text">{@title}</h2>
       </div>
       <div id={@id}>{render_slot(@inner_block)}</div>
     </section>
     """
+  end
+
+  defp admin_primary_btn_class(extra \\ "") do
+    base =
+      "inline-flex items-center gap-2 rounded-pill bg-primary text-on-primary text-sm font-semibold px-4 py-2 hover:bg-primary-hover disabled:opacity-50 disabled:cursor-not-allowed"
+
+    if extra == "", do: base, else: base <> " " <> extra
+  end
+
+  defp admin_secondary_btn_class(extra \\ "") do
+    base =
+      "inline-flex items-center gap-2 rounded-pill bg-surface-2 text-text text-sm font-semibold px-4 py-2 hover:bg-surface-3 disabled:opacity-50 disabled:cursor-not-allowed"
+
+    if extra == "", do: base, else: base <> " " <> extra
   end
 
   defp invite_kind_label(%{kind: :multi_use, uses_remaining: ur}) when is_integer(ur) do
@@ -551,12 +579,12 @@ defmodule YawpWeb.AdminDashboardLive do
     ~H"""
     <%= case @status do %>
       <% :ok -> %>
-        <p class="text-sm flex items-center gap-2">
+        <p class="text-sm flex items-center gap-2 text-text">
           <.icon name="hero-check-circle" class="size-4 text-success" /> Postgres reachable
         </p>
-        <p class="text-xs text-base-content/70 mt-1 truncate" title={@version}>{@version}</p>
+        <p class="text-xs text-text-tertiary mt-1 truncate" title={@version}>{@version}</p>
       <% :error -> %>
-        <p class="text-sm flex items-center gap-2 text-error">
+        <p class="text-sm flex items-center gap-2 text-danger">
           <.icon name="hero-x-circle" class="size-4" /> Postgres unreachable
         </p>
     <% end %>

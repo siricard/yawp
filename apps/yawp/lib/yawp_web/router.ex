@@ -78,7 +78,7 @@ defmodule YawpWeb.Router do
                   on_mount: [{YawpWeb.LiveUserAuth, :live_no_user}],
                   overrides: [
                     YawpWeb.AuthOverrides,
-                    Elixir.AshAuthentication.Phoenix.Overrides.DaisyUI
+                    Elixir.AshAuthentication.Phoenix.Overrides.Default
                   ]
   end
 
