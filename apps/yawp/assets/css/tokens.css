@@ -1,0 +1,128 @@
+:root {
+  --color-bg: #202831;
+  --color-bg-2: #1a2128;
+  --color-surface: #353E4B;
+  --color-surface-2: #485363;
+  --color-surface-3: #5a6776;
+  --color-text: #f0efea;
+  --color-text-secondary: #b5b9bf;
+  --color-text-tertiary: #7a8290;
+  --color-border: #2a323d;
+  --color-border-soft: #4a5464;
+
+  --color-primary: #d8ee4d;
+  --color-primary-hover: #c3d740;
+  --color-primary-soft: color-mix(in oklch, var(--color-primary) 22%, var(--color-surface));
+  --color-on-primary: #202831;
+  --color-success: #74cf86;
+  --color-success-soft: color-mix(in oklch, var(--color-success) 22%, var(--color-surface));
+  --color-warning: #e8a06b;
+  --color-warning-soft: color-mix(in oklch, var(--color-warning) 22%, var(--color-surface));
+  --color-danger: #e8615a;
+  --color-danger-soft: color-mix(in oklch, var(--color-danger) 22%, var(--color-surface));
+
+  --space-xs: 4px;
+  --space-sm: 8px;
+  --space-md: 12px;
+  --space-lg: 16px;
+  --space-xl: 24px;
+  --space-2xl: 32px;
+  --space-3xl: 48px;
+
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 18px;
+  --radius-xl: 22px;
+  --radius-pill: 999px;
+
+  --font-family: "Geist", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "Geist Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  --font-display: "Cal Sans", "Geist", ui-sans-serif, system-ui, sans-serif;
+
+  --font-xs: 0.75rem;
+  --font-sm: 0.875rem;
+  --font-base: 1rem;
+  --font-lg: 1.25rem;
+  --font-xl: 1.5rem;
+  --font-2xl: 2rem;
+  --font-3xl: 2.75rem;
+
+  --search-bg: var(--color-bg);
+  --search-bg-hover: #1a2128;
+  --search-border-focus: var(--color-primary);
+  --search-fg: var(--color-text);
+  --search-fg-placeholder: var(--color-text-tertiary);
+  --search-icon: var(--color-text-tertiary);
+  --search-height: 36px;
+  --search-radius: var(--radius-pill);
+  --search-padding-x: 14px;
+  --search-gap: 10px;
+  --search-font: var(--font-sm);
+
+  --call-ctrl-size: 56px;
+  --call-ctrl-bg: var(--color-surface-2);
+  --call-ctrl-fg: var(--color-text);
+  --call-ctrl-bg-active: var(--color-primary);
+  --call-ctrl-fg-active: var(--color-on-primary);
+  --call-ctrl-bg-danger: var(--color-danger);
+  --call-ctrl-fg-danger: #fff;
+  --call-ctrl-bg-accept: var(--color-success);
+
+  --glow-primary-sm: 0 3px 10px color-mix(in oklch, var(--color-primary) 18%, transparent);
+  --glow-primary-md: 0 5px 16px color-mix(in oklch, var(--color-primary) 22%, transparent);
+  --glow-primary-lg: 0 8px 22px color-mix(in oklch, var(--color-primary) 28%, transparent);
+  --glow-success-sm: 0 3px 10px color-mix(in oklch, var(--color-success) 20%, transparent);
+  --glow-success-md: 0 5px 18px color-mix(in oklch, var(--color-success) 28%, transparent);
+  --glow-success-lg: 0 8px 24px color-mix(in oklch, var(--color-success) 34%, transparent);
+  --glow-danger-sm: 0 3px 10px color-mix(in oklch, var(--color-danger) 20%, transparent);
+  --glow-danger-md: 0 5px 18px color-mix(in oklch, var(--color-danger) 28%, transparent);
+  --glow-danger-lg: 0 8px 24px color-mix(in oklch, var(--color-danger) 34%, transparent);
+
+  --grad-surface-warm: radial-gradient(
+    ellipse at top,
+    color-mix(in oklch, var(--color-primary) 8%, var(--color-surface)) 0%,
+    var(--color-surface) 70%
+  );
+  --grad-surface-cool: radial-gradient(
+    ellipse at top,
+    color-mix(in oklch, var(--color-success) 8%, var(--color-surface)) 0%,
+    var(--color-surface) 70%
+  );
+  --grad-surface-soft: linear-gradient(
+    180deg,
+    color-mix(in oklch, var(--color-text) 1.5%, var(--color-surface)) 0%,
+    var(--color-surface) 60%
+  );
+  --grad-stage-success: radial-gradient(
+    ellipse at center 30%,
+    color-mix(in oklch, var(--color-success) 8%, var(--color-surface)) 0%,
+    var(--color-surface) 65%
+  );
+  --grad-stage-primary: radial-gradient(
+    ellipse at top,
+    color-mix(in oklch, var(--color-primary) 10%, var(--color-surface)) 0%,
+    var(--color-surface) 60%
+  );
+  --grad-mobile-warm: radial-gradient(
+    ellipse at top,
+    color-mix(in oklch, var(--color-primary) 8%, var(--color-bg)) 0%,
+    var(--color-bg) 70%
+  );
+  --grad-mobile-cool: radial-gradient(
+    ellipse at top,
+    color-mix(in oklch, var(--color-success) 8%, var(--color-bg)) 0%,
+    var(--color-bg) 70%
+  );
+
+  --shadow-tint: 8 12 18;
+  --shadow-card: 0 1px 0 0 rgba(255,255,255,.02) inset, 0 6px 22px rgba(8,12,18,.28), 0 1px 2px rgba(8,12,18,.18);
+  --shadow-elev: 0 14px 40px rgba(8,12,18,.42), 0 4px 12px rgba(8,12,18,.22);
+
+  --focus-ring: 0 0 0 2px color-mix(in oklch, var(--color-primary) 70%, transparent);
+
+  --ease-spring: cubic-bezier(0.32, 0.72, 0, 1);
+  --ease-out-quint: cubic-bezier(0.22, 1, 0.36, 1);
+  --dur-fast: 180ms;
+  --dur-base: 280ms;
+  --dur-slow: 520ms;
+}

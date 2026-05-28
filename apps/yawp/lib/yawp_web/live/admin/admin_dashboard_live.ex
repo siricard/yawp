@@ -172,17 +172,20 @@ defmodule YawpWeb.AdminDashboardLive do
   def render(assigns) do
     ~H"""
     <Layouts.app flash={@flash}>
-      <.header>
-        Operator console
-        <:subtitle>
-          <span id="operator-email">{@current_account.email}</span>
-        </:subtitle>
-        <:actions>
-          <.link href={~p"/admin/logout"} class="btn btn-ghost">
-            <.icon name="hero-arrow-right-on-rectangle" class="size-4" /> Log out
-          </.link>
-        </:actions>
-      </.header>
+      <header
+        id="admin-header-strip"
+        class="flex items-center justify-between gap-lg bg-surface text-text rounded-lg px-lg py-md mb-lg shadow-card"
+      >
+        <div>
+          <h1 class="font-display text-2xl font-bold text-text">Operator console</h1>
+          <p class="text-sm text-text-secondary font-mono">
+            <span id="operator-email">{@current_account.email}</span>
+          </p>
+        </div>
+        <.link href={~p"/admin/logout"} class="btn btn-ghost">
+          <.icon name="hero-arrow-right-on-rectangle" class="size-4" /> Log out
+        </.link>
+      </header>
 
       <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
         <.section id="attachment-backend" title="Attachment backend" icon="hero-paper-clip">
