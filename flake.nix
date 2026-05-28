@@ -21,6 +21,9 @@
             gnumake
             just
             nodejs_22
+            openssl
+            openssl.dev
+            pkg-config
             pnpm
             watchman
             zulu17
