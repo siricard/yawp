@@ -49,14 +49,17 @@ jobs:
       - name: Run Elixir tests
         run: nix develop -c mix test
 
+      - name: Install web asset dependencies
+        run: nix develop -c bash -c 'cd apps/yawp/assets && npm ci --no-audit --no-fund'
+
       - name: Typecheck web assets
         run: nix develop -c bash -c 'cd apps/yawp/assets && npx tsc --noEmit'
 
-      - name: Typecheck React Native assets
-        run: nix develop -c bash -c 'cd apps/yawp/assets/native && npx tsc --noEmit'
-
       - name: Install RN dependencies
         run: nix develop -c bash -c 'cd apps/yawp/assets/native && npm ci --no-audit --no-fund'
+
+      - name: Typecheck React Native assets
+        run: nix develop -c bash -c 'cd apps/yawp/assets/native && npx tsc --noEmit'
 
       - name: Jest (React Native shared bundle)
         run: nix develop -c bash -c 'cd apps/yawp/assets/native && npm test --silent'
