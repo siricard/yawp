@@ -76,7 +76,6 @@ module.exports = {
       "monospace"
     ],
     "display": [
-      "Cal Sans",
       "Geist",
       "ui-sans-serif",
       "system-ui",
