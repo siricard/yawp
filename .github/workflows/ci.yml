@@ -9,6 +9,24 @@ jobs:
     name: Compile, test, and typecheck
     runs-on: ubuntu-latest
 
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: yawp_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U postgres"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=10
+
+    env:
+      MIX_ENV: test
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -18,6 +36,9 @@ jobs:
 
       - name: Fetch Elixir dependencies
         run: nix develop -c mix deps.get
+
+      - name: Check formatting
+        run: nix develop -c mix format --check-formatted
 
       - name: Compile with warnings as errors
         run: nix develop -c mix compile --warnings-as-errors
@@ -30,6 +51,12 @@ jobs:
 
       - name: Typecheck React Native assets
         run: nix develop -c bash -c 'cd apps/yawp/assets/native && npx tsc --noEmit'
+
+      - name: Install RN dependencies
+        run: nix develop -c bash -c 'cd apps/yawp/assets/native && npm ci --no-audit --no-fund'
+
+      - name: Jest (React Native shared bundle)
+        run: nix develop -c bash -c 'cd apps/yawp/assets/native && npm test --silent'
 
   verify-singletons:
     name: Verify RN bundle singletons (react, css-interop, …)
