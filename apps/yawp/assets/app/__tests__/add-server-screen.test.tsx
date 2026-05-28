@@ -278,7 +278,7 @@ describe('AddServerScreen', () => {
     const err = findByTestId(tree, 'add-server-error');
     expect(err).toBeTruthy();
     const texts: string[] = [];
-    err.findAll(n => n.type === 'Text' || (n.type as Function)?.name === 'Text')
+    err.findAll(n => (n.type as unknown) === 'Text' || (n.type as Function)?.name === 'Text')
       .forEach(n => {
         const c = n.props.children;
         if (typeof c === 'string') texts.push(c);

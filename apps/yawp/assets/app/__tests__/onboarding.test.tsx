@@ -211,11 +211,12 @@ describe('Onboarding ceremony (IdentityProvider)', () => {
       });
     }
 
-    expect(observed!.status).toBe('onboarding');
-    if (observed!.status === 'onboarding') {
-      expect(observed!.step).toBe('choose_path');
-      expect(observed!.draftIdentity.mnemonic).toHaveLength(12);
-      expect(observed!.draftIdentity.masterPk.length).toBe(32);
+    const s = observed!;
+    expect(s.status).toBe('onboarding');
+    if (s.status === 'onboarding') {
+      expect(s.step).toBe('choose_path');
+      expect(s.draftIdentity.mnemonic).toHaveLength(12);
+      expect(s.draftIdentity.masterPk.length).toBe(32);
     }
     const persisted = await loadIdentity();
     expect(persisted).toBeNull();
@@ -265,9 +266,10 @@ describe('Onboarding ceremony (IdentityProvider)', () => {
     await ReactTestRenderer.act(async () => {
       await runComplete!({passphrase: null, displayName: 'Test Yawper'});
     });
-    expect(observed!.status).toBe('onboarding');
-    if (observed!.status === 'onboarding') {
-      expect(observed!.step).toBe('complete');
+    const s2 = observed!;
+    expect(s2.status).toBe('onboarding');
+    if (s2.status === 'onboarding') {
+      expect(s2.step).toBe('complete');
     }
     await ReactTestRenderer.act(async () => {
       runFinish!();

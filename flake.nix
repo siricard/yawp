@@ -17,7 +17,6 @@
             android-tools
             beam.elixir_1_19
             beam.erlang
-            cocoapods
             git
             gnumake
             just
@@ -27,6 +26,8 @@
             zulu17
           ] ++ pkgs.lib.optionals pkgs.stdenv.isLinux [
             pkgs.inotify-tools
+          ] ++ pkgs.lib.optionals pkgs.stdenv.isDarwin [
+            pkgs.cocoapods
           ];
 
           shellHook = ''

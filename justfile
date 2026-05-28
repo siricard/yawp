@@ -45,59 +45,29 @@ fmt:
 check:
     nix develop -c mix compile --warnings-as-errors
 
+# Full local CI-parity gate: same steps GitHub Actions runs, plus mix format
+# check. Run this before `git push`; the pre-push hook runs it for you.
+ci:
+    nix develop -c mix format --check-formatted
+    nix develop -c mix compile --warnings-as-errors
+    nix develop -c mix test
+    nix develop -c bash -c 'cd apps/yawp/assets && npx tsc --noEmit'
+    nix develop -c bash -c 'cd apps/yawp/assets/native && npx tsc --noEmit'
+    nix develop -c bash -c 'cd apps/yawp/assets/native && npm test --silent'
+    just verify-singletons
+
 # Reset dev DB (drop, create, migrate, seed)
 db-reset:
     nix develop -c mix ecto.reset
 
-# M7.1 vertical slice: fresh DB + Phoenix; prints the
-# operator setup URL on startup. See docs/walkthroughs/m7-1.md.
-demo-m7-1:
+# Reset the dev DB, boot Phoenix, and walk the latest end-to-end demo.
+# See docs/walkthroughs/latest.md for the current scripted flow.
+demo:
     nix develop -c mix ecto.reset
     @echo ""
-    @echo "--- M7.1 walkthrough ---"
+    @echo "--- demo ---"
     @echo "After Phoenix boots, look for: OPERATOR SETUP <url>"
-    @echo "Then follow docs/walkthroughs/m7-1.md"
-    @echo ""
-    nix develop -c bash -c 'cd apps/yawp && mix phx.server'
-
-# M7.2 vertical slice: fresh DB + Phoenix; builds on M7.1 and
-# adds real-time #general messaging between two browser sessions
-# bound to the chat-owner identity. See docs/walkthroughs/m7-2.md.
-demo-m7-2:
-    nix develop -c mix ecto.reset
-    @echo ""
-    @echo "--- M7.2 walkthrough ---"
-    @echo "After Phoenix boots, look for: OPERATOR SETUP <url>"
-    @echo "1. Run M7.1 steps 1-5 (operator + chat-owner claim)."
-    @echo "2. Open the workspace tile, then #general (window A)."
-    @echo "3. Open a private/incognito window B at http://localhost:4000/"
-    @echo "   - it auto-binds a NEW device to the same chat-owner identity."
-    @echo "4. Send messages back and forth (~250ms round-trip)."
-    @echo "Full instructions: docs/walkthroughs/m7-2.md"
-    @echo ""
-    nix develop -c bash -c 'cd apps/yawp && mix phx.server'
-
-# M7.3 vertical slice: fresh DB + Phoenix; builds on M7.2 and adds
-# the mnemonic-gate onboarding ceremony, restore-from-mnemonic, and
-# server invites that let a SECOND identity join #general. See
-# docs/walkthroughs/m7-3.md.
-demo-m7-3:
-    nix develop -c mix ecto.reset
-    @echo ""
-    @echo "--- M7.3 walkthrough ---"
-    @echo "After Phoenix boots, look for: OPERATOR SETUP <url>"
-    @echo "1. Run M7.1 steps 1-5 (operator + chat-owner claim) — you"
-    @echo "   will walk through the mnemonic-gate ceremony as part of"
-    @echo "   the claim flow."
-    @echo "2. Follow M7.2 step 5 to send a few messages in #general"
-    @echo "   between two windows of the chat-owner identity."
-    @echo "3. In /admin → 'Server invites', click Mint and copy the"
-    @echo "   26-char base32 token."
-    @echo "4. Open a SECOND private/incognito browser at the same URL"
-    @echo "   (http://localhost:4000/), create a new identity, and use"
-    @echo "   '+ Add server' with token-kind = Invite to redeem."
-    @echo "5. Land in #general; send messages between the two users."
-    @echo "Full instructions: docs/walkthroughs/m7-3.md"
+    @echo "Then follow docs/walkthroughs/latest.md"
     @echo ""
     nix develop -c bash -c 'cd apps/yawp && mix phx.server'
 

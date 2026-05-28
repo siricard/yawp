@@ -1,8 +1,14 @@
 {
   "extends": "@react-native/typescript-config",
   "compilerOptions": {
+    "lib": [
+      "es2022",
+      "dom"
+    ],
     "types": [
       "jest",
+      "node",
+      "react-test-renderer",
       "nativewind/types"
     ],
     // Mirror Metro's platform-specific resolution: prefer `.native.ts` over
@@ -25,6 +31,9 @@
       ],
       "react-native-get-random-values": [
         "./node_modules/react-native-get-random-values"
+      ],
+      "react-test-renderer": [
+        "./node_modules/@types/react-test-renderer"
       ]
     }
   },

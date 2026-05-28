@@ -26,6 +26,7 @@
     "ignoreDeprecations": "6.0",
     "baseUrl": ".",
     "paths": {
+      "phoenix": ["node_modules/@types/phoenix"],
       "*": ["../../../deps/*"]
     },
     // Match Phoenix esbuild's `--resolve-extensions=.web.tsx,.web.ts,...` so
@@ -38,7 +39,7 @@
     "resolveJsonModule": true,
     "moduleResolution": "bundler",
     "module": "esnext",
-    "types": ["nativewind/types"]
+    "types": ["node", "phoenix", "nativewind/types"]
   },
   "include": ["js/**/*", "app/**/*", "../priv/test_vectors/*.json"],
   // Web tsc should never see the native-only files (react-native-keychain,

@@ -29,6 +29,10 @@ import {
 } from '../identity-context';
 import {RestoreMnemonicScreen} from '../screens/RestoreMnemonicScreen';
 
+type RestoreResult =
+  | {ok: true}
+  | {ok: false; reason: 'wrong_word_count' | 'unknown_word' | 'bad_checksum'};
+
 const VALID_MNEMONIC = [
   'abandon',
   'abandon',
@@ -188,14 +192,15 @@ describe('restoreFromMnemonic (IdentityProvider)', () => {
     await pumpEffects();
     expect(observed!.status).toBe('onboarding');
 
-    let result: Awaited<ReturnType<NonNullable<typeof runRestore>>> | null = null;
+    let result: RestoreResult | null = null;
     await ReactTestRenderer.act(async () => {
       result = await runRestore!(VALID_MNEMONIC);
     });
     expect(result).toEqual({ok: true});
-    expect(observed!.status).toBe('ready');
-    if (observed!.status === 'ready') {
-      expect(observed!.identity.didFull).toBe(
+    const sR1 = observed!;
+    expect(sR1.status).toBe('ready');
+    if (sR1.status === 'ready') {
+      expect(sR1.identity.didFull).toBe(
         expectedDidFromMnemonic(VALID_MNEMONIC),
       );
     }
@@ -242,7 +247,7 @@ describe('restoreFromMnemonic (IdentityProvider)', () => {
     });
     await pumpEffects();
 
-    let result: Awaited<ReturnType<NonNullable<typeof runRestore>>> | null = null;
+    let result: RestoreResult | null = null;
     await ReactTestRenderer.act(async () => {
       result = await runRestore!(BAD_CHECKSUM_MNEMONIC);
     });
@@ -280,7 +285,7 @@ describe('restoreFromMnemonic (IdentityProvider)', () => {
     });
     await pumpEffects();
 
-    let result: Awaited<ReturnType<NonNullable<typeof runRestore>>> | null = null;
+    let result: RestoreResult | null = null;
     await ReactTestRenderer.act(async () => {
       result = await runRestore!(['abandon', 'abandon']);
     });
@@ -313,7 +318,7 @@ describe('restoreFromMnemonic (IdentityProvider)', () => {
     });
     await pumpEffects();
 
-    let result: Awaited<ReturnType<NonNullable<typeof runRestore>>> | null = null;
+    let result: RestoreResult | null = null;
     const bad = [...VALID_MNEMONIC];
     bad[0] = 'notaword';
     await ReactTestRenderer.act(async () => {
@@ -354,9 +359,10 @@ describe('restoreFromMnemonic (IdentityProvider)', () => {
       );
     });
     await pumpEffects();
-    expect(observed!.status).toBe('ready');
-    if (observed!.status === 'ready') {
-      expect(observed!.identity.didFull).toBe(`did:yawp:${previous.did}`);
+    const sR2 = observed!;
+    expect(sR2.status).toBe('ready');
+    if (sR2.status === 'ready') {
+      expect(sR2.identity.didFull).toBe(`did:yawp:${previous.did}`);
     }
 
     await ReactTestRenderer.act(async () => {
@@ -373,8 +379,9 @@ describe('restoreFromMnemonic (IdentityProvider)', () => {
     expect(Array.from(restoredMasterSk)).toEqual(
       Array.from(restoredMaster.sk),
     );
-    if (observed!.status === 'ready') {
-      expect(observed!.identity.didFull).toBe(
+    const sR3 = observed!;
+    if (sR3.status === 'ready') {
+      expect(sR3.identity.didFull).toBe(
         expectedDidFromMnemonic(VALID_MNEMONIC),
       );
     }

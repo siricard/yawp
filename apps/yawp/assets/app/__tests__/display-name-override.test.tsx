@@ -43,12 +43,8 @@ describe('useDisplayName effectiveDisplayName', () => {
       return null;
     }
 
-    let runComplete: typeof import('../identity-context').useOnboarding extends () => infer R
-      ? R['complete']
-      : never;
-    let runFinish: typeof import('../identity-context').useOnboarding extends () => infer R
-      ? R['finish']
-      : never;
+    let runComplete: ReturnType<typeof import('../identity-context').useOnboarding>['complete'];
+    let runFinish: ReturnType<typeof import('../identity-context').useOnboarding>['finish'];
     function CaptureOnboarding() {
       const {complete, finish} = (
         require('../identity-context') as typeof import('../identity-context')
@@ -94,12 +90,8 @@ describe('useDisplayName effectiveDisplayName', () => {
       observed = useDisplayName();
       return null;
     }
-    let runComplete: typeof import('../identity-context').useOnboarding extends () => infer R
-      ? R['complete']
-      : never;
-    let runFinish: typeof import('../identity-context').useOnboarding extends () => infer R
-      ? R['finish']
-      : never;
+    let runComplete: ReturnType<typeof import('../identity-context').useOnboarding>['complete'];
+    let runFinish: ReturnType<typeof import('../identity-context').useOnboarding>['finish'];
     function CaptureOnboarding() {
       const {complete, finish} = (
         require('../identity-context') as typeof import('../identity-context')
@@ -148,12 +140,8 @@ describe('useDisplayName effectiveDisplayName', () => {
       observed = useDisplayName();
       return null;
     }
-    let runComplete: typeof import('../identity-context').useOnboarding extends () => infer R
-      ? R['complete']
-      : never;
-    let runFinish: typeof import('../identity-context').useOnboarding extends () => infer R
-      ? R['finish']
-      : never;
+    let runComplete: ReturnType<typeof import('../identity-context').useOnboarding>['complete'];
+    let runFinish: ReturnType<typeof import('../identity-context').useOnboarding>['finish'];
     function CaptureOnboarding() {
       const {complete, finish} = (
         require('../identity-context') as typeof import('../identity-context')
@@ -219,15 +207,9 @@ describe('useDisplayName effectiveDisplayName', () => {
       }
       return null;
     }
-    let runComplete: typeof import('../identity-context').useOnboarding extends () => infer R
-      ? R['complete']
-      : never;
-    let runFinish: typeof import('../identity-context').useOnboarding extends () => infer R
-      ? R['finish']
-      : never;
-    let runRestore: typeof import('../identity-context').useOnboarding extends () => infer R
-      ? R['restore']
-      : never;
+    let runComplete: ReturnType<typeof import('../identity-context').useOnboarding>['complete'];
+    let runFinish: ReturnType<typeof import('../identity-context').useOnboarding>['finish'];
+    let runRestore: ReturnType<typeof import('../identity-context').useOnboarding>['restore'];
     function CaptureOnboarding() {
       const {complete, finish, restore} = (
         require('../identity-context') as typeof import('../identity-context')

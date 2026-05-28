@@ -88,7 +88,7 @@ export function useChannel(
           setStatus('joined');
           setErrorMessage(null);
         })
-        .receive('error', resp => {
+        .receive('error', (resp: {reason?: string} | undefined) => {
           if (cancelled) return;
           setStatus('error');
           setErrorMessage(

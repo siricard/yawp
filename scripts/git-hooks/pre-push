@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+#
+# Yawp pre-push hook: runs the same checks GitHub CI does so a red push
+# never reaches origin. Bypass with `git push --no-verify` when you really
+# mean it.
+
+set -euo pipefail
+
+repo_root="$(git rev-parse --show-toplevel)"
+cd "$repo_root"
+
+if ! command -v just >/dev/null 2>&1; then
+  echo "pre-push: 'just' not on PATH. Enter the dev shell first (direnv / nix develop)." >&2
+  exit 1
+fi
+
+echo "pre-push: running 'just ci'..."
+just ci

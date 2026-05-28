@@ -295,7 +295,7 @@ describe('App — auto-bind on server-tile click', () => {
     const texts: string[] = [];
     banner
       .findAll(
-        n => n.type === 'Text' || (n.type as Function)?.name === 'Text',
+        n => (n.type as unknown) === 'Text' || (n.type as Function)?.name === 'Text',
       )
       .forEach(n => {
         const c = n.props.children;

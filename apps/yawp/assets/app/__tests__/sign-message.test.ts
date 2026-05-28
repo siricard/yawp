@@ -19,7 +19,7 @@ import {
   signMessage,
 } from '../chat/sign-message';
 
-(ed.hashes as {sha512: typeof sha512}).sha512 = sha512;
+(ed.hashes as unknown as {sha512: typeof sha512}).sha512 = sha512;
 
 function hexToBytes(hex: string): Uint8Array {
   const clean = hex.replace(/^0x/, '');

@@ -46,12 +46,12 @@ export async function getValidSessionToken(args: {
     return {ok: true, sessionToken: stored.sessionToken};
   }
 
-  const customFetch: typeof fetch = (input, init) => {
+  const customFetch = ((input: RequestInfo | URL, init?: RequestInit) => {
     if (typeof input === 'string' && input.startsWith('/rpc/')) {
       return baseFetch(`${base}${input}`, init);
     }
     return baseFetch(input as RequestInfo, init);
-  };
+  }) as typeof fetch;
 
   let result;
   try {
