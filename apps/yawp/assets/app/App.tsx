@@ -106,7 +106,7 @@ function AppShell() {
 
   if (identityState.status === 'onboarding') {
     return (
-      <View className="flex-1 bg-slate-900" nativeID="app-root">
+      <View className="flex-1 bg-bg" nativeID="app-root">
         {Platform.OS !== 'web' ? <StatusBar barStyle="light-content" /> : null}
         <OnboardingFlow onDone={() => setScreen({kind: 'home'})} />
       </View>
@@ -115,7 +115,7 @@ function AppShell() {
 
   if (identityState.status === 'locked') {
     return (
-      <View className="flex-1 bg-slate-900" nativeID="app-root">
+      <View className="flex-1 bg-bg" nativeID="app-root">
         {Platform.OS !== 'web' ? <StatusBar barStyle="light-content" /> : null}
         <LockedScreen />
       </View>
@@ -170,7 +170,7 @@ function AppShell() {
   }
 
   return (
-    <View className="flex-1 bg-slate-900" nativeID="app-root">
+    <View className="flex-1 bg-bg" nativeID="app-root">
       {Platform.OS !== 'web' ? <StatusBar barStyle="light-content" /> : null}
       <View
         style={{
