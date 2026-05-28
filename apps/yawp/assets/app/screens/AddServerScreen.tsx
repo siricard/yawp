@@ -17,6 +17,15 @@ type TokenKind = 'claim' | 'invite';
 type Props = {
   onCancel: () => void;
   onAdded: (server: WorkspaceServer) => void;
+  /**
+   * invoked after a successful invite-token redeem +
+   * bind to navigate the newly-joined user straight into the server's
+   * `#general` channel. Threaded from App.tsx so the same primitive
+   * powers manual tile clicks and post-redeem auto-nav. The claim
+   * (operator) branch still uses `onAdded` (lands on home with the
+   * new tile selected).
+   */
+  onNavigateToServer?: (server: WorkspaceServer) => void;
 };
 
 const monospace = Platform.select({
@@ -35,7 +44,7 @@ function labelFromUrl(raw: string): string {
   }
 }
 
-export function AddServerScreen({onCancel, onAdded}: Props) {
+export function AddServerScreen({onCancel, onAdded, onNavigateToServer}: Props) {
   const identityState = useIdentityState();
   const {addServer} = useWorkspaceServers();
   const {recordFirstBound} = useRecordFirstBoundAt();
@@ -92,7 +101,11 @@ export function AddServerScreen({onCancel, onAdded}: Props) {
         label: labelFromUrl(serverUrl.trim()),
       };
       addServer(server);
-      onAdded(server);
+      if (onNavigateToServer) {
+        onNavigateToServer(server);
+      } else {
+        onAdded(server);
+      }
       return;
     }
 

@@ -145,6 +145,9 @@ function AppShell() {
         <AddServerScreen
           onCancel={() => setScreen({kind: 'home'})}
           onAdded={() => setScreen({kind: 'home'})}
+          onNavigateToServer={server => {
+            handleSelectServer(server);
+          }}
         />
       );
       break;
