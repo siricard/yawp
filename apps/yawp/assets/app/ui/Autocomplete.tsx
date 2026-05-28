@@ -64,7 +64,7 @@ export function Autocomplete({
                   onSelect(s);
                   setFocused(false);
                 }}
-                className="px-md py-sm active:bg-surface-2">
+                className="px-3 py-2 active:bg-surface-2">
                 <Text className="text-text text-sm font-mono">{s}</Text>
               </Pressable>
             ))}

@@ -141,13 +141,13 @@ export function AddServerScreen({onCancel, onAdded, onNavigateToServer}: Props) 
 
   return (
     <View
-      className="flex-1 bg-bg px-xl pt-2xl pb-lg"
+      className="flex-1 bg-bg px-6 pt-8 pb-4"
       nativeID="add-server-screen"
       testID="add-server-screen">
-      <Text className="font-display text-3xl font-bold text-text mb-xs">
+      <Text className="font-display text-3xl font-bold text-text mb-1">
         Add server
       </Text>
-      <Text className="text-sm text-text-secondary mb-lg">
+      <Text className="text-sm text-text-secondary mb-4">
         Paste a claim token (from the server operator) or an invite token
         (from the chat owner) and we&apos;ll bind this device&apos;s identity
         to that server.
@@ -168,7 +168,7 @@ export function AddServerScreen({onCancel, onAdded, onNavigateToServer}: Props) 
 
       <Field label="Token kind">
         <View
-          className="flex-row bg-surface-2 rounded-pill p-xs self-start"
+          className="flex-row bg-surface-2 rounded-pill p-1 self-start"
           testID="token-kind-toggle">
           <Pressable
             testID="token-kind-claim"
@@ -177,7 +177,7 @@ export function AddServerScreen({onCancel, onAdded, onNavigateToServer}: Props) 
             onPress={() => setTokenKind('claim')}
             disabled={submitting}
             className={[
-              'rounded-pill py-sm px-md',
+              'rounded-pill py-2 px-3',
               tokenKind === 'claim' ? 'bg-primary' : 'bg-transparent',
             ].join(' ')}>
             <Text
@@ -195,7 +195,7 @@ export function AddServerScreen({onCancel, onAdded, onNavigateToServer}: Props) 
             onPress={() => setTokenKind('invite')}
             disabled={submitting}
             className={[
-              'rounded-pill py-sm px-md',
+              'rounded-pill py-2 px-3',
               tokenKind === 'invite' ? 'bg-primary' : 'bg-transparent',
             ].join(' ')}>
             <Text
@@ -229,7 +229,7 @@ export function AddServerScreen({onCancel, onAdded, onNavigateToServer}: Props) 
       </Field>
 
       {errorMessage ? (
-        <View className="mb-lg">
+        <View className="mb-4">
           <Banner
             kind="danger"
             message={errorMessage}

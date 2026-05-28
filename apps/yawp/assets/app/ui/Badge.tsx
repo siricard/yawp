@@ -30,7 +30,7 @@ export function Badge({count, label, tone = 'primary', testID}: BadgeProps) {
     <View
       testID={testID}
       accessibilityLabel={`badge ${display}`}
-      className={`rounded-pill px-sm ${TONE_BG[tone]}`}
+      className={`rounded-pill px-2 ${TONE_BG[tone]}`}
       style={{minWidth: 18, alignItems: 'center', justifyContent: 'center'}}>
       <Text
         className={`text-xs font-bold font-mono ${TONE_TEXT[tone]}`}>

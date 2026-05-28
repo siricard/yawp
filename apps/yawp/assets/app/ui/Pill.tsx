@@ -29,9 +29,9 @@ export function Pill({label, tone = 'default', icon, testID}: PillProps) {
     <View
       testID={testID}
       accessibilityLabel={`pill ${label}`}
-      className={`rounded-pill px-sm flex-row items-center ${t.bg}`}
+      className={`rounded-pill px-2 flex-row items-center ${t.bg}`}
       style={{paddingVertical: 3, paddingHorizontal: 9}}>
-      {icon ? <View className="mr-xs">{icon}</View> : null}
+      {icon ? <View className="mr-1">{icon}</View> : null}
       <Text className={`text-xs font-semibold ${t.text}`}>{label}</Text>
     </View>
   );

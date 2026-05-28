@@ -34,9 +34,9 @@ const VARIANT_TEXT: Record<ButtonVariant, string> = {
 };
 
 const SIZE_CLASSES: Record<ButtonSize, string> = {
-  sm: 'px-md py-sm',
-  md: 'px-lg py-sm',
-  lg: 'px-xl py-md',
+  sm: 'px-3 py-2',
+  md: 'px-4 py-2',
+  lg: 'px-6 py-3',
 };
 
 const SIZE_TEXT: Record<ButtonSize, string> = {
@@ -63,7 +63,7 @@ export function Button({
   const baseClass = [
     'rounded-pill items-center justify-center flex-row',
     VARIANT_CLASSES[variant],
-    isIconOnly ? 'px-sm py-sm' : SIZE_CLASSES[size],
+    isIconOnly ? 'px-2 py-2' : SIZE_CLASSES[size],
     block ? 'w-full' : '',
     disabled ? 'opacity-50' : '',
   ]
@@ -83,14 +83,14 @@ export function Button({
         iconOnly
       ) : (
         <>
-          {iconLeft ? <View className="mr-sm">{iconLeft}</View> : null}
+          {iconLeft ? <View className="mr-2">{iconLeft}</View> : null}
           {label !== undefined || children !== undefined ? (
             <Text
               className={`font-semibold ${VARIANT_TEXT[variant]} ${SIZE_TEXT[size]}`}>
               {label ?? children}
             </Text>
           ) : null}
-          {iconRight ? <View className="ml-sm">{iconRight}</View> : null}
+          {iconRight ? <View className="ml-2">{iconRight}</View> : null}
         </>
       )}
     </Pressable>

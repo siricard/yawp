@@ -38,12 +38,12 @@ export function Banner({
     <View
       testID={testID}
       accessibilityLabel={title ? `${kind} ${title}` : `${kind} banner`}
-      className={`rounded-md p-md ${KIND_CONTAINER[kind]}`}>
+      className={`rounded-md p-3 ${KIND_CONTAINER[kind]}`}>
       <View className="flex-row items-start">
-        {icon ? <View className="mr-sm mt-xs">{icon}</View> : null}
+        {icon ? <View className="mr-2 mt-1">{icon}</View> : null}
         <View className="flex-1">
           {title ? (
-            <Text className={`text-sm font-bold mb-xs ${KIND_TITLE[kind]}`}>
+            <Text className={`text-sm font-bold mb-1 ${KIND_TITLE[kind]}`}>
               {title}
             </Text>
           ) : null}
@@ -55,7 +55,7 @@ export function Banner({
         </View>
       </View>
       {actions ? (
-        <View className="flex-row mt-md" style={{gap: 8}}>
+        <View className="flex-row mt-3" style={{gap: 8}}>
           {actions}
         </View>
       ) : null}

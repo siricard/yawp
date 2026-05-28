@@ -45,8 +45,8 @@ export function WorkspaceBar({
       accessibilityLabel="workspace bar"
       className={
         horizontal
-          ? 'bg-bg px-sm py-sm border-b border-border'
-          : 'bg-bg px-sm py-md border-r border-border'
+          ? 'bg-bg px-2 py-2 border-b border-border'
+          : 'bg-bg px-2 py-3 border-r border-border'
       }
       style={
         horizontal
@@ -68,7 +68,7 @@ export function WorkspaceBar({
           <View
             testID="workspace-self-tile"
             accessibilityLabel={`you ${effectiveDisplayName}`}
-            className="w-12 h-12 rounded-lg bg-success items-center justify-center mb-sm">
+            className="w-12 h-12 rounded-lg bg-success items-center justify-center mb-2">
             <Text className="text-base font-bold text-on-primary">
               {selfInitial}
             </Text>

@@ -41,7 +41,7 @@ export function DidPill({
     <View
       testID={testID}
       accessibilityLabel={`did ${did}`}
-      className="flex-row items-center bg-bg rounded-sm px-md py-sm"
+      className="flex-row items-center bg-bg rounded-sm px-3 py-2"
       style={{gap: 8}}>
       <Text className="text-xs text-text-tertiary font-mono">DID</Text>
       <Text className="text-xs text-text-secondary font-mono flex-1">

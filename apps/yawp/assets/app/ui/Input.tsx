@@ -30,7 +30,7 @@ export function Input({
     <View
       className={[
         'flex-row items-center bg-surface-2',
-        isTextarea ? 'rounded-md py-md px-md' : 'rounded-md px-md py-sm',
+        isTextarea ? 'rounded-md py-3 px-3' : 'rounded-md px-3 py-2',
         error ? 'border border-danger' : 'border border-transparent',
       ].join(' ')}
       style={containerStyle}>
@@ -47,7 +47,7 @@ export function Input({
         }
         {...rest}
       />
-      {rightSlot ? <View className="ml-sm">{rightSlot}</View> : null}
+      {rightSlot ? <View className="ml-2">{rightSlot}</View> : null}
     </View>
   );
 }

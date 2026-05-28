@@ -24,7 +24,7 @@ export function Card({
   style,
   ...rest
 }: CardProps) {
-  const className = `rounded-lg p-lg ${VARIANT_CLASSES[variant]}`;
+  const className = `rounded-lg p-4 ${VARIANT_CLASSES[variant]}`;
   const elevatedStyle =
     variant === 'elevated'
       ? {

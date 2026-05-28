@@ -48,7 +48,7 @@ export function Modal({
         testID={testID}
         accessibilityRole={Platform.OS === 'web' ? undefined : undefined}
         accessibilityLabel={title}
-        className="bg-surface rounded-lg p-lg w-full"
+        className="bg-surface rounded-lg p-4 w-full"
         style={{
           maxWidth: 480,
           shadowColor: '#08111a',
@@ -58,12 +58,12 @@ export function Modal({
           elevation: 12,
         }}>
         {title ? (
-          <Text className="text-lg font-bold text-text mb-md">{title}</Text>
+          <Text className="text-lg font-bold text-text mb-3">{title}</Text>
         ) : null}
         <View>{children}</View>
         {footer ? (
           <View
-            className="flex-row justify-end mt-lg"
+            className="flex-row justify-end mt-4"
             style={{gap: 8}}>
             {footer}
           </View>

@@ -11,10 +11,10 @@ export type FieldProps = {
 
 export function Field({label, helper, error, children, testID}: FieldProps) {
   return (
-    <View testID={testID} className="mb-md">
+    <View testID={testID} className="mb-3">
       {label ? (
         <Text
-          className="text-xs font-semibold text-text-secondary mb-xs uppercase"
+          className="text-xs font-semibold text-text-secondary mb-1 uppercase"
           accessibilityLabel={label}>
           {label}
         </Text>
@@ -23,13 +23,13 @@ export function Field({label, helper, error, children, testID}: FieldProps) {
       {error ? (
         <Text
           testID={testID ? `${testID}-error` : undefined}
-          className="text-xs text-danger mt-xs">
+          className="text-xs text-danger mt-1">
           {error}
         </Text>
       ) : helper ? (
         <Text
           testID={testID ? `${testID}-helper` : undefined}
-          className="text-xs text-text-tertiary mt-xs">
+          className="text-xs text-text-tertiary mt-1">
           {helper}
         </Text>
       ) : null}
