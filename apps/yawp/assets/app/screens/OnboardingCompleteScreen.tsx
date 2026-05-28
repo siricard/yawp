@@ -15,29 +15,29 @@ export function OnboardingCompleteScreen({
 }: Props) {
   return (
     <ScrollView
-      className="flex-1 bg-slate-900"
+      className="flex-1 bg-bg"
       contentContainerStyle={{padding: 24, paddingTop: 48}}
       nativeID="onboarding-complete-screen"
       testID="onboarding-complete-screen">
-      <Text className="text-3xl font-bold text-slate-50 mb-2">
+      <Text className="text-3xl font-bold text-text mb-2">
         You&apos;re all set
       </Text>
-      <Text className="text-sm text-slate-400 mb-6">
+      <Text className="text-sm text-text-secondary mb-6">
         Your identity is ready to use on this device.
       </Text>
 
-      <View className="bg-slate-800 rounded-lg p-4 mb-3">
-        <Text className="text-xs text-slate-400 mb-1">Display name</Text>
-        <Text testID="complete-display-name" className="text-base text-slate-50">
+      <View className="bg-surface rounded-lg p-4 mb-3">
+        <Text className="text-xs text-text-secondary mb-1">Display name</Text>
+        <Text testID="complete-display-name" className="text-base text-text">
           {displayName}
         </Text>
       </View>
 
-      <View className="bg-slate-800 rounded-lg p-4 mb-6">
-        <Text className="text-xs text-slate-400 mb-1">Fingerprint</Text>
+      <View className="bg-surface rounded-lg p-4 mb-6">
+        <Text className="text-xs text-text-secondary mb-1">Fingerprint</Text>
         <Text
           testID="complete-fingerprint"
-          className="text-sm text-slate-50"
+          className="text-sm text-text"
           selectable>
           {fingerprint}
         </Text>
@@ -48,8 +48,8 @@ export function OnboardingCompleteScreen({
         accessibilityRole="button"
         accessibilityLabel="go to home"
         onPress={onGoHome}
-        className="rounded-lg py-3 px-4 self-start bg-indigo-500 active:bg-indigo-400">
-        <Text className="text-sm font-semibold text-slate-50">Go to home</Text>
+        className="rounded-lg py-3 px-4 self-start bg-primary active:bg-primary-hover">
+        <Text className="text-sm font-semibold text-on-primary">Go to home</Text>
       </Pressable>
     </ScrollView>
   );

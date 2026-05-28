@@ -31,14 +31,14 @@ export function OnboardingDisplayNameScreen({
 
   return (
     <ScrollView
-      className="flex-1 bg-slate-900"
+      className="flex-1 bg-bg"
       contentContainerStyle={{padding: 24, paddingTop: 48}}
       nativeID="onboarding-display-name-screen"
       testID="onboarding-display-name-screen">
-      <Text className="text-3xl font-bold text-slate-50 mb-2">
+      <Text className="text-3xl font-bold text-text mb-2">
         Pick a display name
       </Text>
-      <Text className="text-sm text-slate-400 mb-6">
+      <Text className="text-sm text-text-secondary mb-6">
         This is how others in your workspaces will see you. We picked one for
         you — feel free to change it.
       </Text>
@@ -53,8 +53,8 @@ export function OnboardingDisplayNameScreen({
             autoCapitalize="words"
             autoCorrect={false}
             placeholder="Your display name"
-            placeholderTextColor="#64748b"
-            className="bg-slate-800 text-slate-50 rounded-lg px-3 py-2 border border-slate-700"
+            placeholderTextColor="#7a8290"
+            className="bg-surface text-text rounded-lg px-3 py-2 border border-border-soft"
             style={{fontFamily: monospace}}
           />
         </View>
@@ -62,15 +62,15 @@ export function OnboardingDisplayNameScreen({
         <View
           testID="display-name-default"
           accessibilityLabel="default display name"
-          className="bg-slate-800 rounded-lg px-4 py-4 mb-4 flex-row items-center justify-between">
-          <Text className="text-lg text-slate-50">{defaultDisplayName}</Text>
+          className="bg-surface rounded-lg px-4 py-4 mb-4 flex-row items-center justify-between">
+          <Text className="text-lg text-text">{defaultDisplayName}</Text>
           <Pressable
             testID="display-name-change-btn"
             accessibilityRole="button"
             accessibilityLabel="change display name"
             onPress={() => setEditing(true)}
-            className="rounded-lg py-1 px-3 bg-slate-700 border border-slate-600 active:bg-slate-600">
-            <Text className="text-xs font-semibold text-slate-50">Change</Text>
+            className="rounded-lg py-1 px-3 bg-surface-2 border border-border-soft active:bg-surface-3">
+            <Text className="text-xs font-semibold text-text">Change</Text>
           </Pressable>
         </View>
       )}
@@ -91,10 +91,10 @@ export function OnboardingDisplayNameScreen({
         className={[
           'rounded-lg py-3 px-4 self-start',
           canSubmit
-            ? 'bg-indigo-500 active:bg-indigo-400'
-            : 'bg-slate-700 opacity-60',
+            ? 'bg-primary active:bg-primary-hover'
+            : 'bg-surface-2 opacity-60',
         ].join(' ')}>
-        <Text className="text-sm font-semibold text-slate-50">Continue</Text>
+        <Text className="text-sm font-semibold text-on-primary">Continue</Text>
       </Pressable>
     </ScrollView>
   );

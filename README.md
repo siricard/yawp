@@ -10,6 +10,10 @@
 - [`docs/walkthroughs/m7-3.md`](docs/walkthroughs/m7-3.md) — mnemonic
   onboarding + restore + server invites: a second identity redeems an
   invite and joins `#general` (`just demo-m7-3`).
+- [`docs/walkthroughs/m7-4-design.md`](docs/walkthroughs/m7-4-design.md) —
+  shared component library + design-system pass: every M7.0–M7.3 surface
+  re-skinned against `.designkit` v16, viewable in isolation via Ladle
+  (`just demo-m7-4-design`).
 
 ## Running everything locally
 
