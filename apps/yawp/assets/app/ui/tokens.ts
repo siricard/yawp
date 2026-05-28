@@ -1,3 +1,5 @@
+// AUTO-GENERATED from apps/yawp/assets/css/tokens.css by scripts/gen-tokens.mjs.
+// Do not edit by hand. Run `node apps/yawp/assets/native/scripts/gen-tokens.mjs`.
 export const tokens = {
   color: {
     "bg": "#202831",

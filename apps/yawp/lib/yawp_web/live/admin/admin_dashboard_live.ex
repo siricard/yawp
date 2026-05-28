@@ -174,7 +174,7 @@ defmodule YawpWeb.AdminDashboardLive do
     <Layouts.app flash={@flash}>
       <header
         id="admin-header-strip"
-        class="flex items-center justify-between gap-lg bg-surface text-text rounded-lg px-lg py-md mb-lg shadow-card"
+        class="flex items-center justify-between gap-4 bg-surface text-text rounded-lg px-4 py-3 mb-4 shadow-card"
       >
         <div>
           <h1 class="font-display text-2xl font-bold text-text">Operator console</h1>
@@ -493,7 +493,7 @@ defmodule YawpWeb.AdminDashboardLive do
     ~H"""
     <section
       id={"section-#{@id}"}
-      class="rounded-lg bg-surface border border-border-soft p-lg shadow-card"
+      class="rounded-lg bg-surface border border-border-soft p-4 shadow-card"
     >
       <div class="flex items-center gap-2 mb-3 pb-2 border-b border-border-soft">
         <.icon name={@icon} class="size-4 text-text-tertiary" />
