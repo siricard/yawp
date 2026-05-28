@@ -43,6 +43,9 @@ jobs:
       - name: Compile with warnings as errors
         run: nix develop -c mix compile --warnings-as-errors
 
+      - name: Setup Ash (create + migrate test DB)
+        run: nix develop -c bash -c 'cd apps/yawp && mix ash.setup --quiet'
+
       - name: Run Elixir tests
         run: nix develop -c mix test
 

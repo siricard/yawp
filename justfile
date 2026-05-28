@@ -50,6 +50,7 @@ check:
 ci:
     nix develop -c mix format --check-formatted
     nix develop -c mix compile --warnings-as-errors
+    nix develop -c bash -c 'cd apps/yawp && mix ash.setup --quiet'
     nix develop -c mix test
     nix develop -c bash -c 'cd apps/yawp/assets && npx tsc --noEmit'
     nix develop -c bash -c 'cd apps/yawp/assets/native && npx tsc --noEmit'
