@@ -28,7 +28,7 @@ defmodule Yawp.MixProject do
     ]
   end
 
-        def application do
+  def application do
     [
       mod: {Yawp.Application, []},
       extra_applications: [:logger, :runtime_tools]
@@ -41,10 +41,10 @@ defmodule Yawp.MixProject do
     ]
   end
 
-    defp elixirc_paths(:test), do: ["lib", "test/support"]
+  defp elixirc_paths(:test), do: ["lib", "test/support"]
   defp elixirc_paths(_), do: ["lib"]
 
-        defp deps do
+  defp deps do
     [
       {:bcrypt_elixir, "~> 3.0"},
       {:argon2_elixir, "~> 4.0"},
@@ -99,7 +99,7 @@ defmodule Yawp.MixProject do
     ]
   end
 
-              defp aliases do
+  defp aliases do
     [
       setup: ["deps.get", "ash.setup", "assets.setup", "assets.build", "run priv/repo/seeds.exs"],
       "ecto.setup": ["ecto.create", "ecto.migrate", "run priv/repo/seeds.exs"],
