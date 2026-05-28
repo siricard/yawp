@@ -10,6 +10,8 @@
     "test": "jest"
   },
   "dependencies": {
+    "@expo-google-fonts/geist": "^0.4.2",
+    "@expo-google-fonts/geist-mono": "^0.4.2",
     "@noble/ciphers": "^2.2.0",
     "@noble/ed25519": "^3.1.0",
     "@noble/hashes": "^2.2.0",
