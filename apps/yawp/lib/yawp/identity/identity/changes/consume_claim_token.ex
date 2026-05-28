@@ -24,7 +24,7 @@ defmodule Yawp.Identity.Identity.Changes.ConsumeClaimToken do
   defp consume(changeset) do
     token = Ash.Changeset.get_argument(changeset, :claim_token)
 
-                case Admin.consume_claim_token(token, return_notifications?: true) do
+    case Admin.consume_claim_token(token, return_notifications?: true) do
       {:ok, claim, notifications} ->
         changeset
         |> Ash.Changeset.put_context(:consumed_claim_token, claim)
@@ -34,7 +34,7 @@ defmodule Yawp.Identity.Identity.Changes.ConsumeClaimToken do
         Ash.Changeset.put_context(changeset, :consumed_claim_token, claim)
 
       {:error, slug} when is_atom(slug) ->
-                                                type = classify(token, slug)
+        type = classify(token, slug)
 
         Ash.Changeset.add_error(
           changeset,

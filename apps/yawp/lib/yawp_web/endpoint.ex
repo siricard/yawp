@@ -1,7 +1,7 @@
 defmodule YawpWeb.Endpoint do
   use Phoenix.Endpoint, otp_app: :yawp
 
-        @session_options [
+  @session_options [
     store: :cookie,
     key: "_yawp_key",
     signing_salt: "A86h2uWA",
@@ -12,9 +12,9 @@ defmodule YawpWeb.Endpoint do
     websocket: [connect_info: [session: @session_options]],
     longpoll: [connect_info: [session: @session_options]]
 
-    socket "/socket", YawpWeb.UserSocket, websocket: true
+  socket "/socket", YawpWeb.UserSocket, websocket: true
 
-            plug Plug.Static,
+  plug Plug.Static,
     at: "/",
     from: :yawp,
     gzip: not code_reloading?,
@@ -25,9 +25,9 @@ defmodule YawpWeb.Endpoint do
     plug Tidewave
   end
 
-      if code_reloading? do
+  if code_reloading? do
     plug AshAi.Mcp.Dev,
-            protocol_version_statement: "2024-11-05",
+      protocol_version_statement: "2024-11-05",
       otp_app: :yawp,
       path: "/ash_ai/mcp"
 

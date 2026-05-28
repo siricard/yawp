@@ -64,7 +64,7 @@ defmodule Yawp.Servers.ServerInvite do
         constraints: [one_of: [:single_use, :multi_use]]
 
       argument :ttl_seconds, :integer, default: 24 * 60 * 60
-            argument :uses_remaining, :integer, allow_nil?: true
+      argument :uses_remaining, :integer, allow_nil?: true
 
       change Yawp.Servers.ServerInvite.Changes.VerifyServerOwnership
       change Yawp.Servers.ServerInvite.Changes.ValidateMintKind

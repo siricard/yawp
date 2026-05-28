@@ -26,7 +26,7 @@ defmodule YawpWeb.AshTypescriptRpcControllerTest do
         |> put_req_header("content-type", "application/json")
         |> post(~p"/rpc/run", body)
 
-                              assert conn.status == 200
+      assert conn.status == 200
       payload = json_response(conn, 200)
       assert payload["success"] == false
       assert is_list(payload["errors"]) and payload["errors"] != []
@@ -57,7 +57,7 @@ defmodule YawpWeb.AshTypescriptRpcControllerTest do
 
     test "GET /rpc/run is not routed", %{conn: conn} do
       conn = get(conn, "/rpc/run")
-                  assert conn.status == 404
+      assert conn.status == 404
     end
   end
 
@@ -74,7 +74,7 @@ defmodule YawpWeb.AshTypescriptRpcControllerTest do
         |> put_req_header("content-type", "application/json")
         |> post(~p"/rpc/validate", body)
 
-                        assert conn.status == 200
+      assert conn.status == 200
     end
   end
 end

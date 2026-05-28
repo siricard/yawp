@@ -1,5 +1,5 @@
 defmodule Yawp.Application do
-      @moduledoc false
+  @moduledoc false
 
   use Application
 
@@ -17,11 +17,11 @@ defmodule Yawp.Application do
       {Phoenix.PubSub, name: Yawp.PubSub},
       Yawp.Vault,
       Yawp.Admin.SetupToken,
-                        YawpWeb.Endpoint,
+      YawpWeb.Endpoint,
       {AshAuthentication.Supervisor, [otp_app: :yawp]}
     ]
 
-            opts = [strategy: :one_for_one, name: Yawp.Supervisor]
+    opts = [strategy: :one_for_one, name: Yawp.Supervisor]
 
     case Supervisor.start_link(children, opts) do
       {:ok, _pid} = ok ->
@@ -35,7 +35,7 @@ defmodule Yawp.Application do
     end
   end
 
-          defp maybe_announce_setup_token do
+  defp maybe_announce_setup_token do
     if Application.get_env(:yawp, :announce_setup_token_on_boot, true) do
       try do
         if account_count() == 0 do
@@ -77,7 +77,7 @@ defmodule Yawp.Application do
     end
   end
 
-        defp ensure_active_server_key do
+  defp ensure_active_server_key do
     if Application.get_env(:yawp, :ensure_server_key_on_boot, true) do
       try do
         Yawp.Federation.ensure_active_server_key!()
@@ -89,7 +89,7 @@ defmodule Yawp.Application do
     end
   end
 
-              defp maybe_run_servers_seeder do
+  defp maybe_run_servers_seeder do
     if Application.get_env(:yawp, :run_servers_seeder_on_boot, true) do
       try do
         Yawp.Servers.Seeder.run()
@@ -101,7 +101,7 @@ defmodule Yawp.Application do
     end
   end
 
-      @impl true
+  @impl true
   def config_change(changed, _new, removed) do
     YawpWeb.Endpoint.config_change(changed, removed)
     :ok

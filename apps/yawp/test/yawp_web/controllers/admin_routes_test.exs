@@ -4,7 +4,7 @@ defmodule YawpWeb.AdminRoutesTest do
   describe "AshAdmin mount location" do
     test "GET /admin no longer hits AshAdmin (redirects to /admin/login or renders dashboard)",
          %{conn: conn} do
-                        conn = get(conn, "/admin")
+      conn = get(conn, "/admin")
       assert conn.status in [200, 302]
       refute conn.resp_body =~ "AshAdmin"
 
@@ -14,7 +14,7 @@ defmodule YawpWeb.AdminRoutesTest do
     end
 
     test "GET /dev/ash-admin hits AshAdmin", %{conn: conn} do
-            conn = get(conn, "/dev/ash-admin")
+      conn = get(conn, "/dev/ash-admin")
       assert conn.status in [200, 302]
     end
 
@@ -22,7 +22,7 @@ defmodule YawpWeb.AdminRoutesTest do
       routes = YawpWeb.Router.__routes__()
       paths = Enum.map(routes, & &1.path)
 
-                              allowed = ~w(/admin /admin/login /admin/logout /admin/setup)
+      allowed = ~w(/admin /admin/login /admin/logout /admin/setup)
 
       unexpected =
         paths
@@ -32,7 +32,7 @@ defmodule YawpWeb.AdminRoutesTest do
       assert unexpected == [],
              "Unexpected /admin routes (only #{inspect(allowed)} permitted ): #{inspect(unexpected)}"
 
-                  refute Enum.any?(routes, fn route ->
+      refute Enum.any?(routes, fn route ->
                String.starts_with?(route.path, "/admin") and
                  inspect(route.plug) =~ "AshAdmin"
              end),

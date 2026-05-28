@@ -91,7 +91,7 @@ defmodule Yawp.Admin do
     end
   end
 
-            defp attempt_atomic_consume(%Yawp.Admin.ClaimToken{} = claim, opts) do
+  defp attempt_atomic_consume(%Yawp.Admin.ClaimToken{} = claim, opts) do
     return_notifications? = Keyword.get(opts, :return_notifications?, false)
 
     claim

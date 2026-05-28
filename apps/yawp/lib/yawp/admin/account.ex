@@ -35,7 +35,7 @@ defmodule Yawp.Admin.Account do
       password :password do
         identity_field :email
         hash_provider AshAuthentication.Argon2Provider
-                        registration_enabled? false
+        registration_enabled? false
       end
     end
   end
@@ -126,7 +126,7 @@ defmodule Yawp.Admin.Account do
       authorize_if always()
     end
 
-                        policy action(:create_account) do
+    policy action(:create_account) do
       authorize_if always()
     end
 

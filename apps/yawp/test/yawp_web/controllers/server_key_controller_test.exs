@@ -26,7 +26,7 @@ defmodule YawpWeb.ServerKeyControllerTest do
     assert is_binary(entry["not_before"])
     assert is_binary(entry["not_after"])
 
-        assert {:ok, decoded} = Base.url_decode64(entry["public_key"], padding: false)
+    assert {:ok, decoded} = Base.url_decode64(entry["public_key"], padding: false)
     assert decoded == key.public_key
   end
 

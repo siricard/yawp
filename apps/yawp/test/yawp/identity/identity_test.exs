@@ -99,7 +99,7 @@ defmodule Yawp.Identity.IdentityTest do
       assert sub["signature"] == args.device_signature
       assert is_binary(sub["issued_at"])
 
-            assert updated.anchor_list == [YawpWeb.Endpoint.url()]
+      assert updated.anchor_list == [YawpWeb.Endpoint.url()]
       assert updated.profile_version == 1
     end
   end
@@ -113,14 +113,14 @@ defmodule Yawp.Identity.IdentityTest do
       assert after_first.profile_version == 1
       assert length(after_first.device_subkeys["subkeys"]) == 1
 
-            args2 = bind_args(sk, did, device_id: args.device_id)
+      args2 = bind_args(sk, did, device_id: args.device_id)
       {:ok, after_second} = Identity.bind_device(after_first, args2)
 
       assert length(after_second.device_subkeys["subkeys"]) == 1
       assert after_second.anchor_list == [YawpWeb.Endpoint.url()]
-            assert after_second.profile_version == 1
+      assert after_second.profile_version == 1
 
-            sub = hd(after_second.device_subkeys["subkeys"])
+      sub = hd(after_second.device_subkeys["subkeys"])
       assert sub["signature"] == args.device_signature
     end
   end
@@ -145,7 +145,7 @@ defmodule Yawp.Identity.IdentityTest do
     test "mismatched device delegation is rejected" do
       %{identity: identity, master_sk: _sk, did: did} = seed_identity!()
 
-            {_other_pk, other_sk} = :crypto.generate_key(:eddsa, :ed25519)
+      {_other_pk, other_sk} = :crypto.generate_key(:eddsa, :ed25519)
       args = bind_args(other_sk, did)
 
       assert {:error, error} = Identity.bind_device(identity, args)

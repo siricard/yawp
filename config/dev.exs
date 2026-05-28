@@ -11,7 +11,7 @@ config :yawp, Yawp.Repo,
   pool_size: 10
 
 config :yawp, YawpWeb.Endpoint,
-      http: [ip: {127, 0, 0, 1}],
+  http: [ip: {127, 0, 0, 1}],
   check_origin: false,
   code_reloader: true,
   debug_errors: true,
@@ -25,11 +25,11 @@ config :yawp, YawpWeb.Endpoint,
   live_reload: [
     web_console_logger: true,
     patterns: [
-            ~r"priv/static/(?!uploads/).*\.(js|css|png|jpeg|jpg|gif|svg)$",
-            ~r"priv/gettext/.*\.po$",
-            ~r"(apps/yawp/)?lib/yawp_web/router\.ex$",
+      ~r"priv/static/(?!uploads/).*\.(js|css|png|jpeg|jpg|gif|svg)$",
+      ~r"priv/gettext/.*\.po$",
+      ~r"(apps/yawp/)?lib/yawp_web/router\.ex$",
       ~r"(apps/yawp/)?lib/yawp_web/(controllers|live|components)/.*\.(ex|heex)$",
-            ~r"(apps/yawp/)?assets/app/.*\.(ts|tsx|js|jsx|json)$"
+      ~r"(apps/yawp/)?assets/app/.*\.(ts|tsx|js|jsx|json)$"
     ]
   ]
 
@@ -42,8 +42,8 @@ config :phoenix, :stacktrace_depth, 20
 config :phoenix, :plug_init_mode, :runtime
 
 config :phoenix_live_view,
-      debug_heex_annotations: true,
+  debug_heex_annotations: true,
   debug_attributes: true,
-    enable_expensive_runtime_checks: true
+  enable_expensive_runtime_checks: true
 
 config :swoosh, :api_client, false

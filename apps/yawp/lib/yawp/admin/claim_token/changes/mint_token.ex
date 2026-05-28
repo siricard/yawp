@@ -43,7 +43,7 @@ defmodule Yawp.Admin.ClaimToken.Changes.MintToken do
 
   @ttl_seconds 15 * 60
 
-      @advisory_lock_key 7_151_500_000_000_001
+  @advisory_lock_key 7_151_500_000_000_001
 
   @impl true
   def change(changeset, _opts, _context) do
@@ -63,12 +63,12 @@ defmodule Yawp.Admin.ClaimToken.Changes.MintToken do
     |> Ash.Changeset.before_action(&revoke_active_tokens/1)
   end
 
-                defp acquire_xact_lock(changeset) do
+  defp acquire_xact_lock(changeset) do
     Yawp.Repo.query!("SELECT pg_advisory_xact_lock($1)", [@advisory_lock_key])
     changeset
   end
 
-                                      defp revoke_active_tokens(changeset) do
+  defp revoke_active_tokens(changeset) do
     Yawp.Admin.ClaimToken
     |> Ash.Query.filter(is_nil(consumed_at) and is_nil(revoked_at))
     |> Ash.bulk_update!(:revoke, %{},

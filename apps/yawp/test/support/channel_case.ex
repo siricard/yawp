@@ -8,9 +8,9 @@ defmodule YawpWeb.ChannelCase do
 
   using do
     quote do
-            @endpoint YawpWeb.Endpoint
+      @endpoint YawpWeb.Endpoint
 
-            import Phoenix.ChannelTest
+      import Phoenix.ChannelTest
       import YawpWeb.ChannelCase
     end
   end

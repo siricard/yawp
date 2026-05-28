@@ -64,7 +64,7 @@ defmodule Yawp.Identity.BindDeviceRpcTest do
     device_pk_b64 = Base.url_encode64(device_pk_bytes, padding: false)
     device_sig_b64 = Base.url_encode64(device_sig, padding: false)
 
-            canonical_body =
+    canonical_body =
       Yawp.CanonicalJson.encode(%{
         "did" => did,
         "device_id" => device_id,
@@ -129,18 +129,18 @@ defmodule Yawp.Identity.BindDeviceRpcTest do
       assert (Map.get(d, :did) || Map.get(d, "did")) == did
       assert (Map.get(d, :profileVersion) || Map.get(d, "profileVersion")) == 1
 
-            {:ok, refreshed} = Ash.get(Yawp.Identity.Identity, identity.id, authorize?: false)
+      {:ok, refreshed} = Ash.get(Yawp.Identity.Identity, identity.id, authorize?: false)
       assert length(refreshed.device_subkeys["subkeys"]) == 1
       sub = hd(refreshed.device_subkeys["subkeys"])
       assert sub["device_id"] == built.device_id
       assert sub["pk"] == built.device_pk_b64
       assert sub["signature"] == built.device_sig_b64
 
-            server_url = YawpWeb.Endpoint.url()
+      server_url = YawpWeb.Endpoint.url()
       assert server_url in refreshed.anchor_list
       assert refreshed.profile_version == 1
 
-            meta = metadata(result)
+      meta = metadata(result)
 
       session_token =
         Map.get(meta, :sessionToken) || Map.get(meta, "sessionToken") ||
@@ -158,10 +158,10 @@ defmodule Yawp.Identity.BindDeviceRpcTest do
       assert is_binary(refresh_token) and byte_size(refresh_token) > 0
       assert expires_at
 
-            assert {:ok, %Yawp.Identity.Identity{id: id}} = Identity.verify_session(session_token)
+      assert {:ok, %Yawp.Identity.Identity{id: id}} = Identity.verify_session(session_token)
       assert id == identity.id
 
-            {:ok, entries} = Yawp.Admin.list_recent_audit_entries()
+      {:ok, entries} = Yawp.Admin.list_recent_audit_entries()
       bind = Enum.find(entries, &(&1.action == "identity.bind_device"))
       assert bind
       payload = bind.payload
@@ -186,8 +186,8 @@ defmodule Yawp.Identity.BindDeviceRpcTest do
       assert success?(result), inspect(result)
 
       {:ok, refreshed} = Ash.get(Yawp.Identity.Identity, identity.id, authorize?: false)
-            assert length(refreshed.device_subkeys["subkeys"]) == 1
-            assert refreshed.profile_version == 1
+      assert length(refreshed.device_subkeys["subkeys"]) == 1
+      assert refreshed.profile_version == 1
 
       meta = metadata(result)
       session_token = Map.get(meta, :sessionToken) || Map.get(meta, "sessionToken")
@@ -228,7 +228,7 @@ defmodule Yawp.Identity.BindDeviceRpcTest do
       %{master_sk: _master_sk, did: did} = seed_identity!()
       {_other_pk, other_sk} = :crypto.generate_key(:eddsa, :ed25519)
 
-            built = build_input(master_sk: other_sk, did: did)
+      built = build_input(master_sk: other_sk, did: did)
 
       result = run(did, built.input)
       assert "invalid_device_delegation" in error_types(result)
@@ -272,7 +272,8 @@ defmodule Yawp.Identity.BindDeviceRpcTest do
   describe "bind_device" do
     test "stale device_issued_at + fresh request_issued_at SUCCEEDS (user-reported flow)" do
       %{identity: identity, master_sk: master_sk, did: did} = seed_identity!()
-                  stale_device =
+
+      stale_device =
         DateTime.utc_now() |> DateTime.add(-60 * 60, :second) |> DateTime.to_iso8601()
 
       built =
@@ -304,7 +305,8 @@ defmodule Yawp.Identity.BindDeviceRpcTest do
   describe "bind_device (client-realistic millisecond issued_at)" do
     test "issued_at with millisecond precision (JS Date.toISOString shape) succeeds" do
       %{identity: identity, master_sk: master_sk, did: did} = seed_identity!()
-                  ms_iso =
+
+      ms_iso =
         DateTime.utc_now()
         |> DateTime.truncate(:millisecond)
         |> DateTime.to_iso8601()
@@ -318,7 +320,7 @@ defmodule Yawp.Identity.BindDeviceRpcTest do
 
       {:ok, refreshed} = Ash.get(Yawp.Identity.Identity, identity.id, authorize?: false)
       sub = hd(refreshed.device_subkeys["subkeys"])
-            assert sub["issued_at"] == ms_iso
+      assert sub["issued_at"] == ms_iso
     end
   end
 
@@ -349,7 +351,7 @@ defmodule Yawp.Identity.BindDeviceRpcTest do
         |> Enum.map(fn {:ok, r} -> r end)
 
       successes = Enum.filter(results, &success?/1)
-                              assert successes != []
+      assert successes != []
 
       {:ok, refreshed} = Ash.get(Yawp.Identity.Identity, identity.id, authorize?: false)
       assert length(refreshed.device_subkeys["subkeys"]) == 1

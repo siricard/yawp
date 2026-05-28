@@ -38,12 +38,12 @@ defmodule Yawp.Identity.SessionTokenTest do
       assert session.device_id == device_id
       assert refresh.device_id == device_id
 
-            session_ttl = DateTime.diff(session.expires_at, DateTime.utc_now(), :second)
+      session_ttl = DateTime.diff(session.expires_at, DateTime.utc_now(), :second)
       refresh_ttl = DateTime.diff(refresh.expires_at, DateTime.utc_now(), :second)
       assert session_ttl > 55 * 60 and session_ttl <= 60 * 60
       assert refresh_ttl > 13 * 86_400 and refresh_ttl <= 14 * 86_400
 
-            assert Yawp.Repo.aggregate("identity_session_tokens", :count) == 1
+      assert Yawp.Repo.aggregate("identity_session_tokens", :count) == 1
       assert Yawp.Repo.aggregate("identity_refresh_tokens", :count) == 1
     end
   end
@@ -78,7 +78,7 @@ defmodule Yawp.Identity.SessionTokenTest do
       device_id = Ecto.UUID.generate()
       {:ok, %{session_token: session}} = Yawp.Identity.issue_pair(identity.id, device_id)
 
-            past = DateTime.add(DateTime.utc_now(), -3600, :second)
+      past = DateTime.add(DateTime.utc_now(), -3600, :second)
 
       Yawp.Repo.update_all(
         from(s in "identity_session_tokens",
@@ -106,7 +106,7 @@ defmodule Yawp.Identity.SessionTokenTest do
       assert new_session.device_id == device_id
       assert new_refresh.device_id == device_id
 
-            old_row =
+      old_row =
         RefreshToken
         |> Ash.Query.for_read(:get_by_token, %{token: refresh.token})
         |> Ash.read_one!(authorize?: false)
@@ -210,7 +210,7 @@ defmodule Yawp.Identity.SessionTokenTest do
       assert reload_refresh(ra1).revoked_at != nil
       assert reload_refresh(ra2).revoked_at != nil
 
-            assert reload_session(sb).revoked_at == nil
+      assert reload_session(sb).revoked_at == nil
       assert reload_refresh(rb).revoked_at == nil
     end
   end

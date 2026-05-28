@@ -21,7 +21,7 @@ defmodule Yawp.Admin.AccountTest do
 
       assert to_string(account.email) == "op@example.com"
       assert is_binary(account.hashed_password)
-            assert String.starts_with?(account.hashed_password, "$argon2id$")
+      assert String.starts_with?(account.hashed_password, "$argon2id$")
       assert %DateTime{} = account.inserted_at
       assert account.last_login_at == nil
     end

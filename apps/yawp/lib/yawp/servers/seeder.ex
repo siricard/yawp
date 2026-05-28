@@ -18,7 +18,7 @@ defmodule Yawp.Servers.Seeder do
   ]
   @default_server_name "Yawp"
 
-      @advisory_lock_key 7_160_000_000_000_001
+  @advisory_lock_key 7_160_000_000_000_001
 
   @doc """
   Idempotent seed entrypoint. Returns `:ok` either way.
@@ -91,6 +91,6 @@ defmodule Yawp.Servers.Seeder do
         n
       end
 
-            {:ok, List.flatten([server_notifications, role_notifications, channel_notifications])}
+    {:ok, List.flatten([server_notifications, role_notifications, channel_notifications])}
   end
 end

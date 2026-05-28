@@ -73,7 +73,6 @@ defmodule Yawp.Federation.ServerKey do
       prepare build(sort: [not_before: :desc], limit: 1, load: [:private_key])
     end
 
-                
     read :list_active do
       description "All in-window, non-revoked keys, newest first."
       filter expr(is_nil(revoked_at) and not_before <= now() and not_after >= now())

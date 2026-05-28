@@ -5,7 +5,7 @@ defmodule YawpWeb.Layouts do
   """
   use YawpWeb, :html
 
-          embed_templates "layouts/*"
+  embed_templates "layouts/*"
 
   @doc """
   Renders your app layout.

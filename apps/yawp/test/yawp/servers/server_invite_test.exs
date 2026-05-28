@@ -84,7 +84,7 @@ defmodule Yawp.Servers.ServerInviteTest do
       assert invite.consumed_at == nil
       assert invite.revoked_at == nil
       assert invite.server_id == server.id
-                  assert invite.created_by_identity_id == owner.id
+      assert invite.created_by_identity_id == owner.id
 
       ttl_seconds = DateTime.diff(invite.expires_at, DateTime.utc_now())
       assert ttl_seconds in (24 * 60 * 60 - 60)..(24 * 60 * 60)
@@ -121,7 +121,7 @@ defmodule Yawp.Servers.ServerInviteTest do
     end
 
     test "rejects mint by non-owner identity (not_server_owner)", %{server: server} do
-            {pk2, _sk2} = :crypto.generate_key(:eddsa, :ed25519)
+      {pk2, _sk2} = :crypto.generate_key(:eddsa, :ed25519)
       did2 = "did:yawp:" <> Identity.did_from_pubkey(pk2)
       non_owner = Ash.Seed.seed!(Yawp.Identity.Identity, %{did: did2, master_public_key: pk2})
 
@@ -164,13 +164,13 @@ defmodule Yawp.Servers.ServerInviteTest do
       assert server_id == server.id
       assert role == "Member"
 
-            {:ok, refetched} = Servers.get_server_invite_by_id(invite.id)
+      {:ok, refetched} = Servers.get_server_invite_by_id(invite.id)
       assert refetched.consumed_at != nil
 
-            identity = Yawp.Identity.get_identity_by_did!(args.did)
+      identity = Yawp.Identity.get_identity_by_did!(args.did)
       assert identity.master_public_key == args._pk_bytes
 
-            {:ok, role_row} = Servers.get_system_role_for_server("Member", server.id)
+      {:ok, role_row} = Servers.get_system_role_for_server("Member", server.id)
       require Ash.Query
 
       memberships =
@@ -200,7 +200,7 @@ defmodule Yawp.Servers.ServerInviteTest do
       assert after_second.uses_remaining == 0
       assert after_second.consumed_at != nil
 
-            assert {:error, error} = do_redeem(build_redeem_args(invite.token))
+      assert {:error, error} = do_redeem(build_redeem_args(invite.token))
       assert error_type(error) == "invite_token_exhausted"
     end
   end
@@ -277,7 +277,7 @@ defmodule Yawp.Servers.ServerInviteTest do
       parent = self()
       n = 4
 
-            args_list = for _ <- 1..n, do: build_redeem_args(invite.token)
+      args_list = for _ <- 1..n, do: build_redeem_args(invite.token)
 
       results =
         args_list
@@ -306,7 +306,6 @@ defmodule Yawp.Servers.ServerInviteTest do
     end
   end
 
-  
   defp error_type(error) do
     cond do
       is_struct(error, Yawp.RpcError) ->

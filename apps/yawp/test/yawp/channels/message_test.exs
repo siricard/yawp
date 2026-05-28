@@ -10,7 +10,7 @@ defmodule Yawp.Channels.MessageTest do
     {:ok, channel} =
       Yawp.Servers.create_channel(%{server_id: server.id, name: "general", type: :text})
 
-            {master_pk, _master_sk} = :crypto.generate_key(:eddsa, :ed25519)
+    {master_pk, _master_sk} = :crypto.generate_key(:eddsa, :ed25519)
     {device_pk, device_sk} = :crypto.generate_key(:eddsa, :ed25519)
 
     did = "did:yawp:" <> Identity.did_from_pubkey(master_pk)
@@ -81,7 +81,7 @@ defmodule Yawp.Channels.MessageTest do
        ctx do
     body = "tampered"
     ts = System.system_time(:millisecond)
-        sig_b64 = sign_message(ctx.channel.id, "original", ts, ctx.device_sk)
+    sig_b64 = sign_message(ctx.channel.id, "original", ts, ctx.device_sk)
 
     assert {:error, error} =
              Channels.send_message(%{

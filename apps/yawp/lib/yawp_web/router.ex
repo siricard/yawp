@@ -22,12 +22,12 @@ defmodule YawpWeb.Router do
     plug :set_actor, :user
   end
 
-                  pipeline :rpc do
+  pipeline :rpc do
     plug :accepts, ["json"]
     plug :put_secure_browser_headers
   end
 
-      scope "/", YawpWeb do
+  scope "/", YawpWeb do
     pipe_through :rpc
 
     post "/rpc/run", AshTypescriptRpcController, :run
@@ -65,12 +65,12 @@ defmodule YawpWeb.Router do
 
     get "/", PageController, :home
 
-                auth_routes AuthController, Yawp.Admin.Account, path: "/auth"
+    auth_routes AuthController, Yawp.Admin.Account, path: "/auth"
 
-                get "/admin/logout", AuthController, :logout
+    get "/admin/logout", AuthController, :logout
     delete "/admin/logout", AuthController, :logout
 
-                    get "/admin/setup", AdminSetupController, :new
+    get "/admin/setup", AdminSetupController, :new
     post "/admin/setup", AdminSetupController, :create
 
     sign_in_route path: "/admin/login",
@@ -82,9 +82,8 @@ defmodule YawpWeb.Router do
                   ]
   end
 
-        
-    if Application.compile_env(:yawp, :dev_routes) do
-                        import Phoenix.LiveDashboard.Router
+  if Application.compile_env(:yawp, :dev_routes) do
+    import Phoenix.LiveDashboard.Router
 
     scope "/dev" do
       pipe_through :browser

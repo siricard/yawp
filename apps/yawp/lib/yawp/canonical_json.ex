@@ -58,9 +58,8 @@ defmodule Yawp.CanonicalJson do
   defp to_key_binary(k) when is_binary(k), do: k
   defp to_key_binary(k) when is_atom(k), do: Atom.to_string(k)
 
-    defp utf16_units(bin), do: :unicode.characters_to_binary(bin, :utf8, :utf16)
+  defp utf16_units(bin), do: :unicode.characters_to_binary(bin, :utf8, :utf16)
 
-  
   defp encode_string(s), do: [?", escape(s), ?"]
 
   defp escape(<<>>), do: []
@@ -76,10 +75,9 @@ defmodule Yawp.CanonicalJson do
     [?\\, ?u, :io_lib.format("~4.16.0b", [c]) |> IO.iodata_to_binary(), escape(rest)]
   end
 
-      defp escape(<<c, rest::binary>>), do: [c, escape(rest)]
+  defp escape(<<c, rest::binary>>), do: [c, escape(rest)]
 
-  
-      @safe_int_max 9_007_199_254_740_992
+  @safe_int_max 9_007_199_254_740_992
 
   defp format_float(+0.0), do: "0"
   defp format_float(-0.0), do: "0"
@@ -98,10 +96,10 @@ defmodule Yawp.CanonicalJson do
     end
   end
 
-            defp reshape_to_es6(bin) do
+  defp reshape_to_es6(bin) do
     case String.split(bin, "e") do
       [mantissa] ->
-                                strip_trailing_zero_dot(mantissa)
+        strip_trailing_zero_dot(mantissa)
 
       [mantissa, exp_str] ->
         exp = String.to_integer(exp_str)
@@ -112,10 +110,10 @@ defmodule Yawp.CanonicalJson do
             es6_exp(mantissa, exp)
 
           exp >= 0 ->
-                        expand_positive(mantissa, exp)
+            expand_positive(mantissa, exp)
 
           exp >= -6 ->
-                        expand_negative(mantissa, exp)
+            expand_negative(mantissa, exp)
 
           true ->
             es6_exp(mantissa, exp)
@@ -137,7 +135,7 @@ defmodule Yawp.CanonicalJson do
 
   defp expand_positive(mantissa, exp) do
     {sign, digits, dot_pos} = split_mantissa(mantissa)
-        new_dot = dot_pos + exp
+    new_dot = dot_pos + exp
 
     cond do
       new_dot >= byte_size(digits) ->
@@ -164,7 +162,7 @@ defmodule Yawp.CanonicalJson do
     end
   end
 
-    defp split_mantissa("-" <> rest) do
+  defp split_mantissa("-" <> rest) do
     {_, d, p} = split_mantissa(rest)
     {"-", d, p}
   end

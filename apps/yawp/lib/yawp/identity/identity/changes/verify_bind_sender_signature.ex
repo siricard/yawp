@@ -35,7 +35,7 @@ defmodule Yawp.Identity.Identity.Changes.VerifyBindSenderSignature do
   end
 
   defp build_canonical(changeset) do
-                Yawp.CanonicalJson.encode(%{
+    Yawp.CanonicalJson.encode(%{
       "did" => changeset.data.did,
       "device_id" => Ash.Changeset.get_argument(changeset, :device_id),
       "device_pk" => Ash.Changeset.get_argument(changeset, :device_pk),

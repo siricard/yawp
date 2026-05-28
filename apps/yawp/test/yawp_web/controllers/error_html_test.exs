@@ -1,7 +1,7 @@
 defmodule YawpWeb.ErrorHTMLTest do
   use YawpWeb.ConnCase, async: true
 
-    import Phoenix.Template, only: [render_to_string: 4]
+  import Phoenix.Template, only: [render_to_string: 4]
 
   test "renders 404.html" do
     assert render_to_string(YawpWeb.ErrorHTML, "404", "html", []) == "Not Found"

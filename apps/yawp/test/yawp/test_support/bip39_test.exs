@@ -1,5 +1,5 @@
 defmodule Yawp.TestSupport.Bip39Test do
-          use ExUnit.Case, async: true
+  use ExUnit.Case, async: true
 
   alias Yawp.TestSupport.Bip39
   alias Yawp.TestSupport.Hkdf
@@ -52,7 +52,7 @@ defmodule Yawp.TestSupport.Bip39Test do
     end
   end
 
-            describe "BIP-39 Japanese vectors (NFKD code-path)" do
+  describe "BIP-39 Japanese vectors (NFKD code-path)" do
     for {v, idx} <- Enum.with_index(@japanese_vectors) do
       @v v
       @idx idx
@@ -66,7 +66,7 @@ defmodule Yawp.TestSupport.Bip39Test do
 
   describe "validate_mnemonic/1" do
     test "rejects a bad checksum" do
-            words =
+      words =
         "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon"
         |> String.split(" ")
 

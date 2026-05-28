@@ -1,4 +1,3 @@
-
 defmodule Yawp.TestSupport.Bip39 do
   @moduledoc """
   BIP-39 — English wordlist only. Byte-for-byte equivalent to the

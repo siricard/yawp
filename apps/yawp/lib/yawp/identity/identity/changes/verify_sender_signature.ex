@@ -30,7 +30,7 @@ defmodule Yawp.Identity.Identity.Changes.VerifySenderSignature do
         )
 
       _ ->
-                                changeset
+        changeset
     end
   end
 

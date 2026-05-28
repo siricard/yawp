@@ -19,7 +19,7 @@ defmodule Yawp.Identity.Identity.Changes.ValidateRequestIssuedAt do
 
   alias Yawp.RpcError
 
-    @window_seconds 5 * 60
+  @window_seconds 5 * 60
 
   @impl true
   def change(changeset, _opts, _context) do
@@ -34,7 +34,7 @@ defmodule Yawp.Identity.Identity.Changes.ValidateRequestIssuedAt do
 
     with true <- is_binary(request_issued_at),
          true <- is_binary(device_issued_at),
-                                    {:ok, _device_dt, _device_offset} <- DateTime.from_iso8601(device_issued_at),
+         {:ok, _device_dt, _device_offset} <- DateTime.from_iso8601(device_issued_at),
          {:ok, request_dt, _request_offset} <- DateTime.from_iso8601(request_issued_at),
          true <- within_window?(request_dt) do
       changeset

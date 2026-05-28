@@ -3,7 +3,7 @@ defmodule YawpWeb.AuthController do
   use AshAuthentication.Phoenix.Controller
 
   def success(conn, _activity, user, token) do
-                _ = Yawp.Admin.audit!(user.id, "login.success", %{email: to_string(user.email)})
+    _ = Yawp.Admin.audit!(user.id, "login.success", %{email: to_string(user.email)})
 
     user_with_token = Ash.Resource.put_metadata(user, :token, token)
 
@@ -42,5 +42,5 @@ defmodule YawpWeb.AuthController do
     |> redirect(to: ~p"/admin/login")
   end
 
-        def sign_out(conn, params), do: logout(conn, params)
+  def sign_out(conn, params), do: logout(conn, params)
 end

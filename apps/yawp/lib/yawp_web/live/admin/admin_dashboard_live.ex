@@ -527,7 +527,7 @@ defmodule YawpWeb.AdminDashboardLive do
   defp clamp_uses(int) when int > 100, do: 100
   defp clamp_uses(int), do: int
 
-      defp truncate_did(did) when is_binary(did) do
+  defp truncate_did(did) when is_binary(did) do
     if String.length(did) <= 28 do
       did
     else

@@ -71,14 +71,14 @@ defmodule Yawp.Identity.RefreshTokenRpcTest do
       assert refresh_token != refresh.token
       assert expires_at
 
-            old_row =
+      old_row =
         RefreshToken
         |> Ash.Query.for_read(:get_by_token, %{token: refresh.token})
         |> Ash.read_one!(authorize?: false)
 
       assert old_row.rotated_to != nil
 
-            assert {:ok, %Identity{id: id}} = IdentityDomain.verify_session(session_token)
+      assert {:ok, %Identity{id: id}} = IdentityDomain.verify_session(session_token)
       assert id == identity.id
     end
   end
@@ -134,7 +134,6 @@ defmodule Yawp.Identity.RefreshTokenRpcTest do
     end
   end
 
-  
   defp run_revoke(actor, identity_did, device_id) do
     conn =
       Phoenix.ConnTest.build_conn()
@@ -178,12 +177,12 @@ defmodule Yawp.Identity.RefreshTokenRpcTest do
       {:ok, %{session_token: sb, refresh_token: rb}} =
         IdentityDomain.issue_pair(identity_b.id, device_b)
 
-            result = run_revoke(identity_a, identity_b.did, device_b)
+      result = run_revoke(identity_a, identity_b.did, device_b)
 
       assert success?(result) == false
       assert "unauthorized" in error_types(result)
 
-            assert reload_session(sb).revoked_at == nil
+      assert reload_session(sb).revoked_at == nil
       assert reload_refresh(rb).revoked_at == nil
     end
 

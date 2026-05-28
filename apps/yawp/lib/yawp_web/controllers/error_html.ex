@@ -6,8 +6,7 @@ defmodule YawpWeb.ErrorHTML do
   """
   use YawpWeb, :html
 
-                
-        def render(template, _assigns) do
+  def render(template, _assigns) do
     Phoenix.Controller.status_message_from_template(template)
   end
 end

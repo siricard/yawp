@@ -279,7 +279,7 @@ defmodule YawpWeb.CoreComponents do
     """
   end
 
-    def input(assigns) do
+  def input(assigns) do
     ~H"""
     <div class="fieldset mb-2">
       <label for={@id}>
@@ -301,7 +301,7 @@ defmodule YawpWeb.CoreComponents do
     """
   end
 
-    defp error(assigns) do
+  defp error(assigns) do
     ~H"""
     <p class="mt-1.5 flex gap-2 items-center text-sm text-error">
       <.icon name="hero-exclamation-circle" class="size-5" />
@@ -450,7 +450,6 @@ defmodule YawpWeb.CoreComponents do
     """
   end
 
-  
   def show(js \\ %JS{}, selector) do
     JS.show(js,
       to: selector,
@@ -476,7 +475,7 @@ defmodule YawpWeb.CoreComponents do
   Translates an error message using gettext.
   """
   def translate_error({msg, opts}) do
-                                            if count = opts[:count] do
+    if count = opts[:count] do
       Gettext.dngettext(YawpWeb.Gettext, "errors", msg, msg, count, opts)
     else
       Gettext.dgettext(YawpWeb.Gettext, "errors", msg, opts)

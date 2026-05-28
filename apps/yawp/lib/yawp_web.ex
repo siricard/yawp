@@ -23,7 +23,7 @@ defmodule YawpWeb do
     quote do
       use Phoenix.Router, helpers: false
 
-            import Plug.Conn
+      import Plug.Conn
       import Phoenix.Controller
       import Phoenix.LiveView.Router
     end
@@ -67,24 +67,24 @@ defmodule YawpWeb do
     quote do
       use Phoenix.Component
 
-            import Phoenix.Controller,
+      import Phoenix.Controller,
         only: [get_csrf_token: 0, view_module: 1, view_template: 1]
 
-            unquote(html_helpers())
+      unquote(html_helpers())
     end
   end
 
   defp html_helpers do
     quote do
-            use Gettext, backend: YawpWeb.Gettext
+      use Gettext, backend: YawpWeb.Gettext
 
-            import Phoenix.HTML
-            import YawpWeb.CoreComponents
+      import Phoenix.HTML
+      import YawpWeb.CoreComponents
 
-            alias Phoenix.LiveView.JS
+      alias Phoenix.LiveView.JS
       alias YawpWeb.Layouts
 
-            unquote(verified_routes())
+      unquote(verified_routes())
     end
   end
 

@@ -159,14 +159,14 @@ defmodule Yawp.Identity do
   def rotate_refresh(_), do: {:error, :invalid}
 
   defp do_rotate(%Yawp.Identity.RefreshToken{} = refresh) do
-        case Yawp.Identity.RefreshToken
+    case Yawp.Identity.RefreshToken
          |> Ash.Changeset.for_create(:issue_pair, %{
            identity_id: refresh.identity_id,
            device_id: refresh.device_id
          })
          |> Ash.create(authorize?: false, return_notifications?: true) do
       {:ok, new_refresh, n1} ->
-                case refresh
+        case refresh
              |> Ash.Changeset.for_update(:mark_rotated, %{rotated_to: new_refresh.id})
              |> Ash.update(authorize?: false, return_notifications?: true) do
           {:ok, _, n2} ->

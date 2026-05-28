@@ -32,7 +32,7 @@ defmodule Yawp.Federation.ServerKeyTest do
       assert DateTime.compare(key.not_after, key.not_before) == :gt
       assert key.revoked_at == nil
 
-                  raw =
+      raw =
         Yawp.Repo.query!(
           "select encrypted_private_key from federation_server_keys where id = $1",
           [Ecto.UUID.dump!(key.id)]
@@ -48,7 +48,7 @@ defmodule Yawp.Federation.ServerKeyTest do
       {:ok, active} = Federation.get_active_server_key()
 
       assert active.id == key.id
-            assert byte_size(active.private_key) == 32
+      assert byte_size(active.private_key) == 32
     end
 
     test "get_active_server_key/0 returns {:ok, nil} when nothing is generated" do
@@ -66,7 +66,7 @@ defmodule Yawp.Federation.ServerKeyTest do
       {:ok, revoked} = Federation.revoke_server_key(expired)
       assert revoked.revoked_at != nil
 
-            {:ok, valid} = Federation.generate_server_key()
+      {:ok, valid} = Federation.generate_server_key()
 
       {:ok, active} = Federation.get_active_server_key()
       assert active.id == valid.id
@@ -87,7 +87,7 @@ defmodule Yawp.Federation.ServerKeyTest do
       :ok = Federation.ensure_active_server_key!()
       {:ok, key_a} = Federation.get_active_server_key()
 
-                  Yawp.Repo.query!("truncate table federation_server_keys")
+      Yawp.Repo.query!("truncate table federation_server_keys")
       :ok = Federation.ensure_active_server_key!()
       {:ok, key_b} = Federation.get_active_server_key()
 
@@ -108,7 +108,7 @@ defmodule Yawp.Federation.ServerKeyTest do
       assert byte_size(sig) == 64
       assert is_binary(key_id)
 
-            {:ok, active} = Federation.get_active_server_key()
+      {:ok, active} = Federation.get_active_server_key()
       assert active.key_id == key_id
 
       canonical = Yawp.CanonicalJson.encode(payload)

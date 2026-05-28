@@ -1,4 +1,3 @@
-
 import Config
 
 config :cinder, default_theme: "daisy_ui"

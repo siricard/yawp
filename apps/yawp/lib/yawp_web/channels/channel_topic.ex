@@ -123,6 +123,6 @@ defmodule YawpWeb.ChannelTopic do
     }
   end
 
-        defp bare_base58_did("did:yawp:" <> base58), do: base58
+  defp bare_base58_did("did:yawp:" <> base58), do: base58
   defp bare_base58_did(other) when is_binary(other), do: other
 end

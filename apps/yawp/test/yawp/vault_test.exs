@@ -46,7 +46,7 @@ defmodule Yawp.VaultTest do
     end
   end
 
-            describe "Mix.Tasks.Yawp.Gen.CloakKey" do
+  describe "Mix.Tasks.Yawp.Gen.CloakKey" do
     test "prints a 44-character base64-encoded 32-byte key" do
       output =
         ExUnit.CaptureIO.capture_io(fn ->

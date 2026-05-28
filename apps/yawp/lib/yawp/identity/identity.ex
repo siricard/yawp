@@ -51,13 +51,13 @@ defmodule Yawp.Identity.Identity do
 
       argument :claim_token, :string, allow_nil?: false
       argument :did, :string, allow_nil?: false
-            argument :pk, :string, allow_nil?: false
-            argument :sender_signature, :string, allow_nil?: false
+      argument :pk, :string, allow_nil?: false
+      argument :sender_signature, :string, allow_nil?: false
 
       upsert? true
       upsert_identity :unique_did
 
-            change Yawp.Identity.Identity.Changes.DecodeClaimPayload
+      change Yawp.Identity.Identity.Changes.DecodeClaimPayload
       change Yawp.Identity.Identity.Changes.VerifyDidDerivation
       change Yawp.Identity.Identity.Changes.VerifySenderSignature
       change Yawp.Identity.Identity.Changes.ConsumeClaimToken
@@ -128,10 +128,10 @@ defmodule Yawp.Identity.Identity do
       require_atomic? false
 
       argument :device_id, :uuid, allow_nil?: false
-            argument :device_pk, :string, allow_nil?: false
-                  argument :device_signature, :string, allow_nil?: false
-                  argument :sender_signature, :string, allow_nil?: false
-                                                                                    argument :device_issued_at, :string, allow_nil?: false
+      argument :device_pk, :string, allow_nil?: false
+      argument :device_signature, :string, allow_nil?: false
+      argument :sender_signature, :string, allow_nil?: false
+      argument :device_issued_at, :string, allow_nil?: false
       argument :request_issued_at, :string, allow_nil?: false
 
       metadata :session_token, :string

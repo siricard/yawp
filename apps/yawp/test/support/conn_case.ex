@@ -19,11 +19,11 @@ defmodule YawpWeb.ConnCase do
 
   using do
     quote do
-            @endpoint YawpWeb.Endpoint
+      @endpoint YawpWeb.Endpoint
 
       use YawpWeb, :verified_routes
 
-            import Plug.Conn
+      import Plug.Conn
       import Phoenix.ConnTest
       import YawpWeb.ConnCase
     end

@@ -6,7 +6,7 @@ defmodule YawpWeb.LiveUserAuth do
   import Phoenix.Component
   use YawpWeb, :verified_routes
 
-        def on_mount(:current_user, _params, session, socket) do
+  def on_mount(:current_user, _params, session, socket) do
     {:cont, AshAuthentication.Phoenix.LiveSession.assign_new_resources(socket, session)}
   end
 

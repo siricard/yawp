@@ -43,7 +43,7 @@ defmodule Yawp.Admin.ClaimTokenTest do
       {:ok, claim} = Admin.generate_claim_token(%{created_by_account_id: account.id})
 
       assert is_binary(claim.token)
-            assert String.length(claim.token) == 26
+      assert String.length(claim.token) == 26
       assert claim.token =~ ~r/^[A-Z2-7]+$/
       assert claim.created_by_account_id == account.id
       assert claim.consumed_at == nil
@@ -121,7 +121,7 @@ defmodule Yawp.Admin.ClaimTokenTest do
       account = create_account!()
       {:ok, claim} = Admin.generate_claim_token(%{created_by_account_id: account.id})
 
-            past = DateTime.add(DateTime.utc_now(), -3600, :second)
+      past = DateTime.add(DateTime.utc_now(), -3600, :second)
 
       {:ok, _} =
         claim

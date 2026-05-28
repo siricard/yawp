@@ -9,15 +9,15 @@ defmodule YawpWeb.Telemetry do
   @impl true
   def init(_arg) do
     children = [
-                  {:telemetry_poller, measurements: periodic_measurements(), period: 10_000}
-                ]
+      {:telemetry_poller, measurements: periodic_measurements(), period: 10_000}
+    ]
 
     Supervisor.init(children, strategy: :one_for_one)
   end
 
   def metrics do
     [
-            summary("phoenix.endpoint.start.system_time",
+      summary("phoenix.endpoint.start.system_time",
         unit: {:native, :millisecond}
       ),
       summary("phoenix.endpoint.stop.duration",
@@ -46,8 +46,7 @@ defmodule YawpWeb.Telemetry do
         tags: [:event],
         unit: {:native, :millisecond}
       ),
-
-            summary("yawp.repo.query.total_time",
+      summary("yawp.repo.query.total_time",
         unit: {:native, :millisecond},
         description: "The sum of the other measurements"
       ),
@@ -68,8 +67,7 @@ defmodule YawpWeb.Telemetry do
         description:
           "The time the connection spent waiting before being checked out for the query"
       ),
-
-            summary("vm.memory.total", unit: {:byte, :kilobyte}),
+      summary("vm.memory.total", unit: {:byte, :kilobyte}),
       summary("vm.total_run_queue_lengths.total"),
       summary("vm.total_run_queue_lengths.cpu"),
       summary("vm.total_run_queue_lengths.io")
@@ -77,7 +75,6 @@ defmodule YawpWeb.Telemetry do
   end
 
   defp periodic_measurements do
-    [
-                      ]
+    []
   end
 end

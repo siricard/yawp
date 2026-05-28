@@ -1,5 +1,5 @@
 defmodule Yawp.CanonicalJsonTest do
-          use ExUnit.Case, async: true
+  use ExUnit.Case, async: true
 
   alias Yawp.CanonicalJson
 

@@ -89,11 +89,11 @@ defmodule Yawp.Identity.ClaimChatOwnerRpcTest do
       id = Map.get(d, :id) || Map.get(d, "id")
       assert is_binary(id)
 
-            identity = Yawp.Identity.get_identity_by_did!(did)
+      identity = Yawp.Identity.get_identity_by_did!(did)
       assert identity.master_public_key == pk
       assert identity.id == id
 
-            {:ok, server} = Yawp.Servers.get_singleton_server()
+      {:ok, server} = Yawp.Servers.get_singleton_server()
       {:ok, owner_role} = Yawp.Servers.get_system_role_for_server("Owner", server.id)
 
       require Ash.Query
@@ -107,10 +107,10 @@ defmodule Yawp.Identity.ClaimChatOwnerRpcTest do
 
       assert length(memberships) == 1
 
-            {:ok, refetched} = Admin.get_claim_token_by_id(claim.id)
+      {:ok, refetched} = Admin.get_claim_token_by_id(claim.id)
       assert refetched.consumed_at != nil
 
-            {:ok, entries} = Admin.list_recent_audit_entries()
+      {:ok, entries} = Admin.list_recent_audit_entries()
       consume = Enum.find(entries, &(&1.action == "claim_token.consume"))
       assert consume
       assert Map.get(consume.payload, "did") == did or Map.get(consume.payload, :did) == did
@@ -174,8 +174,7 @@ defmodule Yawp.Identity.ClaimChatOwnerRpcTest do
 
       assert "claim_token_invalid" in error_types(result) or
                "claim_token_revoked" in error_types(result)
-
-                            end
+    end
 
     test "claim_token_expired for an expired token" do
       account = create_account!()
@@ -200,7 +199,7 @@ defmodule Yawp.Identity.ClaimChatOwnerRpcTest do
       bad = Map.put(input, "did", "did:yawp:WRONG")
 
       result = run(bad)
-                        types = error_types(result)
+      types = error_types(result)
       assert "did_mismatch" in types or "invalid_signature" in types
     end
 
@@ -266,7 +265,7 @@ defmodule Yawp.Identity.ClaimChatOwnerRpcTest do
 
       {_ok, _res, winning_did} = hd(successes)
 
-            identities =
+      identities =
         Yawp.Identity.Identity
         |> Ash.Query.for_read(:read)
         |> Ash.read!(authorize?: false)
@@ -274,7 +273,7 @@ defmodule Yawp.Identity.ClaimChatOwnerRpcTest do
       assert length(identities) == 1
       assert hd(identities).did == winning_did
 
-            {:ok, server} = Yawp.Servers.get_singleton_server()
+      {:ok, server} = Yawp.Servers.get_singleton_server()
       {:ok, owner_role} = Yawp.Servers.get_system_role_for_server("Owner", server.id)
       require Ash.Query
 
@@ -286,10 +285,10 @@ defmodule Yawp.Identity.ClaimChatOwnerRpcTest do
       assert length(memberships) == 1
       assert hd(memberships).identity_id == hd(identities).id
 
-            {:ok, refetched} = Admin.get_claim_token_by_id(claim.id)
+      {:ok, refetched} = Admin.get_claim_token_by_id(claim.id)
       assert refetched.consumed_at != nil
 
-            failure_types =
+      failure_types =
         failures
         |> Enum.flat_map(fn {_ok, res, _did} -> error_types(res) end)
 

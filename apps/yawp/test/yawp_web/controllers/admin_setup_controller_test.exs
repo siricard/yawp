@@ -13,7 +13,7 @@ defmodule YawpWeb.AdminSetupControllerTest do
   alias Yawp.Admin.SetupToken
 
   setup do
-        SetupToken.reset()
+    SetupToken.reset()
     :ok
   end
 
@@ -64,8 +64,8 @@ defmodule YawpWeb.AdminSetupControllerTest do
         })
 
       assert redirected_to(conn) == "/admin"
-            assert account_exists?("op@example.com")
-            assert SetupToken.current() == nil
+      assert account_exists?("op@example.com")
+      assert SetupToken.current() == nil
     end
 
     test "POST /admin/setup with a bad token returns 403 and does NOT create an account",
@@ -96,18 +96,18 @@ defmodule YawpWeb.AdminSetupControllerTest do
           "password_confirmation" => "different"
         })
 
-            assert conn.status == 500
+      assert conn.status == 500
       assert conn.resp_body =~ ~s(id="admin-setup-failed")
 
-            assert conn.resp_body =~ ~r/restart the server/i
+      assert conn.resp_body =~ ~r/restart the server/i
 
-                  assert conn.resp_body =~ "password_confirmation"
+      assert conn.resp_body =~ "password_confirmation"
 
-            refute conn.resp_body =~ ~s(name="email")
+      refute conn.resp_body =~ ~s(name="email")
       refute conn.resp_body =~ ~s(name="password")
       refute conn.resp_body =~ ~s(id="admin-setup-form")
 
-                              assert SetupToken.current() == nil
+      assert SetupToken.current() == nil
     end
   end
 
@@ -148,7 +148,7 @@ defmodule YawpWeb.AdminSetupControllerTest do
     test "generate/0 returns a 128-bit base32 token (26 chars)" do
       {:ok, token} = SetupToken.generate()
       assert is_binary(token)
-            assert String.length(token) == 26
+      assert String.length(token) == 26
       assert token =~ ~r/^[A-Z2-7]+$/
     end
 

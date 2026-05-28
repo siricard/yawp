@@ -35,11 +35,11 @@ if config_env() == :prod do
   maybe_ipv6 = if System.get_env("ECTO_IPV6") in ~w(true 1), do: [:inet6], else: []
 
   config :yawp, Yawp.Repo,
-        url: database_url,
+    url: database_url,
     pool_size: String.to_integer(System.get_env("POOL_SIZE") || "10"),
-            socket_options: maybe_ipv6
+    socket_options: maybe_ipv6
 
-            secret_key_base =
+  secret_key_base =
     System.get_env("SECRET_KEY_BASE") ||
       raise """
       environment variable SECRET_KEY_BASE is missing.
@@ -53,7 +53,7 @@ if config_env() == :prod do
   config :yawp, YawpWeb.Endpoint,
     url: [host: host, port: 443, scheme: "https"],
     http: [
-                              ip: {0, 0, 0, 0, 0, 0, 0, 0}
+      ip: {0, 0, 0, 0, 0, 0, 0, 0}
     ],
     secret_key_base: secret_key_base
 
@@ -61,6 +61,4 @@ if config_env() == :prod do
     token_signing_secret:
       System.get_env("TOKEN_SIGNING_SECRET") ||
         raise("Missing environment variable `TOKEN_SIGNING_SECRET`!")
-
-                                                              
-                                  end
+end

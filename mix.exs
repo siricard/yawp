@@ -9,11 +9,11 @@ defmodule Yawp.Umbrella.MixProject do
       deps: deps(),
       aliases: aliases(),
       releases: releases(),
-                                    listeners: [Phoenix.CodeReloader]
+      listeners: [Phoenix.CodeReloader]
     ]
   end
 
-        defp deps do
+  defp deps do
     []
   end
 
@@ -25,16 +25,16 @@ defmodule Yawp.Umbrella.MixProject do
 
   defp aliases do
     [
-                        setup: ["cmd --app yawp mix setup"],
-                        "assets.build": ["cmd --app yawp mix assets.build"],
+      setup: ["cmd --app yawp mix setup"],
+      "assets.build": ["cmd --app yawp mix assets.build"],
       "assets.deploy": ["cmd --app yawp mix assets.deploy"],
       "ecto.setup": ["cmd --app yawp mix ecto.setup"],
       "ecto.reset": ["cmd --app yawp mix ecto.reset"],
-                  precommit: ["compile --warnings-as-errors", "deps.unlock --unused", "format", "test"]
+      precommit: ["compile --warnings-as-errors", "deps.unlock --unused", "format", "test"]
     ]
   end
 
-          defp releases do
+  defp releases do
     [
       yawp: [
         include_executables_for: [:unix],

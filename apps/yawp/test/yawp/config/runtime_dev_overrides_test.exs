@@ -1,10 +1,10 @@
 defmodule Yawp.Config.RuntimeDevOverridesTest do
-      use ExUnit.Case, async: false
+  use ExUnit.Case, async: false
 
   @runtime_exs Path.expand("../../../../../config/runtime.exs", __DIR__)
 
   setup do
-        prev = %{
+    prev = %{
       "DATABASE" => System.get_env("DATABASE"),
       "DATABASE_URL" => System.get_env("DATABASE_URL"),
       "PORT" => System.get_env("PORT")
@@ -17,7 +17,7 @@ defmodule Yawp.Config.RuntimeDevOverridesTest do
       end)
     end)
 
-        Enum.each(Map.keys(prev), &System.delete_env/1)
+    Enum.each(Map.keys(prev), &System.delete_env/1)
     :ok
   end
 
@@ -29,7 +29,7 @@ defmodule Yawp.Config.RuntimeDevOverridesTest do
     cfg = read_runtime(:dev)
     repo = cfg[:yawp][Yawp.Repo] || []
 
-            refute Keyword.has_key?(repo, :url)
+    refute Keyword.has_key?(repo, :url)
     refute Keyword.has_key?(repo, :database)
   end
 
@@ -57,7 +57,7 @@ defmodule Yawp.Config.RuntimeDevOverridesTest do
   end
 
   test "test env: DATABASE/DATABASE_URL do NOT bleed into test repo config" do
-            System.put_env("DATABASE", "should_be_ignored_in_test")
+    System.put_env("DATABASE", "should_be_ignored_in_test")
     System.put_env("DATABASE_URL", "ecto://nope")
     cfg = read_runtime(:test)
     repo = cfg[:yawp][Yawp.Repo] || []

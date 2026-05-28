@@ -137,7 +137,7 @@ defmodule YawpWeb.AdminDashboardLiveTest do
       {:ok, entries} = Yawp.Admin.list_recent_audit_entries()
       actions = Enum.map(entries, & &1.action)
       assert "claim_token.revoke" in actions
-            assert Enum.count(actions, &(&1 == "claim_token.generate")) >= 2
+      assert Enum.count(actions, &(&1 == "claim_token.generate")) >= 2
     end
 
     test "Generate writes a claim_token.generate audit entry", %{conn: conn} do
@@ -189,7 +189,7 @@ defmodule YawpWeb.AdminDashboardLiveTest do
 
       {:ok, view, _html} = live(conn, "/admin")
       assert has_element?(view, "#chat-owner-did")
-            assert render(view) =~ String.slice(did, 0, 16)
+      assert render(view) =~ String.slice(did, 0, 16)
     end
   end
 
@@ -220,7 +220,7 @@ defmodule YawpWeb.AdminDashboardLiveTest do
 
     test "defense-in-depth: forcing a mint_server_invite event with no chat owner is a no-op",
          %{conn: conn} do
-                              {:ok, view, _html} = live(conn, "/admin")
+      {:ok, view, _html} = live(conn, "/admin")
 
       render_hook(view, "mint_server_invite", %{})
 
@@ -264,7 +264,7 @@ defmodule YawpWeb.AdminDashboardLiveTest do
       assert invite.kind == :multi_use
       assert invite.uses_remaining == 3
       assert has_element?(view, "#server-invite-token-#{invite.id}", invite.token)
-            assert render(view) =~ "multi_use (3 uses left)"
+      assert render(view) =~ "multi_use (3 uses left)"
     end
 
     test "revoke button removes the invite from the list", %{conn: conn} do
@@ -292,7 +292,7 @@ defmodule YawpWeb.AdminDashboardLiveTest do
     test "clears the session and redirects to /admin/login", %{conn: conn} do
       conn = get(conn, "/admin/logout")
       assert redirected_to(conn) == "/admin/login"
-            assert {:error, {:redirect, %{to: "/admin/login"}}} = live(recycle(conn), "/admin")
+      assert {:error, {:redirect, %{to: "/admin/login"}}} = live(recycle(conn), "/admin")
     end
   end
 end

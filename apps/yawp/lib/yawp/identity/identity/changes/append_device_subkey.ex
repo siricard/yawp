@@ -20,7 +20,7 @@ defmodule Yawp.Identity.Identity.Changes.AppendDeviceSubkey do
     device_pk_b64 = Ash.Changeset.get_argument(changeset, :device_pk)
     device_sig_b64 = Ash.Changeset.get_argument(changeset, :device_signature)
 
-                issued_at_iso = Ash.Changeset.get_argument(changeset, :device_issued_at)
+    issued_at_iso = Ash.Changeset.get_argument(changeset, :device_issued_at)
 
     existing = Ash.Changeset.get_attribute(changeset, :device_subkeys) || %{"subkeys" => []}
     subkeys = Map.get(existing, "subkeys", [])

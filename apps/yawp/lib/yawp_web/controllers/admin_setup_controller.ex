@@ -73,11 +73,11 @@ defmodule YawpWeb.AdminSetupController do
         render_forbidden(conn, :invalid_token)
 
       {:error, {:create_account, error}} ->
-                                        render_setup_failed(conn, error_messages(error))
+        render_setup_failed(conn, error_messages(error))
     end
   end
 
-          defp consume_and_create(token, attrs) do
+  defp consume_and_create(token, attrs) do
     case SetupToken.consume(token) do
       {:ok, _token} ->
         case Admin.create_account(attrs) do

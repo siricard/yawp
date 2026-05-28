@@ -85,7 +85,7 @@ defmodule Yawp.Admin.SetupToken do
   @spec reset() :: :ok
   def reset, do: invalidate()
 
-    defp generate_token do
+  defp generate_token do
     :crypto.strong_rand_bytes(16)
     |> Base.encode32(padding: false)
   end

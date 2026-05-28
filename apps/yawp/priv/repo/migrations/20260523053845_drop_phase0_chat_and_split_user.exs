@@ -8,7 +8,7 @@ defmodule Yawp.Repo.Migrations.DropPhase0ChatAndSplitUser do
   use Ecto.Migration
 
   def up do
-                        drop_if_exists table(:messages)
+    drop_if_exists table(:messages)
     drop_if_exists table(:rooms)
 
     create table(:identities, primary_key: false) do
@@ -40,6 +40,5 @@ defmodule Yawp.Repo.Migrations.DropPhase0ChatAndSplitUser do
     drop_if_exists unique_index(:identities, [:did], name: "identities_unique_did_index")
 
     drop table(:identities)
-
-                  end
+  end
 end

@@ -94,7 +94,7 @@ defmodule Yawp.Admin.ClaimTokenConcurrencyTest do
 
   describe "generate_claim_token/1 with stale expired-but-active rows" do
     test "revokes an expired-unconsumed-unrevoked row so a fresh mint succeeds" do
-                                                            account = create_account!()
+      account = create_account!()
       account_bin = Ecto.UUID.dump!(account.id)
       now = DateTime.utc_now()
       past = DateTime.add(now, -60, :second)
@@ -140,7 +140,7 @@ defmodule Yawp.Admin.ClaimTokenConcurrencyTest do
       {1, _} =
         Yawp.Repo.delete_all(from u in "users", where: u.id == type(^account.id, Ecto.UUID))
 
-            remaining =
+      remaining =
         Yawp.Repo.one(
           from t in "admin_claim_tokens",
             where: t.id == type(^claim.id, Ecto.UUID),
@@ -152,7 +152,7 @@ defmodule Yawp.Admin.ClaimTokenConcurrencyTest do
     end
 
     test "raw insert of a second active claim token is rejected by the singleton partial unique index" do
-                                          account = create_account!()
+      account = create_account!()
       account_bin = Ecto.UUID.dump!(account.id)
       now = DateTime.utc_now()
       expires_at = DateTime.add(now, 15 * 60, :second)

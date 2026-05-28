@@ -112,7 +112,7 @@ defmodule YawpWeb.ChannelTopicTest do
 
     assert_reply ref, :ok, _
 
-        {:ok, _, socket2} =
+    {:ok, _, socket2} =
       YawpWeb.UserSocket
       |> Phoenix.ChannelTest.socket("identity_socket:#{ctx.identity.id}-2", %{
         current_identity: ctx.identity

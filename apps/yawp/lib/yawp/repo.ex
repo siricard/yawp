@@ -4,10 +4,10 @@ defmodule Yawp.Repo do
 
   @impl true
   def installed_extensions do
-        ["ash-functions", "citext"]
+    ["ash-functions", "citext"]
   end
 
-      @impl true
+  @impl true
   def prefer_transaction? do
     false
   end
