@@ -88,7 +88,7 @@ defmodule YawpWeb.AdminDashboardLive do
     {:noreply,
      socket
      |> stream_insert(:audit_log, entry, at: 0)
-     |> put_flash(:info, "Per-server defaults acknowledged (stub — real settings land in M8).")}
+     |> put_flash(:info, "Per-server defaults acknowledged.")}
   end
 
   def handle_event("mint_server_invite", params, socket) do

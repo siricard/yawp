@@ -11,47 +11,128 @@
 @source "../../lib/yawp_web";
 
 
-@theme {
-  --color-bg: #202831;
-  --color-bg-2: #1a2128;
-  --color-surface: #353E4B;
-  --color-surface-2: #485363;
-  --color-surface-3: #5a6776;
-  --color-text: #f0efea;
-  --color-text-secondary: #b5b9bf;
-  --color-text-tertiary: #7a8290;
-  --color-border: #2a323d;
-  --color-border-soft: #4a5464;
-  --color-primary: #d8ee4d;
-  --color-primary-hover: #c3d740;
-  --color-on-primary: #202831;
-  --color-success: #74cf86;
-  --color-warning: #e8a06b;
-  --color-danger: #e8615a;
+/*
+ * Tailwind v4 theme map. tokens.css (:root) is the single source of truth —
+ * every key below references a `var(--…)` from it, so changing a value in
+ * tokens.css propagates to the generated utilities without editing this file.
+ *
+ * `@theme inline` is mandatory here: it inlines the `var(--…)` into the utility
+ * declarations instead of emitting a same-named CSS variable, which would
+ * otherwise be a self-referential loop (e.g. `--color-bg: var(--color-bg)`).
+ *
+ * Reserved-namespace caution: we deliberately do NOT define a `--spacing-*`
+ * family — Tailwind derives the entire numeric scale (`p-*`, `gap-*`, `w-*`,
+ * `max-w-*`) from `--spacing`, and shadowing it collapses layouts. Semantic
+ * spacing stays in tokens.css as `--space-*` (consumed by raw CSS and the RN
+ * token generator). Likewise the token type scale lives under `--font-*` in
+ * tokens.css and is mapped onto Tailwind's `--text-*` scale below.
+ */
+@theme inline {
+  /* Surfaces, text, borders */
+  --color-bg: var(--color-bg);
+  --color-bg-2: var(--color-bg-2);
+  --color-surface: var(--color-surface);
+  --color-surface-2: var(--color-surface-2);
+  --color-surface-3: var(--color-surface-3);
+  --color-text: var(--color-text);
+  --color-text-secondary: var(--color-text-secondary);
+  --color-text-tertiary: var(--color-text-tertiary);
+  --color-border: var(--color-border);
+  --color-border-soft: var(--color-border-soft);
 
-  --radius-sm: 8px;
-  --radius-md: 12px;
-  --radius-lg: 18px;
-  --radius-xl: 22px;
-  --radius-pill: 999px;
+  /* Brand & status, including soft (color-mix) variants */
+  --color-primary: var(--color-primary);
+  --color-primary-hover: var(--color-primary-hover);
+  --color-primary-soft: var(--color-primary-soft);
+  --color-on-primary: var(--color-on-primary);
+  --color-success: var(--color-success);
+  --color-success-soft: var(--color-success-soft);
+  --color-warning: var(--color-warning);
+  --color-warning-soft: var(--color-warning-soft);
+  --color-danger: var(--color-danger);
+  --color-danger-soft: var(--color-danger-soft);
 
-  --font-sans: "Geist", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
-  --font-mono: "Geist Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
-  --font-display: "Cal Sans", "Geist", ui-sans-serif, system-ui, sans-serif;
+  /* Radius */
+  --radius-sm: var(--radius-sm);
+  --radius-md: var(--radius-md);
+  --radius-lg: var(--radius-lg);
+  --radius-xl: var(--radius-xl);
+  --radius-pill: var(--radius-pill);
 
-  --text-xs: 0.75rem;
-  --text-sm: 0.875rem;
-  --text-base: 1rem;
-  --text-lg: 1.25rem;
-  --text-xl: 1.5rem;
-  --text-2xl: 2rem;
-  --text-3xl: 2.75rem;
+  /* Type families (tokens.css uses --font-family for the sans stack) */
+  --font-sans: var(--font-family);
+  --font-mono: var(--font-mono);
+  --font-display: var(--font-display);
 
-  --shadow-card: 0 1px 0 0 rgba(255,255,255,.02) inset, 0 6px 22px rgba(8,12,18,.28), 0 1px 2px rgba(8,12,18,.18);
-  --shadow-elev: 0 14px 40px rgba(8,12,18,.42), 0 4px 12px rgba(8,12,18,.22);
+  /* Type scale (mapped from tokens.css --font-* sizes) */
+  --text-xs: var(--font-xs);
+  --text-sm: var(--font-sm);
+  --text-base: var(--font-base);
+  --text-lg: var(--font-lg);
+  --text-xl: var(--font-xl);
+  --text-2xl: var(--font-2xl);
+  --text-3xl: var(--font-3xl);
 
-  --ease-spring: cubic-bezier(0.32, 0.72, 0, 1);
-  --ease-out-quint: cubic-bezier(0.22, 1, 0.36, 1);
+  /* Card / elevation shadows */
+  --shadow-card: var(--shadow-card);
+  --shadow-elev: var(--shadow-elev);
+
+  /* Accent glow shadows (focal affordances only) */
+  --shadow-glow-primary-sm: var(--glow-primary-sm);
+  --shadow-glow-primary-md: var(--glow-primary-md);
+  --shadow-glow-primary-lg: var(--glow-primary-lg);
+  --shadow-glow-success-sm: var(--glow-success-sm);
+  --shadow-glow-success-md: var(--glow-success-md);
+  --shadow-glow-success-lg: var(--glow-success-lg);
+  --shadow-glow-danger-sm: var(--glow-danger-sm);
+  --shadow-glow-danger-md: var(--glow-danger-md);
+  --shadow-glow-danger-lg: var(--glow-danger-lg);
+
+  /* Keyboard focus ring (exposed as a shadow utility: shadow-focus-ring) */
+  --shadow-focus-ring: var(--focus-ring);
+
+  /* Easing */
+  --ease-spring: var(--ease-spring);
+  --ease-out-quint: var(--ease-out-quint);
+}
+
+/*
+ * Token families with no native Tailwind theme namespace are surfaced as
+ * explicit utilities so they resolve. They still read tokens.css at runtime.
+ */
+
+/* Motion durations (no --duration-* theme namespace in Tailwind v4) */
+@utility duration-fast {
+  transition-duration: var(--dur-fast);
+}
+@utility duration-base {
+  transition-duration: var(--dur-base);
+}
+@utility duration-slow {
+  transition-duration: var(--dur-slow);
+}
+
+/* Surface gradients (no background-image theme namespace) */
+@utility bg-grad-surface-warm {
+  background-image: var(--grad-surface-warm);
+}
+@utility bg-grad-surface-cool {
+  background-image: var(--grad-surface-cool);
+}
+@utility bg-grad-surface-soft {
+  background-image: var(--grad-surface-soft);
+}
+@utility bg-grad-stage-success {
+  background-image: var(--grad-stage-success);
+}
+@utility bg-grad-stage-primary {
+  background-image: var(--grad-stage-primary);
+}
+@utility bg-grad-mobile-warm {
+  background-image: var(--grad-mobile-warm);
+}
+@utility bg-grad-mobile-cool {
+  background-image: var(--grad-mobile-cool);
 }
 
 
