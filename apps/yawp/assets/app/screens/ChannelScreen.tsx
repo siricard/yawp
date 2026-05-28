@@ -64,18 +64,20 @@ function MessageRow({
   return (
     <View
       testID={`channel-message-${message.id}`}
-      className="px-4 py-2 border-b border-slate-800">
-      <View className="flex-row items-baseline">
+      className="px-6 py-2">
+      <View className="flex-row items-baseline" style={{gap: 8}}>
         <Text
-          className="text-xs text-indigo-300 mr-2"
+          className="text-sm font-bold text-text"
           style={{fontFamily: monospace}}>
           {label}
         </Text>
-        <Text className="text-[10px] text-slate-500">
+        <Text
+          className="text-xs text-text-tertiary"
+          style={{fontFamily: monospace}}>
           {formatTimestamp(message.server_inserted_at)}
         </Text>
       </View>
-      <Text className="text-sm text-slate-100 mt-1">{message.body}</Text>
+      <Text className="text-sm text-text mt-1 leading-5">{message.body}</Text>
     </View>
   );
 }
@@ -108,32 +110,38 @@ export function ChannelScreen({
     setDraft('');
   }
 
+  const statusClass =
+    status === 'joined'
+      ? 'text-xs text-success'
+      : status === 'error'
+        ? 'text-xs text-danger'
+        : 'text-xs text-text-tertiary';
+
   return (
-    <View testID="channel-screen" className="flex-1 bg-slate-900">
-      <View className="px-4 py-3 border-b border-slate-800 flex-row items-center">
+    <View testID="channel-screen" className="flex-1 bg-bg">
+      <View className="px-6 py-3 border-b border-border-soft flex-row items-center bg-surface">
         <Pressable
           testID="channel-back-button"
           accessibilityRole="button"
           accessibilityLabel="back"
           onPress={onBack}
-          className="mr-3 px-2 py-1 rounded-md bg-slate-800 active:bg-slate-700">
-          <Text className="text-slate-200 text-sm">‹</Text>
+          className="mr-3 w-8 h-8 rounded-pill bg-surface-2 active:bg-surface-3 items-center justify-center">
+          <Text className="text-text-secondary text-sm">‹</Text>
         </Pressable>
         <View className="flex-1">
-          <Text className="text-base font-semibold text-slate-50">
-            #{channelName}
+          <Text className="text-base font-bold text-text">
+            <Text className="text-primary" style={{fontFamily: monospace}}>
+              #
+            </Text>
+            {channelName}
           </Text>
-          <Text className="text-xs text-slate-400">{serverLabel}</Text>
+          <Text
+            className="text-xs text-text-tertiary mt-0.5"
+            style={{fontFamily: monospace}}>
+            {serverLabel}
+          </Text>
         </View>
-        <Text
-          testID="channel-status"
-          className={
-            status === 'joined'
-              ? 'text-xs text-emerald-400'
-              : status === 'error'
-                ? 'text-xs text-rose-400'
-                : 'text-xs text-slate-400'
-          }>
+        <Text testID="channel-status" className={statusClass} style={{fontFamily: monospace}}>
           {status}
         </Text>
       </View>
@@ -141,8 +149,8 @@ export function ChannelScreen({
       {errorMessage ? (
         <View
           testID="channel-error"
-          className="px-4 py-2 bg-rose-950/60 border-b border-rose-900">
-          <Text className="text-xs text-rose-200">{errorMessage}</Text>
+          className="px-6 py-2 bg-danger/20 border-b border-danger">
+          <Text className="text-xs text-danger">{errorMessage}</Text>
         </View>
       ) : null}
 
@@ -152,7 +160,7 @@ export function ChannelScreen({
           scrollRef.current = ref;
         }}
         className="flex-1"
-        contentContainerStyle={{paddingVertical: 8}}>
+        contentContainerStyle={{paddingVertical: 12}}>
         {messages.map(message => (
           <MessageRow
             key={message.id}
@@ -163,7 +171,7 @@ export function ChannelScreen({
         ))}
       </ScrollView>
 
-      <View className="px-3 py-2 border-t border-slate-800 flex-row items-center bg-slate-950">
+      <View className="px-4 py-3 border-t border-border-soft bg-bg flex-row items-center" style={{gap: 8}}>
         <TextInput
           testID="channel-message-input"
           value={draft}
@@ -173,8 +181,8 @@ export function ChannelScreen({
           placeholder={
             status === 'joined' ? `Message #${channelName}` : 'Connecting…'
           }
-          placeholderTextColor="#64748b"
-          className="flex-1 px-3 py-2 rounded-md bg-slate-800 text-slate-100"
+          placeholderTextColor="#7a8290"
+          className="flex-1 px-4 py-2 rounded-pill bg-surface-2 text-text border border-border-soft"
         />
         <Pressable
           testID="channel-message-send"
@@ -182,8 +190,13 @@ export function ChannelScreen({
           accessibilityLabel="send message"
           onPress={handleSend}
           disabled={status !== 'joined' || draft.trim().length === 0}
-          className="ml-2 px-4 py-2 rounded-md bg-indigo-600 active:bg-indigo-500 disabled:opacity-50">
-          <Text className="text-slate-50 font-semibold">Send</Text>
+          className={[
+            'px-5 py-2 rounded-pill bg-primary active:bg-primary-hover',
+            status !== 'joined' || draft.trim().length === 0
+              ? 'opacity-50'
+              : '',
+          ].join(' ')}>
+          <Text className="text-on-primary font-semibold">Send</Text>
         </Pressable>
       </View>
     </View>

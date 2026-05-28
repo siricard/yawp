@@ -1,9 +1,10 @@
 
 import React, {useEffect, useState} from 'react';
-import {Platform, Pressable, Text, View} from 'react-native';
+import {Platform, Text, View} from 'react-native';
 
 import {useDisplayName, useIdentityState} from '../identity-context';
 import {runIdentityVectorCheck, type VectorResult} from '../identity-vector';
+import {Banner, Button, Card} from '../ui';
 
 type Props = {
   onOpenVectorTest: () => void;
@@ -57,93 +58,91 @@ export function DidScreen({onOpenVectorTest}: Props) {
 
   return (
     <View
-      className="flex-1 bg-slate-900 px-6 pt-12 pb-6"
+      className="flex-1 bg-bg px-6 pt-8 pb-6"
       nativeID="identity-screen">
-      <Text className="text-3xl font-bold text-slate-50 mb-6">
+      <Text className="font-display text-3xl font-bold text-text mb-6">
         Yawp Identity
       </Text>
 
       {effectiveDisplayName ? (
-        <View
-          className="bg-slate-800 rounded-lg p-4 mb-4"
-          testID="identity-display-name"
-          accessibilityLabel="display name">
-          <Text className="text-sm font-semibold text-slate-400 mb-1">
-            Display name
-          </Text>
-          <Text className="text-lg text-slate-50">{effectiveDisplayName}</Text>
+        <View className="mb-3">
+          <Card
+            testID="identity-display-name"
+            accessibilityLabel="display name">
+            <Text className="text-xs font-semibold text-text-secondary uppercase mb-1">
+              Display name
+            </Text>
+            <Text className="text-lg text-text">{effectiveDisplayName}</Text>
+          </Card>
         </View>
       ) : null}
 
-      <View
-        className="bg-slate-800 rounded-lg p-4 mb-4"
-        testID="did-display"
-        accessibilityLabel="DID display">
-        <Text className="text-sm font-semibold text-slate-400 mb-1">
-          Your DID
-        </Text>
-        <Text
-          className="text-base text-slate-50 break-all"
-          style={{fontFamily: monospace}}
-          testID="did-text"
-          selectable>
-          {didText}
-        </Text>
+      <View className="mb-3">
+        <Card testID="did-display" accessibilityLabel="DID display">
+          <Text className="text-xs font-semibold text-text-secondary uppercase mb-1">
+            Your DID
+          </Text>
+          <Text
+            className="text-base text-text break-all"
+            style={{fontFamily: monospace}}
+            testID="did-text"
+            selectable>
+            {didText}
+          </Text>
+        </Card>
       </View>
 
       {state.status === 'ready' ? (
-        <View className="bg-slate-800 rounded-lg p-4 mb-4">
-          <Text className="text-sm font-semibold text-slate-400 mb-1">
-            Public key (hex)
-          </Text>
-          <Text
-            className="text-xs text-slate-300 break-all"
-            style={{fontFamily: monospace}}
-            testID="pubkey-hex">
-            {pkHex}
-          </Text>
+        <View className="mb-3">
+          <Card>
+            <Text className="text-xs font-semibold text-text-secondary uppercase mb-1">
+              Public key (hex)
+            </Text>
+            <Text
+              className="text-xs text-text-secondary break-all"
+              style={{fontFamily: monospace}}
+              testID="pubkey-hex">
+              {pkHex}
+            </Text>
+          </Card>
         </View>
       ) : null}
 
       {state.status === 'error' ? (
-        <View
-          className="bg-rose-950 border border-rose-700 rounded-lg p-4 mb-4"
-          testID="identity-error"
-          accessibilityLabel="identity error">
-          <Text className="text-sm font-semibold text-rose-300 mb-1">
-            Identity error
-          </Text>
-          <Text
-            className="text-sm text-rose-100 break-all"
-            style={{fontFamily: monospace}}
-            selectable>
-            {state.error}
-          </Text>
+        <View className="mb-3">
+          <Banner
+            kind="danger"
+            title="Identity error"
+            testID="identity-error"
+            message={state.error}
+          />
         </View>
       ) : null}
 
-      <View
-        className="bg-slate-800 rounded-lg p-4 mb-6"
-        testID="vector-check"
-        accessibilityLabel={`vector-status-${vectorStatus}`}>
-        <Text className="text-sm font-semibold text-slate-400 mb-1">
-          Cross-platform vector
-        </Text>
-        <Text
-          className="text-sm text-slate-50"
-          style={{fontFamily: monospace}}>
-          {vectorText}
-        </Text>
+      <View className="mb-6">
+        <Card
+          testID="vector-check"
+          accessibilityLabel={`vector-status-${vectorStatus}`}>
+          <Text className="text-xs font-semibold text-text-secondary uppercase mb-1">
+            Cross-platform vector
+          </Text>
+          <Text
+            className="text-sm text-text"
+            style={{fontFamily: monospace}}>
+            {vectorText}
+          </Text>
+        </Card>
       </View>
 
-      <Pressable
-        accessibilityRole="button"
-        onPress={onOpenVectorTest}
-        className="bg-slate-700 border border-slate-600 rounded-lg py-2 px-4 self-start active:bg-slate-600">
-        <Text className="text-sm font-semibold text-slate-50">
-          Vector Test
-        </Text>
-      </Pressable>
+      <View className="self-start">
+        <Button
+          variant="secondary"
+          size="md"
+          label="Vector Test"
+          accessibilityLabel="Vector Test"
+          onPress={onOpenVectorTest}
+        />
+      </View>
     </View>
   );
 }
