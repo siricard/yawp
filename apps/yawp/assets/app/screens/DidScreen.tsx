@@ -2,12 +2,15 @@
 import React, {useEffect, useState} from 'react';
 import {Platform, Text, View} from 'react-native';
 
+import {copyText, shareText} from '../clipboard';
 import {useDisplayName, useIdentityState} from '../identity-context';
 import {runIdentityVectorCheck, type VectorResult} from '../identity-vector';
-import {Banner, Button, Card} from '../ui';
+import {Banner, Button, Card, DidPill} from '../ui';
 
 type Props = {
   onOpenVectorTest: () => void;
+  onCopy?: (text: string) => void;
+  onShare?: (text: string) => void;
 };
 
 const monospace = Platform.select({
@@ -17,10 +20,22 @@ const monospace = Platform.select({
   default: 'monospace',
 });
 
-export function DidScreen({onOpenVectorTest}: Props) {
+export function DidScreen({onOpenVectorTest, onCopy, onShare}: Props) {
   const state = useIdentityState();
   const {effectiveDisplayName} = useDisplayName();
   const [vector, setVector] = useState<VectorResult | null>(null);
+
+  const identity = state.status === 'ready' ? state.identity : null;
+
+  const handleCopy = (text: string) => {
+    onCopy?.(text);
+    copyText(text).catch(() => {});
+  };
+
+  const handleShare = (text: string) => {
+    onShare?.(text);
+    shareText(text).catch(() => {});
+  };
 
   useEffect(() => {
     const result = runIdentityVectorCheck();
@@ -89,8 +104,52 @@ export function DidScreen({onOpenVectorTest}: Props) {
             selectable>
             {didText}
           </Text>
+          {identity ? (
+            <View className="mt-3">
+              <DidPill
+                did={identity.didFull}
+                testID="did-pill"
+                onCopy={handleCopy}
+              />
+            </View>
+          ) : null}
         </Card>
       </View>
+
+      {identity ? (
+        <View className="mb-3">
+          <Card testID="fingerprint-display" accessibilityLabel="fingerprint">
+            <Text className="text-xs font-semibold text-text-secondary uppercase mb-1">
+              Fingerprint
+            </Text>
+            <Text
+              className="text-base text-text"
+              style={{fontFamily: monospace}}
+              testID="fingerprint-text"
+              selectable>
+              {identity.fingerprint}
+            </Text>
+            <View className="flex-row mt-3" style={{gap: 8}}>
+              <Button
+                variant="secondary"
+                size="sm"
+                label="Copy fingerprint"
+                accessibilityLabel="copy fingerprint"
+                testID="copy-fingerprint-btn"
+                onPress={() => handleCopy(identity.fingerprint)}
+              />
+              <Button
+                variant="secondary"
+                size="sm"
+                label="Share"
+                accessibilityLabel="share fingerprint"
+                testID="share-fingerprint-btn"
+                onPress={() => handleShare(identity.fingerprint)}
+              />
+            </View>
+          </Card>
+        </View>
+      ) : null}
 
       {state.status === 'ready' ? (
         <View className="mb-3">

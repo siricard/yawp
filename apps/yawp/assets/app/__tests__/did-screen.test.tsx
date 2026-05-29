@@ -90,4 +90,53 @@ describe('DidScreen', () => {
     const rendered = collectText(didTextNode);
     expect(rendered).toContain('did:yawp:zZZZZZZ');
   });
+
+  test('renders the fingerprint', async () => {
+    (useIdentityState as jest.Mock).mockReturnValue({
+      status: 'ready',
+      identity: fakeIdentity(),
+      error: null,
+    });
+
+    let root: ReactTestRenderer.ReactTestRenderer | null = null;
+    await ReactTestRenderer.act(async () => {
+      root = ReactTestRenderer.create(
+        <DidScreen onOpenVectorTest={() => {}} />,
+      );
+    });
+    await ReactTestRenderer.act(async () => {
+      await Promise.resolve();
+    });
+
+    const fingerprintNode = findByTestId(root!.root, 'fingerprint-text');
+    const rendered = collectText(fingerprintNode);
+    expect(rendered).toContain('yp:0000 · 0000 · 0000 · 0000');
+  });
+
+  test('fires onCopy when the fingerprint copy affordance is pressed', async () => {
+    (useIdentityState as jest.Mock).mockReturnValue({
+      status: 'ready',
+      identity: fakeIdentity(),
+      error: null,
+    });
+
+    const onCopy = jest.fn();
+
+    let root: ReactTestRenderer.ReactTestRenderer | null = null;
+    await ReactTestRenderer.act(async () => {
+      root = ReactTestRenderer.create(
+        <DidScreen onOpenVectorTest={() => {}} onCopy={onCopy} />,
+      );
+    });
+    await ReactTestRenderer.act(async () => {
+      await Promise.resolve();
+    });
+
+    const copyBtn = findByTestId(root!.root, 'copy-fingerprint-btn');
+    await ReactTestRenderer.act(async () => {
+      copyBtn.props.onPress();
+    });
+
+    expect(onCopy).toHaveBeenCalledWith('yp:0000 · 0000 · 0000 · 0000');
+  });
 });
