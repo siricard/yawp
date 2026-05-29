@@ -255,6 +255,13 @@ describe('Section / Subsection', () => {
     expect(findByTestId(root.root, 's1')).toBeTruthy();
     expect(findByTestId(root.root, 'ss1')).toBeTruthy();
   });
+
+  test('subsection renders its label text', async () => {
+    const root = await render(<Subsection testID="ss2" label="Endpoints" />);
+    expect(
+      root.root.findAllByProps({children: 'Endpoints'}).length,
+    ).toBeGreaterThan(0);
+  });
 });
 
 describe('Avatar', () => {

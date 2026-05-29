@@ -38,6 +38,7 @@ export function Subsection({label, children, testID}: SubsectionProps) {
   return (
     <View testID={testID} className="mb-4">
       <Text className="text-xs font-semibold text-text-secondary font-mono uppercase mb-2">
+        {label}
       </Text>
       <View>{children}</View>
     </View>
