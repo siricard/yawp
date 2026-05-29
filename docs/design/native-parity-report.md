@@ -35,8 +35,9 @@ in `docs/design/native-parity/macos/CAPTURE-STATUS.md`.
 | Restore-from-recovery-phrase grid | ✅ | ✅ |
 | Restore grid with autocomplete overlay open | ✅ | ✅ |
 | Identity home (display name, DID, fingerprint, public key) | ✅ | ✅ |
-| Add-server | (covered on Android) | ✅ |
-| Locked screen (unlock with passphrase) | (covered on Android) | ✅ |
+| Channel (#general header, message rows, composer) | ✅ | ✅ |
+| Add-server | ✅ | ✅ |
+| Locked screen (unlock with passphrase) | ✅ | ✅ |
 | Passphrase settings | ✅ | ✅ |
 
 The identity home embeds the DID detail as its body (`HomeScreen` renders
@@ -44,12 +45,14 @@ The identity home embeds the DID detail as its body (`HomeScreen` renders
 name, DID + copy pill, fingerprint + copy/share, public key, and the
 cross-platform vector card all fit on one screen.
 
-`ChannelScreen` is not captured: it only renders meaningfully after binding a
-device against a running anchor (server) and joining a channel, which needs a
-live backend and a network round-trip beyond an offline UI boot. It shares
-the same `ui/` primitives (Card, Input, Button, message rows) exercised by
-the other surfaces, so it carries no divergence vector not already covered
-below.
+The channel surface (`ChannelScreen`) renders the `#general` header (channel
+name + anchor label + a live connection-status pill), the scrollable message
+list (each row pairing an author label — a display name for self, the
+truncated `did:yawp:…` form for others — with a monospace timestamp and the
+message body), and the bottom composer row (a rounded text input plus a Send
+button). The channel was captured in its joined state with sample messages so
+the row layout, the header status pill, and the bottom-anchored composer are
+all visible on both `ios/channel.png` and `android/channel.png`.
 
 ## Dependency work required to boot the native bundles
 
@@ -246,10 +249,11 @@ single tidy pass.
 All three native targets build and boot:
 
 - iOS: `xcodebuild -scheme YawpNative … build` → BUILD SUCCEEDED; app installed
-  and driven through onboarding/restore to the identity home on the simulator.
+  and driven through onboarding/restore to the identity home, add-server,
+  locked, channel, and passphrase settings on the simulator.
 - Android: `./gradlew :app:assembleDebug` → BUILD SUCCESSFUL; app installed and
-  driven through onboarding to home, add-server, locked, and passphrase
-  settings on the emulator.
+  driven through onboarding to home, add-server, locked, channel, and
+  passphrase settings on the emulator.
 - macOS: `xcodebuild -scheme YawpNative-macOS … build` → BUILD SUCCEEDED; app
   launched with a confirmed on-screen window (see
   `docs/design/native-parity/macos/CAPTURE-STATUS.md`).

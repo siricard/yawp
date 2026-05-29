@@ -20,12 +20,14 @@ Surfaces (file `<surface>.png`):
    overlay open on a word.
 5. `home.png` — identity home; this surface embeds the DID detail (display
    name, DID + copy pill, fingerprint + copy/share, public key, vector card).
-6. `add-server.png` — add-server form (Android).
-7. `locked.png` — locked screen / unlock prompt (Android).
-8. `passphrase-settings.png` — passphrase settings.
+6. `channel.png` — `#general` channel: header (channel name + anchor label +
+   connection-status pill), message rows, and the bottom composer.
+7. `add-server.png` — add-server form (server URL, token kind, submit/cancel).
+8. `locked.png` — locked screen / unlock prompt.
+9. `passphrase-settings.png` — passphrase settings.
 
-iOS and Android cover complementary subsets (iOS via `idb`, Android via
-`adb`); together they exercise every surface and divergence vector. The
+iOS and Android cover the same surface set (iOS via `idb` / `simctl`, Android
+via `adb`); together they exercise every surface and divergence vector. The
 companion analysis lives in `docs/design/native-parity-report.md`.
 
 These are reference assets only — not loaded by code, not gated by CI.
