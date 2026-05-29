@@ -37,12 +37,12 @@
 		799D9CB8AACEE8D3A19D3308 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; includeInIndex = 1; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		AB612A7748E36E1A1094C29E /* Pods-YawpNative-macOS.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-YawpNative-macOS.release.xcconfig"; path = "Target Support Files/Pods-YawpNative-macOS/Pods-YawpNative-macOS.release.xcconfig"; sourceTree = "<group>"; };
 		ED297162215061F000B7C4FE /* JavaScriptCore.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = JavaScriptCore.framework; path = System/Library/Frameworks/JavaScriptCore.framework; sourceTree = SDKROOT; };
-		FAFA000000000000000000B1 /* Geist-Regular.ttf */ = {isa = PBXFileReference; name = "Geist-Regular.ttf"; path = "../assets/fonts/Geist-Regular.ttf"; sourceTree = "<group>"; lastKnownFileType = unknown; };
-		FAFA000000000000000000B2 /* Geist-Bold.ttf */ = {isa = PBXFileReference; name = "Geist-Bold.ttf"; path = "../assets/fonts/Geist-Bold.ttf"; sourceTree = "<group>"; lastKnownFileType = unknown; };
-		FAFA000000000000000000B3 /* Geist-Medium.ttf */ = {isa = PBXFileReference; name = "Geist-Medium.ttf"; path = "../assets/fonts/Geist-Medium.ttf"; sourceTree = "<group>"; lastKnownFileType = unknown; };
-		FAFA000000000000000000B4 /* GeistMono-Regular.ttf */ = {isa = PBXFileReference; name = "GeistMono-Regular.ttf"; path = "../assets/fonts/GeistMono-Regular.ttf"; sourceTree = "<group>"; lastKnownFileType = unknown; };
-		FAFA000000000000000000B5 /* Geist-SemiBold.ttf */ = {isa = PBXFileReference; name = "Geist-SemiBold.ttf"; path = "../assets/fonts/Geist-SemiBold.ttf"; sourceTree = "<group>"; lastKnownFileType = unknown; };
-		FAFA000000000000000000B6 /* GeistMono-Bold.ttf */ = {isa = PBXFileReference; name = "GeistMono-Bold.ttf"; path = "../assets/fonts/GeistMono-Bold.ttf"; sourceTree = "<group>"; lastKnownFileType = unknown; };
+		FAFA000000000000000000B1 /* Geist-Regular.ttf */ = {isa = PBXFileReference; lastKnownFileType = unknown; name = "Geist-Regular.ttf"; path = "../assets/fonts/Geist-Regular.ttf"; sourceTree = "<group>"; };
+		FAFA000000000000000000B2 /* Geist-Bold.ttf */ = {isa = PBXFileReference; lastKnownFileType = unknown; name = "Geist-Bold.ttf"; path = "../assets/fonts/Geist-Bold.ttf"; sourceTree = "<group>"; };
+		FAFA000000000000000000B3 /* Geist-Medium.ttf */ = {isa = PBXFileReference; lastKnownFileType = unknown; name = "Geist-Medium.ttf"; path = "../assets/fonts/Geist-Medium.ttf"; sourceTree = "<group>"; };
+		FAFA000000000000000000B4 /* GeistMono-Regular.ttf */ = {isa = PBXFileReference; lastKnownFileType = unknown; name = "GeistMono-Regular.ttf"; path = "../assets/fonts/GeistMono-Regular.ttf"; sourceTree = "<group>"; };
+		FAFA000000000000000000B5 /* Geist-SemiBold.ttf */ = {isa = PBXFileReference; lastKnownFileType = unknown; name = "Geist-SemiBold.ttf"; path = "../assets/fonts/Geist-SemiBold.ttf"; sourceTree = "<group>"; };
+		FAFA000000000000000000B6 /* GeistMono-Bold.ttf */ = {isa = PBXFileReference; lastKnownFileType = unknown; name = "GeistMono-Bold.ttf"; path = "../assets/fonts/GeistMono-Bold.ttf"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -104,19 +104,6 @@
 			name = Libraries;
 			sourceTree = "<group>";
 		};
-		FAFA000000000000000000C0 /* Fonts */ = {
-			isa = PBXGroup;
-			children = (
-				FAFA000000000000000000B1 /* Geist-Regular.ttf */,
-				FAFA000000000000000000B2 /* Geist-Bold.ttf */,
-				FAFA000000000000000000B3 /* Geist-Medium.ttf */,
-				FAFA000000000000000000B4 /* GeistMono-Regular.ttf */,
-				FAFA000000000000000000B5 /* Geist-SemiBold.ttf */,
-				FAFA000000000000000000B6 /* GeistMono-Bold.ttf */,
-			);
-			name = Fonts;
-			sourceTree = "<group>";
-		};
 		83CBB9F61A601CBA00E9B192 = {
 			isa = PBXGroup;
 			children = (
@@ -140,6 +127,19 @@
 				514201492437B4B30078DB4F /* YawpNative.app */,
 			);
 			name = Products;
+			sourceTree = "<group>";
+		};
+		FAFA000000000000000000C0 /* Fonts */ = {
+			isa = PBXGroup;
+			children = (
+				FAFA000000000000000000B1 /* Geist-Regular.ttf */,
+				FAFA000000000000000000B2 /* Geist-Bold.ttf */,
+				FAFA000000000000000000B3 /* Geist-Medium.ttf */,
+				FAFA000000000000000000B4 /* GeistMono-Regular.ttf */,
+				FAFA000000000000000000B5 /* Geist-SemiBold.ttf */,
+				FAFA000000000000000000B6 /* GeistMono-Bold.ttf */,
+			);
+			name = Fonts;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -393,7 +393,7 @@
 					"-ObjC",
 					"-lc++",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = "ca.simonricard.YawpNative";
+				PRODUCT_BUNDLE_IDENTIFIER = ca.simonricard.YawpNative;
 				PRODUCT_NAME = YawpNative;
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
 				SWIFT_VERSION = 5.0;
@@ -414,7 +414,7 @@
 					"-ObjC",
 					"-lc++",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = "ca.simonricard.YawpNative";
+				PRODUCT_BUNDLE_IDENTIFIER = ca.simonricard.YawpNative;
 				PRODUCT_NAME = YawpNative;
 				SWIFT_VERSION = 5.0;
 				VERSIONING_SYSTEM = "apple-generic";
@@ -439,7 +439,7 @@
 					"-ObjC",
 					"-lc++",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = "ca.simonricard.YawpNative";
+				PRODUCT_BUNDLE_IDENTIFIER = ca.simonricard.YawpNative;
 				PRODUCT_NAME = YawpNative;
 				SDKROOT = macosx;
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
@@ -464,7 +464,7 @@
 					"-ObjC",
 					"-lc++",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = "ca.simonricard.YawpNative";
+				PRODUCT_BUNDLE_IDENTIFIER = ca.simonricard.YawpNative;
 				PRODUCT_NAME = YawpNative;
 				SDKROOT = macosx;
 				SWIFT_VERSION = 5.0;

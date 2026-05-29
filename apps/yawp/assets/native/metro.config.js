@@ -27,6 +27,7 @@ const SINGLETON_DEDUPE = new Set([
   'react',
   'react/jsx-runtime',
   'react/jsx-dev-runtime',
+  'react-native',
   'react-native-css-interop',
   'react-native-css-interop/jsx-runtime',
   'react-native-css-interop/jsx-dev-runtime',

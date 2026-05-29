@@ -1,29 +1,40 @@
 # Native parity screenshots
 
-Per-platform PNG bundles of the re-skinned surfaces.
+Per-platform PNG captures of the re-skinned surfaces, taken on real
+simulators/emulators.
 
 Layout:
 
-- `ios/` — iPhone simulator captures (iOS 17 / iPhone 15 default size).
-- `android/` — Android emulator captures (Pixel 7 / API 34 default size).
-- `macos/` — macOS desktop captures (default react-native-macos window).
+- `ios/` — iPhone simulator captures (iPhone 17 Pro, iOS 26.4).
+- `android/` — Android emulator captures (API 36, arm64).
+- `macos/` — macOS desktop. The window was built and launched but could not be
+  screenshotted from the automation session; see `macos/CAPTURE-STATUS.md` for
+  the build/launch evidence and the OS permission that blocks capture.
 
-Surfaces to capture (one PNG per platform per surface, file named `<surface>.png`):
+Surfaces (file `<surface>.png`):
 
-1. `home.png` — HomeScreen, post-onboarding, no servers bound.
-2. `did.png` — DidScreen content (inside Home), with display-name and PK rendered.
-3. `channel.png` — ChannelScreen, joined, with a couple of messages.
-4. `add-server.png` — AddServerScreen, default tab.
-5. `onboarding-mnemonic.png` — OnboardingMnemonicScreen on the display step (countdown visible).
-6. `restore-mnemonic.png` — RestoreMnemonicScreen with the autocomplete overlay open on word 1.
-7. `locked.png` — LockedScreen.
-8. `passphrase-settings.png` — PassphraseSettingsScreen.
+1. `onboarding-choice.png` — Create / Restore landing.
+2. `onboarding-mnemonic.png` — recovery-phrase display with the countdown.
+3. `restore-mnemonic.png` — restore grid (12 word inputs).
+4. `restore-mnemonic-autocomplete.png` — restore grid with the suggestion
+   overlay open on a word.
+5. `home.png` — identity home; this surface embeds the DID detail (display
+   name, DID + copy pill, fingerprint + copy/share, public key, vector card).
+6. `add-server.png` — add-server form (Android).
+7. `locked.png` — locked screen / unlock prompt (Android).
+8. `passphrase-settings.png` — passphrase settings.
 
-Capture method:
-
-- iOS: `just rn-ios` → `cmd-S` in the simulator (or `xcrun simctl io booted screenshot ...`).
-- Android: `just rn-android` → toolbar camera, or `adb exec-out screencap -p > <file>.png`.
-- macOS: `just rn-macos` → `cmd-shift-4` over the app window.
-
-These are reference assets only — not loaded by code, not gated by CI. The
+iOS and Android cover complementary subsets (iOS via `idb`, Android via
+`adb`); together they exercise every surface and divergence vector. The
 companion analysis lives in `docs/design/native-parity-report.md`.
+
+These are reference assets only — not loaded by code, not gated by CI.
+
+## How captures were taken
+
+- iOS: `xcrun simctl io booted screenshot <file>.png` while driving the app
+  with `idb ui tap` / `idb ui text`.
+- Android: `adb exec-out screencap -p > <file>.png` while driving with
+  `adb shell input`.
+- macOS: requires the Screen-Recording permission; run `just rn-macos` on a
+  workstation that has granted it and use `screencapture -l <windowID>`.
