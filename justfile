@@ -11,7 +11,7 @@ dev:
     nix develop -c bash -c 'cd apps/yawp && mix phx.server'
 
 # Start a second Phoenix dev server (Anchor B) bound to :4100 against the
-# yawp_anchor_b_dev database. Used for cross-anchor federation work (M7.4+).
+# yawp_anchor_b_dev database. Used for cross-anchor federation work.
 # Creates the DB on first run; `mix ecto.create` is idempotent.
 dev-anchor-b:
     nix develop -c bash -c 'cd apps/yawp && DATABASE=yawp_anchor_b_dev mix ecto.create && PORT=4100 DATABASE=yawp_anchor_b_dev mix phx.server'
@@ -106,23 +106,11 @@ rn-macos:
 rn-metro:
     nix develop -c bash -c 'cd apps/yawp/assets/native && npx react-native start --port 8081'
 
-# Serve the shared component library via Ladle (web) at :61000.
+# NativeWind's className→style transform only emits web styles through the
+# production JSX runtime, so the Vite dev server renders components unstyled;
+# build + preview is the only path that shows real design-system styling.
 ladle:
-    nix develop -c bash -c 'cd apps/yawp/assets/native && npx ladle serve'
-
-# Walk the M7.4-design slice: component library viewer + the M7.3 demo with
-# the v16 visual polish applied. See docs/walkthroughs/m7-4-design.md.
-demo-m7-4-design:
-    @echo ""
-    @echo "--- demo M7.4-design ---"
-    @echo "1. Open the component library:  just ladle  (http://localhost:61000)"
-    @echo "2. Boot the M7.3 demo, now visually polished:  just demo-m7-3"
-    @echo "3. Optional native parity check:"
-    @echo "     cd apps/yawp/assets/native && npx react-native start --port 8081"
-    @echo "     (then in another shell)  just rn-ios  /  just rn-android  /  just rn-macos"
-    @echo ""
-    @echo "Walkthrough: docs/walkthroughs/m7-4-design.md"
-    @echo ""
+    nix develop -c bash -c 'cd apps/yawp/assets/native && npx ladle build && npx ladle preview --port 61000'
 
 # Verify that singleton-required packages (react, react-native-css-interop,
 # nativewind, …) appear exactly once in each platform's bundle. Guards the

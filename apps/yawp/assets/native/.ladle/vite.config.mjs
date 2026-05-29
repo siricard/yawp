@@ -1,14 +1,24 @@
+import {fileURLToPath} from 'node:url';
+
 import {defineConfig} from 'vite';
 import react from '@vitejs/plugin-react';
+import tailwindcss from 'tailwindcss';
+
+const tailwindConfig = fileURLToPath(
+  new URL('../tailwind.config.js', import.meta.url),
+);
 
 export default defineConfig({
   plugins: [
     react({
-      babel: {
-        presets: ['nativewind/babel'],
-      },
+      jsxImportSource: 'nativewind',
     }),
   ],
+  css: {
+    postcss: {
+      plugins: [tailwindcss({config: tailwindConfig})],
+    },
+  },
   resolve: {
     alias: [
       {find: /^react-native$/, replacement: 'react-native-web'},
