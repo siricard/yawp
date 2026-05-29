@@ -74,6 +74,7 @@ export function OnboardingFlow({
       return (
         <OnboardingDisplayNameScreen
           defaultDisplayName={defaultName}
+          error={state.error}
           onSubmit={async override => {
             setChosenOverride(override);
             await complete({

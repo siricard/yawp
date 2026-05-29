@@ -118,7 +118,7 @@ type State =
       step: OnboardingStep;
       draftIdentity: DraftIdentity;
       identity: null;
-      error: null;
+      error: string | null;
     }
   | {
       status: 'locked';
@@ -543,22 +543,37 @@ export function IdentityProvider({children}: {children: React.ReactNode}) {
         },
         ...(trimmedName ? {metadata: {displayNameOverride: trimmedName}} : {}),
       };
-      if (passphrase && passphrase.length > 0) {
-        const salt = randomSaltBytes();
-        const sealKey = deriveSealKey(passphrase, salt);
-        const envelope = sealBundleWithKey(bundle, sealKey, salt);
-        await saveSealedEnvelope(envelope);
-        draftSealedRef.current = true;
-        draftSealRef.current = {sealKey, salt};
-      } else {
-        await saveIdentity(bundle);
-        draftSealedRef.current = false;
-        draftSealRef.current = null;
+      try {
+        if (passphrase && passphrase.length > 0) {
+          const salt = randomSaltBytes();
+          const sealKey = deriveSealKey(passphrase, salt);
+          const envelope = sealBundleWithKey(bundle, sealKey, salt);
+          await saveSealedEnvelope(envelope);
+          draftSealedRef.current = true;
+          draftSealRef.current = {sealKey, salt};
+        } else {
+          await saveIdentity(bundle);
+          draftSealedRef.current = false;
+          draftSealRef.current = null;
+        }
+      } catch (e: unknown) {
+        const detail =
+          e && typeof e === 'object' && 'message' in e
+            ? String((e as {message: unknown}).message)
+            : String(e);
+        setState(prev => {
+          if (prev.status !== 'onboarding') return prev;
+          return {
+            ...prev,
+            error: `Couldn't save your identity to this device's secure storage. ${detail}`,
+          };
+        });
+        return;
       }
       setDisplayNameState(trimmedName);
       setState(prev => {
         if (prev.status !== 'onboarding') return prev;
-        return {...prev, step: 'complete'};
+        return {...prev, step: 'complete', error: null};
       });
     },
     [],

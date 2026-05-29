@@ -2,6 +2,8 @@
 import React, {useState} from 'react';
 import {Platform, Pressable, ScrollView, Text, TextInput, View} from 'react-native';
 
+import {Banner} from '../ui/Banner';
+
 const monospace = Platform.select({
   ios: 'Menlo',
   macos: 'Menlo',
@@ -16,11 +18,18 @@ type Props = {
    * `null` when the user kept the default unchanged.
    */
   onSubmit: (override: string | null) => void;
+  /**
+   * Set when persisting the identity to secure storage failed. Surfaced as
+   * a banner so a rejected keychain write doesn't leave the button looking
+   * inert.
+   */
+  error?: string | null;
 };
 
 export function OnboardingDisplayNameScreen({
   defaultDisplayName,
   onSubmit,
+  error = null,
 }: Props) {
   const [editing, setEditing] = useState(false);
   const [override, setOverride] = useState(defaultDisplayName);
@@ -74,6 +83,17 @@ export function OnboardingDisplayNameScreen({
           </Pressable>
         </View>
       )}
+
+      {error ? (
+        <View className="mb-4">
+          <Banner
+            kind="danger"
+            title="Couldn't save your identity"
+            testID="display-name-error"
+            message={error}
+          />
+        </View>
+      ) : null}
 
       <Pressable
         testID="display-name-submit-btn"

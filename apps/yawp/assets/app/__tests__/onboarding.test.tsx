@@ -14,6 +14,7 @@ import React from 'react';
 import ReactTestRenderer from 'react-test-renderer';
 
 import {clearIdentity} from '../identity';
+import * as storageBundle from '../identity/storage-bundle';
 import {loadIdentity} from '../identity/storage-bundle';
 import {
   IdentityProvider,
@@ -23,6 +24,7 @@ import {
   COUNTDOWN_SECONDS,
   OnboardingMnemonicScreen,
 } from '../screens/OnboardingMnemonicScreen';
+import {OnboardingDisplayNameScreen} from '../screens/OnboardingDisplayNameScreen';
 
 function findByTestId(
   tree: ReactTestRenderer.ReactTestInstance,
@@ -284,5 +286,89 @@ describe('Onboarding ceremony (IdentityProvider)', () => {
 
     fetchSpy.mockRestore();
     root!.unmount();
+  });
+
+  test('a rejected secure-storage write surfaces an error and does not advance to complete', async () => {
+    const saveSpy = jest
+      .spyOn(storageBundle, 'saveIdentity')
+      .mockRejectedValue(
+        new Error('internal error when a required entitlement is not present'),
+      );
+
+    let observed: ReturnType<typeof useIdentityState> | null = null;
+    let runComplete:
+      | ((opts: {passphrase: string | null; displayName: string}) => Promise<void>)
+      | null = null;
+
+    function Probe() {
+      observed = useIdentityState();
+      const {complete} = require('../identity-context').useOnboarding();
+      runComplete = complete;
+      return null;
+    }
+
+    let root: ReactTestRenderer.ReactTestRenderer | null = null;
+    await ReactTestRenderer.act(async () => {
+      root = ReactTestRenderer.create(
+        <IdentityProvider>
+          <Probe />
+        </IdentityProvider>,
+      );
+    });
+    for (let i = 0; i < 5; i++) {
+      await ReactTestRenderer.act(async () => {
+        await Promise.resolve();
+      });
+    }
+    expect(observed!.status).toBe('onboarding');
+
+    await ReactTestRenderer.act(async () => {
+      await runComplete!({passphrase: null, displayName: 'Test Yawper'});
+    });
+
+    const s = observed!;
+    expect(s.status).toBe('onboarding');
+    if (s.status === 'onboarding') {
+      expect(s.step).not.toBe('complete');
+      expect(s.error).toBeTruthy();
+    }
+
+    const persisted = await loadIdentity();
+    expect(persisted).toBeNull();
+
+    saveSpy.mockRestore();
+    root!.unmount();
+  });
+});
+
+describe('OnboardingDisplayNameScreen error banner', () => {
+  test('renders an error banner when persisting failed', async () => {
+    let root: ReactTestRenderer.ReactTestRenderer | null = null;
+    await ReactTestRenderer.act(async () => {
+      root = ReactTestRenderer.create(
+        <OnboardingDisplayNameScreen
+          defaultDisplayName="Test Yawper"
+          error="Couldn't save your identity to this device's secure storage."
+          onSubmit={() => {}}
+        />,
+      );
+    });
+    expect(findByTestId(root!.root, 'display-name-error')).toBeTruthy();
+  });
+
+  test('no error banner when error is null', async () => {
+    let root: ReactTestRenderer.ReactTestRenderer | null = null;
+    await ReactTestRenderer.act(async () => {
+      root = ReactTestRenderer.create(
+        <OnboardingDisplayNameScreen
+          defaultDisplayName="Test Yawper"
+          error={null}
+          onSubmit={() => {}}
+        />,
+      );
+    });
+    expect(root!.root.findAllByProps({testID: 'display-name-error'})).toHaveLength(
+      0,
+    );
   });
 });
