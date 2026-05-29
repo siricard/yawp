@@ -11,24 +11,10 @@
 @source "../../lib/yawp_web";
 
 
-/*
- * Tailwind v4 theme map. tokens.css (:root) is the single source of truth —
- * every key below references a `var(--…)` from it, so changing a value in
- * tokens.css propagates to the generated utilities without editing this file.
- *
- * `@theme inline` is mandatory here: it inlines the `var(--…)` into the utility
- * declarations instead of emitting a same-named CSS variable, which would
- * otherwise be a self-referential loop (e.g. `--color-bg: var(--color-bg)`).
- *
- * Reserved-namespace caution: we deliberately do NOT define a `--spacing-*`
- * family — Tailwind derives the entire numeric scale (`p-*`, `gap-*`, `w-*`,
- * `max-w-*`) from `--spacing`, and shadowing it collapses layouts. Semantic
- * spacing stays in tokens.css as `--space-*` (consumed by raw CSS and the RN
- * token generator). Likewise the token type scale lives under `--font-*` in
- * tokens.css and is mapped onto Tailwind's `--text-*` scale below.
- */
+/* inline keeps these as var() references instead of re-emitting same-named
+   variables (a self-reference loop); no --spacing-x family because Tailwind
+   derives its numeric padding, gap and width scale from it and shadowing it breaks layouts. */
 @theme inline {
-  /* Surfaces, text, borders */
   --color-bg: var(--color-bg);
   --color-bg-2: var(--color-bg-2);
   --color-surface: var(--color-surface);
@@ -40,7 +26,6 @@
   --color-border: var(--color-border);
   --color-border-soft: var(--color-border-soft);
 
-  /* Brand & status, including soft (color-mix) variants */
   --color-primary: var(--color-primary);
   --color-primary-hover: var(--color-primary-hover);
   --color-primary-soft: var(--color-primary-soft);
@@ -52,19 +37,16 @@
   --color-danger: var(--color-danger);
   --color-danger-soft: var(--color-danger-soft);
 
-  /* Radius */
   --radius-sm: var(--radius-sm);
   --radius-md: var(--radius-md);
   --radius-lg: var(--radius-lg);
   --radius-xl: var(--radius-xl);
   --radius-pill: var(--radius-pill);
 
-  /* Type families (tokens.css uses --font-family for the sans stack) */
   --font-sans: var(--font-family);
   --font-mono: var(--font-mono);
   --font-display: var(--font-display);
 
-  /* Type scale (mapped from tokens.css --font-* sizes) */
   --text-xs: var(--font-xs);
   --text-sm: var(--font-sm);
   --text-base: var(--font-base);
@@ -73,11 +55,9 @@
   --text-2xl: var(--font-2xl);
   --text-3xl: var(--font-3xl);
 
-  /* Card / elevation shadows */
   --shadow-card: var(--shadow-card);
   --shadow-elev: var(--shadow-elev);
 
-  /* Accent glow shadows (focal affordances only) */
   --shadow-glow-primary-sm: var(--glow-primary-sm);
   --shadow-glow-primary-md: var(--glow-primary-md);
   --shadow-glow-primary-lg: var(--glow-primary-lg);
@@ -88,20 +68,12 @@
   --shadow-glow-danger-md: var(--glow-danger-md);
   --shadow-glow-danger-lg: var(--glow-danger-lg);
 
-  /* Keyboard focus ring (exposed as a shadow utility: shadow-focus-ring) */
   --shadow-focus-ring: var(--focus-ring);
 
-  /* Easing */
   --ease-spring: var(--ease-spring);
   --ease-out-quint: var(--ease-out-quint);
 }
 
-/*
- * Token families with no native Tailwind theme namespace are surfaced as
- * explicit utilities so they resolve. They still read tokens.css at runtime.
- */
-
-/* Motion durations (no --duration-* theme namespace in Tailwind v4) */
 @utility duration-fast {
   transition-duration: var(--dur-fast);
 }
@@ -112,7 +84,6 @@
   transition-duration: var(--dur-slow);
 }
 
-/* Surface gradients (no background-image theme namespace) */
 @utility bg-grad-surface-warm {
   background-image: var(--grad-surface-warm);
 }
