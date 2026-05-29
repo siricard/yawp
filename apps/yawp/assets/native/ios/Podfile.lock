@@ -1751,7 +1751,92 @@ PODS:
   - react-native-get-random-values (1.11.0):
     - React-Core
   - react-native-safe-area-context (5.8.0):
+    - boost
+    - DoubleConversion
+    - fast_float
+    - fmt
+    - glog
+    - hermes-engine
+    - RCT-Folly
+    - RCT-Folly/Fabric
+    - RCTRequired
+    - RCTTypeSafety
     - React-Core
+    - React-debug
+    - React-Fabric
+    - React-featureflags
+    - React-graphics
+    - React-ImageManager
+    - React-jsi
+    - react-native-safe-area-context/common (= 5.8.0)
+    - react-native-safe-area-context/fabric (= 5.8.0)
+    - React-NativeModulesApple
+    - React-RCTFabric
+    - React-renderercss
+    - React-rendererdebug
+    - React-utils
+    - ReactCodegen
+    - ReactCommon/turbomodule/bridging
+    - ReactCommon/turbomodule/core
+    - SocketRocket
+    - Yoga
+  - react-native-safe-area-context/common (5.8.0):
+    - boost
+    - DoubleConversion
+    - fast_float
+    - fmt
+    - glog
+    - hermes-engine
+    - RCT-Folly
+    - RCT-Folly/Fabric
+    - RCTRequired
+    - RCTTypeSafety
+    - React-Core
+    - React-debug
+    - React-Fabric
+    - React-featureflags
+    - React-graphics
+    - React-ImageManager
+    - React-jsi
+    - React-NativeModulesApple
+    - React-RCTFabric
+    - React-renderercss
+    - React-rendererdebug
+    - React-utils
+    - ReactCodegen
+    - ReactCommon/turbomodule/bridging
+    - ReactCommon/turbomodule/core
+    - SocketRocket
+    - Yoga
+  - react-native-safe-area-context/fabric (5.8.0):
+    - boost
+    - DoubleConversion
+    - fast_float
+    - fmt
+    - glog
+    - hermes-engine
+    - RCT-Folly
+    - RCT-Folly/Fabric
+    - RCTRequired
+    - RCTTypeSafety
+    - React-Core
+    - React-debug
+    - React-Fabric
+    - React-featureflags
+    - React-graphics
+    - React-ImageManager
+    - React-jsi
+    - react-native-safe-area-context/common
+    - React-NativeModulesApple
+    - React-RCTFabric
+    - React-renderercss
+    - React-rendererdebug
+    - React-utils
+    - ReactCodegen
+    - ReactCommon/turbomodule/bridging
+    - ReactCommon/turbomodule/core
+    - SocketRocket
+    - Yoga
   - React-NativeModulesApple (0.81.6):
     - boost
     - DoubleConversion
@@ -2257,6 +2342,34 @@ PODS:
     - React-perflogger (= 0.81.6)
     - React-utils (= 0.81.6)
     - SocketRocket
+  - RNCClipboard (1.16.3):
+    - boost
+    - DoubleConversion
+    - fast_float
+    - fmt
+    - glog
+    - hermes-engine
+    - RCT-Folly
+    - RCT-Folly/Fabric
+    - RCTRequired
+    - RCTTypeSafety
+    - React-Core
+    - React-debug
+    - React-Fabric
+    - React-featureflags
+    - React-graphics
+    - React-ImageManager
+    - React-jsi
+    - React-NativeModulesApple
+    - React-RCTFabric
+    - React-renderercss
+    - React-rendererdebug
+    - React-utils
+    - ReactCodegen
+    - ReactCommon/turbomodule/bridging
+    - ReactCommon/turbomodule/core
+    - SocketRocket
+    - Yoga
   - RNKeychain (10.0.0):
     - boost
     - DoubleConversion
@@ -2511,6 +2624,7 @@ DEPENDENCIES:
   - ReactAppDependencyProvider (from `build/generated/ios`)
   - ReactCodegen (from `build/generated/ios`)
   - ReactCommon/turbomodule/core (from `../node_modules/react-native/ReactCommon`)
+  - "RNCClipboard (from `../node_modules/@react-native-clipboard/clipboard`)"
   - RNKeychain (from `../node_modules/react-native-keychain`)
   - RNReanimated (from `../node_modules/react-native-reanimated`)
   - SocketRocket (~> 0.7.1)
@@ -2666,6 +2780,8 @@ EXTERNAL SOURCES:
     :path: build/generated/ios
   ReactCommon:
     :path: "../node_modules/react-native/ReactCommon"
+  RNCClipboard:
+    :path: "../node_modules/@react-native-clipboard/clipboard"
   RNKeychain:
     :path: "../node_modules/react-native-keychain"
   RNReanimated:
@@ -2715,21 +2831,21 @@ SPEC CHECKSUMS:
   React-Mapbuffer: acfada26d7e3b20fa26e2cfe8ed7e870d985c57d
   React-microtasksnativemodule: 0134c9afbfdf920ac715a328619ab863869b0998
   react-native-get-random-values: 21325b2244dfa6b58878f51f9aa42821e7ba3d06
-  react-native-safe-area-context: a9f88b96b54546384efbf54d92eba1ebe60444e9
+  react-native-safe-area-context: 7ee594b2c2aa287757c1ba78ac70278305bc7807
   React-NativeModulesApple: ae0596d8a33c90e62b394b08bab780ec767b57f9
   React-oscompat: d5e3366fbd6c7150e17c1bda85eab583a6fa9fce
   React-perflogger: f5b616d0c00af09b69818484cb4750bb5cbd2053
   React-performancetimeline: b4ed2d0845d8da101d4af613aa495170673ab8f4
   React-RCTActionSheet: bf9dd7b376bee98da0105476aeb6a23d7d03822e
   React-RCTAnimation: 9452ae36aca70b66cb6eb107dd0fdb88e611997d
-  React-RCTAppDelegate: a66c7792bb10ea017d028916c390ff004f8a7700
+  React-RCTAppDelegate: d2d434b41d9f8a07861a05d6e5c5fe664a622a57
   React-RCTBlob: 4926f66486c116493727ca504097c72757604d2b
-  React-RCTFabric: 909e9bdbf3914a6f6dc1a4127e0cd4af46dfc24d
-  React-RCTFBReactNativeSpec: f57cab14340982fb0908a033e84d0b7852075b59
+  React-RCTFabric: 67408654f4e7e5ad8ec5647b8cf4c5399d44a6cf
+  React-RCTFBReactNativeSpec: 026f4ba838830cdd1c230c23af5a280d71dc32c5
   React-RCTImage: 5b16f901f577872c9eb0f449e8c6aa1f5ee44b23
   React-RCTLinking: 805821252cf278f2ca442b7e8bb8d64203fe0581
   React-RCTNetwork: 0b7279b355c9f6f56762a86f8e28f9b097a9da4f
-  React-RCTRuntime: cab7c6ba8013cbb2eab48d71e746d8ea86a09a06
+  React-RCTRuntime: f6b32a87040918474640d2797035245b432da1fb
   React-RCTSettings: 244aaafd60ab44992d1a99d7d20e4c0d5055c131
   React-RCTText: 0428432a3e083d85333637d20e05d73f13357179
   React-RCTVibration: e25066ab445312a35e1cb8ea9d0aeecb138fa616
@@ -2746,8 +2862,9 @@ SPEC CHECKSUMS:
   ReactAppDependencyProvider: 13abb80c2fe164aecc43564432bc5e927e3b3185
   ReactCodegen: 91862ea69b2c0e4dde6443d198c2115b02d0b0ed
   ReactCommon: 04075034bbde9c33dc6ad0f947a635c9e05d775d
-  RNKeychain: 75ec65ac60fae44eb5469313fa098ec580013218
-  RNReanimated: ccfe7506f472ab209c81a80a9805d49185b5205b
+  RNCClipboard: 962296f7af77f6c039b683e21c2e2255af9c05df
+  RNKeychain: 182d986f809280edd9444a557adc21845f7d1e6f
+  RNReanimated: d31cc4b3b90329229123e6f37facf0c11119a70a
   SocketRocket: d4aabe649be1e368d1318fdf28a022d714d65748
   Yoga: 3196a843cc5f4bc433f1a41cf17cdf804a01a529
 
