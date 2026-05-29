@@ -2,18 +2,25 @@
 
 ## Try it
 
-- [`docs/walkthroughs/m7-1.md`](docs/walkthroughs/m7-1.md) — first-boot
-  walkthrough: operator setup + chat-owner claim (`just demo-m7-1`).
-- [`docs/walkthroughs/m7-2.md`](docs/walkthroughs/m7-2.md) — real-time
-  `#general` messaging between two browser sessions bound to the same
-  chat-owner identity (`just demo-m7-2`).
-- [`docs/walkthroughs/m7-3.md`](docs/walkthroughs/m7-3.md) — mnemonic
-  onboarding + restore + server invites: a second identity redeems an
-  invite and joins `#general` (`just demo-m7-3`).
-- [`docs/walkthroughs/m7-4-design.md`](docs/walkthroughs/m7-4-design.md) —
-  shared component library + design-system pass: every M7.0–M7.3 surface
-  re-skinned against `.designkit` v16, viewable in isolation via Ladle
-  (`just demo-m7-4-design`).
+```bash
+just demo
+```
+
+`just demo` resets the dev database, boots Phoenix, and points you at the
+single rolling walkthrough — [`docs/walkthroughs/latest.md`](docs/walkthroughs/latest.md).
+It scripts the full end-to-end path: operator setup → chat-owner claim →
+mnemonic onboarding/restore → a second identity redeems a server invite and
+joins `#general` → real-time messaging between two browser sessions. Every
+surface is skinned against the shared design system, and web + native render
+from the same tokens.
+
+To browse the shared component library in isolation:
+
+```bash
+just ladle
+```
+
+Then open [`http://localhost:61000`](http://localhost:61000).
 
 ## Running everything locally
 
