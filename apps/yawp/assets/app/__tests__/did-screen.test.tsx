@@ -21,6 +21,8 @@ jest.mock('../identity-vector', () => ({
   runIdentityVectorCheck: () => ({pass: true, details: {}}),
 }));
 
+import Clipboard from '@react-native-clipboard/clipboard';
+
 import {useIdentityState} from '../identity-context';
 import {DidScreen} from '../screens/DidScreen';
 
@@ -138,5 +140,35 @@ describe('DidScreen', () => {
     });
 
     expect(onCopy).toHaveBeenCalledWith('yp:0000 · 0000 · 0000 · 0000');
+  });
+
+  test('writes to the system clipboard when copy fingerprint is pressed', async () => {
+    (useIdentityState as jest.Mock).mockReturnValue({
+      status: 'ready',
+      identity: fakeIdentity(),
+      error: null,
+    });
+
+    (Clipboard.setString as jest.Mock).mockClear();
+
+    let root: ReactTestRenderer.ReactTestRenderer | null = null;
+    await ReactTestRenderer.act(async () => {
+      root = ReactTestRenderer.create(<DidScreen onOpenVectorTest={() => {}} />);
+    });
+    await ReactTestRenderer.act(async () => {
+      await Promise.resolve();
+    });
+
+    const copyBtn = findByTestId(root!.root, 'copy-fingerprint-btn');
+    await ReactTestRenderer.act(async () => {
+      copyBtn.props.onPress();
+    });
+    await ReactTestRenderer.act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(Clipboard.setString).toHaveBeenCalledWith(
+      'yp:0000 · 0000 · 0000 · 0000',
+    );
   });
 });

@@ -1,5 +1,13 @@
 require('fake-indexeddb/auto');
 
+jest.mock('@react-native-clipboard/clipboard', () => ({
+  __esModule: true,
+  default: {
+    setString: jest.fn(),
+    getString: jest.fn(async () => ''),
+  },
+}));
+
 jest.mock('react-native-keychain', () => {
   const store = new Map();
 
