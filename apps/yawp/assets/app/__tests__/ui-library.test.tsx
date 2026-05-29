@@ -161,6 +161,41 @@ describe('Autocomplete', () => {
     const overlay = findByTestId(root.root, 'autocomplete-overlay');
     expect(overlay.props.style.position).toBe('absolute');
   });
+
+  test('row highlight is a per-row background, not a floating bar', async () => {
+    const root = await render(
+      <Autocomplete
+        inputTestID="ac-input3"
+        value="ab"
+        onChangeText={() => {}}
+        suggestions={['abandon', 'ability']}
+        onSelect={() => {}}
+      />,
+    );
+    await ReactTestRenderer.act(async () => {
+      findByTestId(root.root, 'ac-input3').props.onFocus();
+    });
+    // The option's style is a Pressable state callback so the highlight is the
+    // row's own background across web/iOS/Android/macOS, never a separately
+    // positioned/measured bar that can detach or oversize.
+    const opt = findByTestId(root.root, 'autocomplete-option-0');
+    expect(typeof opt.props.style).toBe('function');
+
+    const idle = opt.props.style({pressed: false, hovered: false});
+    const flatIdle = Object.assign({}, ...idle.filter(Boolean));
+    expect(flatIdle.backgroundColor).toBeUndefined();
+    // No absolute positioning on the highlighted row (would indicate a floater).
+    expect(flatIdle.position).toBeUndefined();
+
+    const pressed = opt.props.style({pressed: true, hovered: false});
+    const flatPressed = Object.assign({}, ...pressed.filter(Boolean));
+    expect(flatPressed.backgroundColor).toBeDefined();
+    expect(flatPressed.position).toBeUndefined();
+
+    const hovered = opt.props.style({pressed: false, hovered: true});
+    const flatHovered = Object.assign({}, ...hovered.filter(Boolean));
+    expect(flatHovered.backgroundColor).toBe(flatPressed.backgroundColor);
+  });
 });
 
 describe('Card', () => {

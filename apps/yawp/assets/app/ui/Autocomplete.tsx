@@ -3,12 +3,14 @@ import {
   Platform,
   Pressable,
   ScrollView,
+  StyleSheet,
   Text,
   type TextInput,
   View,
 } from 'react-native';
 
 import {Input, type InputProps} from './Input';
+import {tokens} from './tokens';
 
 export type AutocompleteProps = Omit<InputProps, 'onChangeText'> & {
   value: string;
@@ -78,7 +80,12 @@ export const Autocomplete = React.forwardRef<TextInput, AutocompleteProps>(
                   onSelect(s);
                   setFocused(false);
                 }}
-                className="px-3 py-2 active:bg-surface-2">
+                style={state => [
+                  styles.option,
+                  (state.pressed ||
+                    (state as {hovered?: boolean}).hovered) &&
+                    styles.optionHighlighted,
+                ]}>
                 <Text className="text-text text-sm font-mono">{s}</Text>
               </Pressable>
             ))}
@@ -89,3 +96,18 @@ export const Autocomplete = React.forwardRef<TextInput, AutocompleteProps>(
   );
   },
 );
+
+// The selected/hover highlight is the row's OWN background (a StyleSheet style
+// applied from Pressable's pressed/hovered state) rather than a separately
+// measured floating bar. A measured absolute bar drifted and oversized on
+// RN-macOS where row layout timing differs; a per-row background can never
+// detach from or exceed the row it paints.
+const styles = StyleSheet.create({
+  option: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  optionHighlighted: {
+    backgroundColor: tokens.color.surface2,
+  },
+});

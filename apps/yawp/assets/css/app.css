@@ -197,3 +197,20 @@
 [data-phx-session], [data-phx-teleported-src] { display: contents }
 
 
+/* react-native-web turns the app root into a flex-1 box that only fills a
+   sized parent, so the host chain must claim the full viewport or every
+   screen collapses to content height and the composer floats mid-window.
+   100dvh keeps mobile browser chrome from clipping the bottom row, with
+   100vh as the fallback for engines without dynamic-viewport units. */
+html, body {
+  height: 100%;
+}
+
+#app {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  min-height: 100dvh;
+}
+
+
