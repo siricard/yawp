@@ -16,14 +16,17 @@ export type InputProps = Omit<TextInputProps, 'style'> & {
   testID?: string;
 };
 
-export function Input({
-  variant = 'text',
-  error = false,
-  rightSlot,
-  containerStyle,
-  testID,
-  ...rest
-}: InputProps) {
+export const Input = React.forwardRef<TextInput, InputProps>(function Input(
+  {
+    variant = 'text',
+    error = false,
+    rightSlot,
+    containerStyle,
+    testID,
+    ...rest
+  },
+  ref,
+) {
   const isTextarea = variant === 'textarea';
   const secure = variant === 'password';
   return (
@@ -35,6 +38,7 @@ export function Input({
       ].join(' ')}
       style={containerStyle}>
       <TextInput
+        ref={ref}
         testID={testID}
         secureTextEntry={secure}
         multiline={isTextarea}
@@ -50,4 +54,4 @@ export function Input({
       {rightSlot ? <View className="ml-2">{rightSlot}</View> : null}
     </View>
   );
-}
+});

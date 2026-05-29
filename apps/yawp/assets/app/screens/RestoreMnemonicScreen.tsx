@@ -1,6 +1,6 @@
 
-import React, {useMemo, useState} from 'react';
-import {ScrollView, Text, View} from 'react-native';
+import React, {useMemo, useRef, useState} from 'react';
+import {ScrollView, Text, type TextInput, View} from 'react-native';
 
 import {ENGLISH_WORDLIST} from '../identity/bip39-wordlist';
 import type {RestoreResult} from '../identity-context';
@@ -43,6 +43,7 @@ export function RestoreMnemonicScreen({onRestore, onCancel}: Props) {
   );
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const inputRefs = useRef<Array<TextInput | null>>([]);
 
   const normalized = useMemo(
     () => words.map(w => w.trim().toLowerCase()),
@@ -57,6 +58,11 @@ export function RestoreMnemonicScreen({onRestore, onCancel}: Props) {
       return next;
     });
     if (error) setError(null);
+  }
+
+  function selectWord(i: number, value: string) {
+    setWord(i, value);
+    inputRefs.current[i + 1]?.focus();
   }
 
   async function handleRestore() {
@@ -101,13 +107,16 @@ export function RestoreMnemonicScreen({onRestore, onCancel}: Props) {
                 </Text>
                 <View style={{flex: 1}}>
                   <Autocomplete
+                    ref={el => {
+                      inputRefs.current[idx] = el;
+                    }}
                     inputTestID={`restore-input-${idx}`}
                     overlayTestID={`restore-suggestions-${idx}`}
                     optionTestID={s => `restore-suggestion-${idx}-${s}`}
                     accessibilityLabel={`recovery word ${idx + 1}`}
                     value={word}
                     onChangeText={v => setWord(idx, v)}
-                    onSelect={s => setWord(idx, s)}
+                    onSelect={s => selectWord(idx, s)}
                     suggestions={suggestions}
                     autoCapitalize="none"
                     autoCorrect={false}

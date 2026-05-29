@@ -47,6 +47,14 @@ export function LockedScreen() {
             This device is protected by a passphrase. Enter it to continue.
           </Text>
 
+          <View
+            testID="locked-identity-context"
+            className="bg-surface-2 rounded-md py-3 px-3 mb-6">
+            <Text className="text-sm text-text-secondary text-center">
+              Enter your passphrase to unlock your identity on this device.
+            </Text>
+          </View>
+
           <Field
             label="Passphrase"
             error={error ?? undefined}

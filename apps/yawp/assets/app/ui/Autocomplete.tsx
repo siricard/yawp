@@ -1,5 +1,12 @@
 import React from 'react';
-import {Platform, Pressable, ScrollView, Text, View} from 'react-native';
+import {
+  Platform,
+  Pressable,
+  ScrollView,
+  Text,
+  type TextInput,
+  View,
+} from 'react-native';
 
 import {Input, type InputProps} from './Input';
 
@@ -14,17 +21,21 @@ export type AutocompleteProps = Omit<InputProps, 'onChangeText'> & {
   optionTestID?: (suggestion: string, index: number) => string;
 };
 
-export function Autocomplete({
-  value,
-  onChangeText,
-  suggestions,
-  onSelect,
-  maxVisible = 6,
-  inputTestID,
-  overlayTestID = 'autocomplete-overlay',
-  optionTestID,
-  ...inputProps
-}: AutocompleteProps) {
+export const Autocomplete = React.forwardRef<TextInput, AutocompleteProps>(
+  function Autocomplete(
+    {
+      value,
+      onChangeText,
+      suggestions,
+      onSelect,
+      maxVisible = 6,
+      inputTestID,
+      overlayTestID = 'autocomplete-overlay',
+      optionTestID,
+      ...inputProps
+    },
+    ref,
+  ) {
   const [focused, setFocused] = React.useState(false);
   const visible = focused && suggestions.length > 0;
   const shown = suggestions.slice(0, maxVisible);
@@ -33,6 +44,7 @@ export function Autocomplete({
     <View style={{position: 'relative'}}>
       <Input
         {...inputProps}
+        ref={ref}
         testID={inputTestID}
         value={value}
         onChangeText={onChangeText}
@@ -75,4 +87,5 @@ export function Autocomplete({
       ) : null}
     </View>
   );
-}
+  },
+);

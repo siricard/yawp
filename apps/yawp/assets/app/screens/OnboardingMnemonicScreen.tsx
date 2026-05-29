@@ -2,10 +2,25 @@
 import React, {useEffect, useState} from 'react';
 import {ScrollView, Text, View} from 'react-native';
 
-import {Button, Card, Field, Input} from '../ui';
+import {ENGLISH_WORDLIST} from '../identity/bip39-wordlist';
+import {Autocomplete, Button, Card, Field} from '../ui';
 
 export const COUNTDOWN_SECONDS = 5;
 export const VERIFY_WORD_COUNT = 3;
+const MAX_SUGGESTIONS = 5;
+
+function suggestionsFor(prefix: string): string[] {
+  const p = prefix.trim().toLowerCase();
+  if (!p) return [];
+  const out: string[] = [];
+  for (const w of ENGLISH_WORDLIST) {
+    if (w.startsWith(p)) {
+      out.push(w);
+      if (out.length >= MAX_SUGGESTIONS) break;
+    }
+  }
+  return out;
+}
 
 type Props = {
   mnemonic: string[];
@@ -139,25 +154,32 @@ export function OnboardingMnemonicScreen({
             your written copy.
           </Text>
 
-          {positions.map((pos, i) => (
-            <Field key={pos} label={`Word #${pos + 1}`}>
-              <Input
-                testID={`verify-input-${i}`}
-                accessibilityLabel={`verify word position ${pos + 1}`}
-                value={inputs[i]}
-                onChangeText={v =>
-                  setInputs(prev => {
-                    const next = [...prev];
-                    next[i] = v;
-                    return next;
-                  })
-                }
-                autoCapitalize="none"
-                autoCorrect={false}
-                placeholder="word"
-              />
-            </Field>
-          ))}
+          {positions.map((pos, i) => {
+            const setVerifyWord = (v: string) =>
+              setInputs(prev => {
+                const next = [...prev];
+                next[i] = v;
+                return next;
+              });
+            return (
+              <Field key={pos} label={`Word #${pos + 1}`}>
+                <Autocomplete
+                  inputTestID={`verify-input-${i}`}
+                  overlayTestID={`verify-suggestions-${i}`}
+                  optionTestID={s => `verify-suggestion-${i}-${s}`}
+                  accessibilityLabel={`verify word position ${pos + 1}`}
+                  value={inputs[i]}
+                  onChangeText={setVerifyWord}
+                  onSelect={setVerifyWord}
+                  suggestions={suggestionsFor(inputs[i])}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  spellCheck={false}
+                  placeholder="word"
+                />
+              </Field>
+            );
+          })}
 
           {verifyError ? (
             <View
