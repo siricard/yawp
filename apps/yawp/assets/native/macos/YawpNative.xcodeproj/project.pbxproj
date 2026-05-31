@@ -34,7 +34,7 @@
 		514201562437B4B40078DB4F /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		514201572437B4B40078DB4F /* main.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = main.m; sourceTree = "<group>"; };
 		514201592437B4B40078DB4F /* YawpNative.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = YawpNative.entitlements; sourceTree = "<group>"; };
-		799D9CB8AACEE8D3A19D3308 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; includeInIndex = 1; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
+		799D9CB8AACEE8D3A19D3308 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xml; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		AB612A7748E36E1A1094C29E /* Pods-YawpNative-macOS.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-YawpNative-macOS.release.xcconfig"; path = "Target Support Files/Pods-YawpNative-macOS/Pods-YawpNative-macOS.release.xcconfig"; sourceTree = "<group>"; };
 		ED297162215061F000B7C4FE /* JavaScriptCore.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = JavaScriptCore.framework; path = System/Library/Frameworks/JavaScriptCore.framework; sourceTree = SDKROOT; };
 		FAFA000000000000000000B1 /* Geist-Regular.ttf */ = {isa = PBXFileReference; lastKnownFileType = unknown; name = "Geist-Regular.ttf"; path = "../assets/fonts/Geist-Regular.ttf"; sourceTree = "<group>"; };
@@ -70,7 +70,6 @@
 				0D62165EB93F4D525F8E194D /* Pods-YawpNative-macOS.debug.xcconfig */,
 				AB612A7748E36E1A1094C29E /* Pods-YawpNative-macOS.release.xcconfig */,
 			);
-			name = Pods;
 			path = Pods;
 			sourceTree = "<group>";
 		};
@@ -193,10 +192,12 @@
 				LastUpgradeCheck = 1130;
 				TargetAttributes = {
 					13B07F861A680F5B00A75B9A = {
+						DevelopmentTeam = 5V3LQJXXTW;
 						LastSwiftMigration = 1120;
 					};
 					514201482437B4B30078DB4F = {
 						CreatedOnToolsVersion = 11.4;
+						DevelopmentTeam = 5V3LQJXXTW;
 						ProvisioningStyle = Automatic;
 					};
 				};
@@ -385,6 +386,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CLANG_ENABLE_MODULES = YES;
 				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 5V3LQJXXTW;
 				ENABLE_BITCODE = NO;
 				INFOPLIST_FILE = "YawpNative-iOS/Info.plist";
 				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks";
@@ -407,6 +409,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CLANG_ENABLE_MODULES = YES;
 				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 5V3LQJXXTW;
 				INFOPLIST_FILE = "YawpNative-iOS/Info.plist";
 				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks";
 				OTHER_LDFLAGS = (
@@ -430,6 +433,7 @@
 				CODE_SIGN_ENTITLEMENTS = "YawpNative-macOS/YawpNative.entitlements";
 				CURRENT_PROJECT_VERSION = 1;
 				DEAD_CODE_STRIPPING = NO;
+				DEVELOPMENT_TEAM = 5V3LQJXXTW;
 				INFOPLIST_FILE = "YawpNative-macos/Info.plist";
 				LD = clang;
 				LDPLUSPLUS = "clang++";
@@ -456,6 +460,7 @@
 				CLANG_ENABLE_MODULES = YES;
 				CODE_SIGN_ENTITLEMENTS = "YawpNative-macOS/YawpNative.entitlements";
 				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 5V3LQJXXTW;
 				INFOPLIST_FILE = "YawpNative-macos/Info.plist";
 				LD = clang;
 				LDPLUSPLUS = "clang++";
