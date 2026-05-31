@@ -1,0 +1,39 @@
+# Yawp Licensing
+
+This repository contains code under **two different licenses**. The split lives at
+the app boundary inside the Mix umbrella:
+
+| Path                  | License                                           | File                                |
+| --------------------- | ------------------------------------------------- | ----------------------------------- |
+| `apps/yawp/`          | GNU Affero General Public License v3.0 (AGPL-3.0) | [`apps/yawp/LICENSE`](apps/yawp/LICENSE)                 |
+| `apps/yawp_premium/`  | Proprietary — All rights reserved                 | [`apps/yawp_premium/LICENSE`](apps/yawp_premium/LICENSE) |
+
+## Core — `apps/yawp/`
+
+The core Yawp project (everything required to run a self-hosted, federated,
+end-to-end-encrypted Yawp instance) is licensed under the **GNU Affero General
+Public License, version 3.0**. See [`apps/yawp/LICENSE`](apps/yawp/LICENSE) for the
+full text. The AGPL-3.0 obliges anyone who modifies and runs the software as a
+network service to make their modifications available to users of that service.
+
+## Premium — `apps/yawp_premium/`
+
+The `apps/yawp_premium/` tree is **proprietary**, copyright Simon Ricard, all rights
+reserved. It is **NOT** licensed under the AGPL-3.0. It exists in this repository
+for development convenience and clarity of separation — it is not free software,
+and no rights are granted to use, modify, or redistribute it. See
+[`apps/yawp_premium/LICENSE`](apps/yawp_premium/LICENSE) for the full notice.
+
+## Cross-tree boundary
+
+**No code from `apps/yawp/` may be copied into `apps/yawp_premium/`, and no code
+from `apps/yawp_premium/` may be copied into `apps/yawp/`, without explicit
+relicensing by the copyright holder.** The two trees are deliberately quarantined
+so the licenses cannot bleed into each other.
+
+## Contributing
+
+See [`CONTRIBUTING.md`](CONTRIBUTING.md). External contributions are accepted to
+`apps/yawp/` (subject to a Contributor License Agreement signed via CLA Assistant
+and a DCO `Signed-off-by` line). External contributions to `apps/yawp_premium/`
+are not accepted.

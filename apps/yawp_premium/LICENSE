@@ -1,0 +1,16 @@
+Copyright (c) 2026 Simon Ricard
+All rights reserved.
+
+This software (the 'Premium Tier' of the Yawp project) is proprietary.
+It is NOT licensed under the AGPL-3.0 that governs the rest of the
+Yawp project. No license, express or implied, is granted to use, copy,
+modify, merge, publish, distribute, sublicense, or sell any portion of
+this directory or its contents without prior written permission from
+the copyright holder.
+
+This directory is included in the Yawp repository for development
+convenience and clarity of separation. Forks of Yawp must replace this
+directory with their own equivalent or remove it; they may NOT include
+this directory's contents under their own license.
+
+For licensing inquiries: <set-on-first-commit@example.org>
