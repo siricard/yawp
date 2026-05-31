@@ -33,3 +33,5 @@ npm-debug.log
 /assets/node_modules/
 /apps/*/assets/node_modules/
 /apps/*/assets/native/node_modules/
+
+.DS_Store
