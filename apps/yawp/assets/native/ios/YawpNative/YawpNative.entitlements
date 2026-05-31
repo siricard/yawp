@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!--
+	  react-native-keychain calls SecItemAdd/SecItemCopyMatching, which require
+	  the "Keychain Sharing" entitlement (keychain-access-groups) for any signed
+	  app on a real device — even when sharing isn't actually used. Without at
+	  least one group declared here, getOrCreateIdentity() fails with the cryptic
+	  "internal error when a required entitlement isn't present" (errSecMissing-
+	  Entitlement, -34018). The iOS Simulator doesn't enforce this, so the bug
+	  only surfaces on physical hardware.
+
+	  Using the app's own bundle id as the group keeps the keychain item private
+	  to the app. $(AppIdentifierPrefix) is the team-prefix variable Xcode auto-
+	  substitutes from the signing team.
+	-->
+	<key>keychain-access-groups</key>
+	<array>
+		<string>$(AppIdentifierPrefix)ca.simonricard.YawpNative</string>
+	</array>
+</dict>
+</plist>
