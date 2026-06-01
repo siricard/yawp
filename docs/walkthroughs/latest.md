@@ -59,11 +59,17 @@ Optional, for native parity verification:
      to continue. (The server never sees the phrase or the derived keys.)
    - Land on home with `#general` available.
 
-2. **Add a second identity via an invite.** Generate a server invite from the
-   first session, then open a second browser session (or an incognito window)
-   and redeem it. Choose "create new identity" to run the mnemonic ceremony
-   again, or "restore" to enter an existing phrase. The second identity joins
-   `#general`.
+2. **Add a second identity via an invite.** In the operator console, mint a
+   server invite and use its **Copy link** button to grab a full invite link
+   (`<server>/invite#<token>`). Open a second browser session (or an incognito
+   window), choose "create new identity" to run the mnemonic ceremony again
+   (or "restore" to enter an existing phrase), then open **Add server**. Paste
+   the full link into the single input and press **Next** — the screen probes
+   the server, recognizes it as already set up, pre-fills the token, and labels
+   the field "Invite token". Press **Add server** to join `#general`. (If you
+   only have the server address, paste that instead: the screen still probes
+   and asks for the right token kind on the next step — no manual claim-vs-invite
+   toggle.)
 
 3. **Chat in real time.** With both sessions on `#general`, send a message from
    one — it appears in the other without a refresh.
@@ -133,6 +139,12 @@ Optional, for native parity verification:
   onboarding choice / display-name / mnemonic / passphrase / recovery /
   complete, home, channel, DID, admin, add-server, invites.
 - Mnemonic-suggestions dropdown converted to an overlay (no layout push).
+- Add-server is now paste-first and server-state-driven: paste a full invite
+  or claim link to join in one step, or enter a server address and the screen
+  probes `/.well-known/yawp/server-info` to decide whether to ask for a claim
+  token (unclaimed) or an invite token (claimed). The old claim-vs-invite
+  toggle is gone. Operator console now offers Copy-link / Copy-app-link buttons
+  next to claim tokens and invites.
 - Completed slate→token sweep on the onboarding and vector-test screens
   (`OnboardingChoiceScreen`, `OnboardingDisplayNameScreen`,
   `OnboardingCompleteScreen`, `VectorTestScreen`) — the last legacy

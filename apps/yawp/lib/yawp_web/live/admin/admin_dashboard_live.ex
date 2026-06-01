@@ -333,6 +333,26 @@ defmodule YawpWeb.AdminDashboardLive do
                       <.icon name="hero-clipboard" class="size-4" /> Copy
                     </button>
                     <button
+                      id="claim-token-copy-link-btn"
+                      type="button"
+                      phx-hook=".CopyLink"
+                      data-token={@active_claim_token.token}
+                      data-form="https"
+                      class={admin_secondary_btn_class()}
+                    >
+                      <.icon name="hero-link" class="size-4" /> Copy link
+                    </button>
+                    <button
+                      id="claim-token-copy-applink-btn"
+                      type="button"
+                      phx-hook=".CopyLink"
+                      data-token={@active_claim_token.token}
+                      data-form="yawp"
+                      class={admin_secondary_btn_class()}
+                    >
+                      <.icon name="hero-device-phone-mobile" class="size-4" /> Copy app link
+                    </button>
+                    <button
                       id="claim-token-replace-btn"
                       type="button"
                       phx-click="generate_claim_token"
@@ -356,6 +376,29 @@ defmodule YawpWeb.AdminDashboardLive do
                           const token = this.el.dataset.token || ""
                           if (navigator.clipboard && navigator.clipboard.writeText) {
                             navigator.clipboard.writeText(token)
+                          }
+                        })
+                      }
+                    }
+                  </script>
+                  <script :type={Phoenix.LiveView.ColocatedHook} name=".CopyLink">
+                    function b64url(str) {
+                      return btoa(str)
+                        .replace(/\+/g, "-")
+                        .replace(/\//g, "_")
+                        .replace(/=+$/, "")
+                    }
+                    export default {
+                      mounted() {
+                        this.el.addEventListener("click", () => {
+                          const token = this.el.dataset.token || ""
+                          const origin = window.location.origin
+                          const link =
+                            this.el.dataset.form === "yawp"
+                              ? `yawp://invite/${b64url(origin)}/${token}`
+                              : `${origin}/invite#${token}`
+                          if (navigator.clipboard && navigator.clipboard.writeText) {
+                            navigator.clipboard.writeText(link)
                           }
                         })
                       }
@@ -450,6 +493,26 @@ defmodule YawpWeb.AdminDashboardLive do
                 <span class="text-xs font-semibold text-text-tertiary">
                   {invite_kind_label(invite)}
                 </span>
+                <button
+                  id={"server-invite-copy-link-btn-#{invite.id}"}
+                  type="button"
+                  phx-hook=".CopyLink"
+                  data-token={invite.token}
+                  data-form="https"
+                  class="inline-flex items-center gap-1 rounded-pill bg-surface text-text text-xs font-semibold px-2 py-1 hover:bg-surface-3"
+                >
+                  <.icon name="hero-link" class="size-3" /> Link
+                </button>
+                <button
+                  id={"server-invite-copy-applink-btn-#{invite.id}"}
+                  type="button"
+                  phx-hook=".CopyLink"
+                  data-token={invite.token}
+                  data-form="yawp"
+                  class="inline-flex items-center gap-1 rounded-pill bg-surface text-text text-xs font-semibold px-2 py-1 hover:bg-surface-3"
+                >
+                  <.icon name="hero-device-phone-mobile" class="size-3" /> App link
+                </button>
                 <button
                   id={"server-invite-revoke-btn-#{invite.id}"}
                   type="button"

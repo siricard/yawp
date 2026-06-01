@@ -1,11 +1,15 @@
-
 import React, {useState} from 'react';
-import {Pressable, Text, View} from 'react-native';
+import {Text, View} from 'react-native';
 
 import {submitClaim} from '../claim';
 import {submitBindDevice} from '../bind';
 import {submitRedeemInvite} from '../invite';
 import {useRecordFirstBoundAt} from '../nudge-store';
+import {parseInviteLink} from '../onboarding/parseInviteLink';
+import {
+  probeServerInfo,
+  type ServerInfo,
+} from '../onboarding/useServerInfoProbe';
 import {
   useIdentityState,
   useWorkspaceServers,
@@ -13,21 +17,19 @@ import {
 } from '../identity-context';
 import {Banner, Button, Field, Input} from '../ui';
 
-type TokenKind = 'claim' | 'invite';
-
 type Props = {
   onCancel: () => void;
   onAdded: (server: WorkspaceServer) => void;
   /**
-   * invoked after a successful invite-token redeem +
-   * bind to navigate the newly-joined user straight into the server's
-   * `#general` channel. Threaded from App.tsx so the same primitive
-   * powers manual tile clicks and post-redeem auto-nav. The claim
-   * (operator) branch still uses `onAdded` (lands on home with the
+   * invoked after a successful invite-token redeem + bind to navigate the
+   * newly-joined user straight into the server's `#general` channel. The
+   * claim (operator) branch still uses `onAdded` (lands on home with the
    * new tile selected).
    */
   onNavigateToServer?: (server: WorkspaceServer) => void;
 };
+
+type Step = 'connect' | 'code';
 
 function labelFromUrl(raw: string): string {
   try {
@@ -43,28 +45,71 @@ export function AddServerScreen({onCancel, onAdded, onNavigateToServer}: Props) 
   const {addServer} = useWorkspaceServers();
   const {recordFirstBound} = useRecordFirstBoundAt();
 
-  const [serverUrl, setServerUrl] = useState('http://localhost:4000');
-  const [tokenKind, setTokenKind] = useState<TokenKind>('claim');
+  const [step, setStep] = useState<Step>('connect');
+  const [pasteValue, setPasteValue] = useState('http://localhost:4000');
+  const [serverUrl, setServerUrl] = useState('');
   const [tokenValue, setTokenValue] = useState('');
+  const [probing, setProbing] = useState(false);
+  const [info, setInfo] = useState<ServerInfo | null>(null);
+  const [probeError, setProbeError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const identityReady = identityState.status === 'ready';
-  const canSubmit =
-    identityReady &&
-    !submitting &&
-    serverUrl.trim().length > 0 &&
-    tokenValue.trim().length > 0;
 
-  async function handleSubmit() {
+  async function probeAndAdvance(url: string, prefilledToken: string | null) {
+    setProbing(true);
+    setProbeError(null);
+    setErrorMessage(null);
+
+    const result = await probeServerInfo(url);
+
+    setProbing(false);
+
+    if (!result.ok) {
+      setInfo(null);
+      setProbeError(result.message);
+    } else {
+      setInfo(result.info);
+    }
+
+    if (prefilledToken) {
+      setTokenValue(prefilledToken);
+    }
+    setStep('code');
+  }
+
+  async function handleConnect() {
+    if (probing || submitting) return;
+    const raw = pasteValue.trim();
+    if (raw.length === 0) return;
+
+    const parsed = parseInviteLink(raw);
+    if (parsed) {
+      setServerUrl(parsed.serverUrl);
+      await probeAndAdvance(parsed.serverUrl, parsed.token);
+      return;
+    }
+
+    setServerUrl(raw);
+    await probeAndAdvance(raw, null);
+  }
+
+  async function handleSubmitCode() {
     if (!identityReady || submitting) return;
+    const url = serverUrl.trim();
+    const token = tokenValue.trim();
+    if (url.length === 0 || token.length === 0) return;
+
     setSubmitting(true);
     setErrorMessage(null);
 
-    if (tokenKind === 'invite') {
+    const claimed = info?.claimed === true;
+
+    if (claimed) {
       const redeem = await submitRedeemInvite({
-        serverUrl: serverUrl.trim(),
-        inviteToken: tokenValue.trim(),
+        serverUrl: url,
+        inviteToken: token,
         identity: identityState.identity,
       });
 
@@ -75,7 +120,7 @@ export function AddServerScreen({onCancel, onAdded, onNavigateToServer}: Props) 
       }
 
       const bind = await submitBindDevice({
-        serverUrl: serverUrl.trim(),
+        serverUrl: url,
         identity: identityState.identity,
       });
 
@@ -89,10 +134,10 @@ export function AddServerScreen({onCancel, onAdded, onNavigateToServer}: Props) 
       await recordFirstBound();
 
       const server: WorkspaceServer = {
-        url: serverUrl.trim().replace(/\/+$/, ''),
+        url: url.replace(/\/+$/, ''),
         did: `did:yawp:${identityState.identity.did}`,
         role: redeem.role,
-        label: labelFromUrl(serverUrl.trim()),
+        label: labelFromUrl(url),
       };
       addServer(server);
       if (onNavigateToServer) {
@@ -104,14 +149,14 @@ export function AddServerScreen({onCancel, onAdded, onNavigateToServer}: Props) 
     }
 
     const result = await submitClaim({
-      serverUrl: serverUrl.trim(),
-      claimToken: tokenValue.trim(),
+      serverUrl: url,
+      claimToken: token,
       identity: identityState.identity,
     });
 
     if (result.ok) {
       const bind = await submitBindDevice({
-        serverUrl: serverUrl.trim(),
+        serverUrl: url,
         identity: identityState.identity,
       });
 
@@ -125,10 +170,10 @@ export function AddServerScreen({onCancel, onAdded, onNavigateToServer}: Props) 
       await recordFirstBound();
 
       const server: WorkspaceServer = {
-        url: serverUrl.trim().replace(/\/+$/, ''),
+        url: url.replace(/\/+$/, ''),
         did: result.did,
         role: result.role,
-        label: labelFromUrl(serverUrl.trim()),
+        label: labelFromUrl(url),
       };
       addServer(server);
       onAdded(server);
@@ -139,6 +184,23 @@ export function AddServerScreen({onCancel, onAdded, onNavigateToServer}: Props) 
     setErrorMessage(result.message);
   }
 
+  const codeLabel = info?.claimed ? 'Invite token' : 'Claim token';
+  const codeHint = (() => {
+    if (!info) {
+      return 'Paste your token to continue.';
+    }
+    return info.claimed
+      ? 'This server is set up. Paste your invite token.'
+      : "This server hasn't been set up yet. Paste the operator claim token.";
+  })();
+
+  const canConnect = pasteValue.trim().length > 0 && !probing && !submitting;
+  const canSubmitCode =
+    identityReady &&
+    !submitting &&
+    serverUrl.trim().length > 0 &&
+    tokenValue.trim().length > 0;
+
   return (
     <View
       className="flex-1 bg-bg px-6 pt-8 pb-4"
@@ -148,116 +210,123 @@ export function AddServerScreen({onCancel, onAdded, onNavigateToServer}: Props) 
         Add server
       </Text>
       <Text className="text-sm text-text-secondary mb-4">
-        Paste a claim token (from the server operator) or an invite token
-        (from the chat owner) and we&apos;ll bind this device&apos;s identity
-        to that server.
+        Paste an invite or claim link to join instantly, or enter a server
+        address and we&apos;ll guide you through the rest.
       </Text>
 
-      <Field label="Server URL">
-        <Input
-          testID="server-url-input"
-          accessibilityLabel="server url"
-          value={serverUrl}
-          onChangeText={setServerUrl}
-          autoCapitalize="none"
-          autoCorrect={false}
-          editable={!submitting}
-          placeholder="http://localhost:4000"
-        />
-      </Field>
+      {step === 'connect' ? (
+        <>
+          <Field
+            label="Invite link or server address"
+            helper="Paste a full invite/claim link, or just the server URL.">
+            <Input
+              testID="server-url-input"
+              accessibilityLabel="invite link or server url"
+              value={pasteValue}
+              onChangeText={setPasteValue}
+              autoCapitalize="none"
+              autoCorrect={false}
+              editable={!probing}
+              placeholder="https://server.example/invite#… or http://localhost:4000"
+            />
+          </Field>
 
-      <Field label="Token kind">
-        <View
-          className="flex-row bg-surface-2 rounded-pill p-1 self-start"
-          testID="token-kind-toggle">
-          <Pressable
-            testID="token-kind-claim"
-            accessibilityRole="button"
-            accessibilityLabel="claim token kind"
-            onPress={() => setTokenKind('claim')}
-            disabled={submitting}
-            className={[
-              'rounded-pill py-2 px-3',
-              tokenKind === 'claim' ? 'bg-primary' : 'bg-transparent',
-            ].join(' ')}>
-            <Text
-              className={[
-                'text-xs font-semibold',
-                tokenKind === 'claim' ? 'text-on-primary' : 'text-text',
-              ].join(' ')}>
-              Claim token (operator)
+          <View className="flex-row" style={{gap: 12}}>
+            <Button
+              testID="add-server-next"
+              accessibilityLabel="next"
+              variant="primary"
+              size="lg"
+              disabled={!canConnect}
+              label={probing ? 'Checking…' : 'Next'}
+              onPress={handleConnect}
+            />
+            <Button
+              testID="add-server-cancel"
+              accessibilityLabel="cancel"
+              variant="secondary"
+              size="lg"
+              disabled={probing}
+              label="Cancel"
+              onPress={onCancel}
+            />
+          </View>
+        </>
+      ) : (
+        <>
+          <View className="mb-3">
+            <Text className="text-xs font-semibold text-text-secondary uppercase mb-1">
+              Server
             </Text>
-          </Pressable>
-          <Pressable
-            testID="token-kind-invite"
-            accessibilityRole="button"
-            accessibilityLabel="invite token kind"
-            onPress={() => setTokenKind('invite')}
-            disabled={submitting}
-            className={[
-              'rounded-pill py-2 px-3',
-              tokenKind === 'invite' ? 'bg-primary' : 'bg-transparent',
-            ].join(' ')}>
             <Text
-              className={[
-                'text-xs font-semibold',
-                tokenKind === 'invite' ? 'text-on-primary' : 'text-text',
-              ].join(' ')}>
-              Invite token
+              testID="add-server-resolved-url"
+              className="text-sm font-mono text-text">
+              {serverUrl.replace(/\/+$/, '')}
             </Text>
-          </Pressable>
-        </View>
-      </Field>
+          </View>
 
-      <Field label={tokenKind === 'claim' ? 'Claim token' : 'Invite token'}>
-        <Input
-          testID="claim-token-input"
-          accessibilityLabel={
-            tokenKind === 'claim' ? 'claim token' : 'invite token'
-          }
-          value={tokenValue}
-          onChangeText={setTokenValue}
-          autoCapitalize="none"
-          autoCorrect={false}
-          editable={!submitting}
-          placeholder={
-            tokenKind === 'claim'
-              ? 'Paste the operator-issued token'
-              : 'Paste the chat-owner invite token'
-          }
-        />
-      </Field>
+          {probeError ? (
+            <View className="mb-4">
+              <Banner
+                kind="warning"
+                message={probeError}
+                testID="add-server-probe-error"
+              />
+            </View>
+          ) : null}
 
-      {errorMessage ? (
-        <View className="mb-4">
-          <Banner
-            kind="danger"
-            message={errorMessage}
-            testID="add-server-error"
-          />
-        </View>
-      ) : null}
+          <Field label={codeLabel} helper={codeHint}>
+            <Input
+              testID="claim-token-input"
+              accessibilityLabel={info?.claimed ? 'invite token' : 'claim token'}
+              value={tokenValue}
+              onChangeText={setTokenValue}
+              autoCapitalize="none"
+              autoCorrect={false}
+              editable={!submitting}
+              placeholder={
+                info?.claimed
+                  ? 'Paste the chat-owner invite token'
+                  : 'Paste the operator-issued claim token'
+              }
+            />
+          </Field>
 
-      <View className="flex-row" style={{gap: 12}}>
-        <Button
-          testID="add-server-submit"
-          accessibilityLabel="add server"
-          variant="primary"
-          size="lg"
-          disabled={!canSubmit}
-          label={submitting ? 'Adding…' : 'Add server'}
-          onPress={handleSubmit}
-        />
-        <Button
-          testID="add-server-cancel"
-          accessibilityLabel="cancel"
-          variant="secondary"
-          size="lg"
-          disabled={submitting}
-          label="Cancel"
-          onPress={onCancel}
-        />
-      </View>
+          {errorMessage ? (
+            <View className="mb-4">
+              <Banner
+                kind="danger"
+                message={errorMessage}
+                testID="add-server-error"
+              />
+            </View>
+          ) : null}
+
+          <View className="flex-row" style={{gap: 12}}>
+            <Button
+              testID="add-server-submit"
+              accessibilityLabel="add server"
+              variant="primary"
+              size="lg"
+              disabled={!canSubmitCode}
+              label={submitting ? 'Adding…' : 'Add server'}
+              onPress={handleSubmitCode}
+            />
+            <Button
+              testID="add-server-back"
+              accessibilityLabel="back"
+              variant="secondary"
+              size="lg"
+              disabled={submitting}
+              label="Back"
+              onPress={() => {
+                setStep('connect');
+                setErrorMessage(null);
+              }}
+            />
+          </View>
+        </>
+      )}
     </View>
   );
 }

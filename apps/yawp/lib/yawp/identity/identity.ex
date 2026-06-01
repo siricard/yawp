@@ -60,6 +60,7 @@ defmodule Yawp.Identity.Identity do
       change Yawp.Identity.Identity.Changes.DecodeClaimPayload
       change Yawp.Identity.Identity.Changes.VerifyDidDerivation
       change Yawp.Identity.Identity.Changes.VerifySenderSignature
+      change Yawp.Identity.Identity.Changes.RejectIfClaimed
       change Yawp.Identity.Identity.Changes.ConsumeClaimToken
       change Yawp.Identity.Identity.Changes.AssignOwnerRole
       change Yawp.Identity.Identity.Changes.WriteClaimAudit

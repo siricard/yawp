@@ -58,6 +58,7 @@ defmodule YawpWeb.Router do
     pipe_through :well_known
 
     get "/server-key.json", ServerKeyController, :show
+    get "/server-info", ServerInfoController, :show
   end
 
   scope "/", YawpWeb do

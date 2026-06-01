@@ -205,6 +205,28 @@ defmodule Yawp.Servers.ServerInviteTest do
     end
   end
 
+  describe "redeem (server-state guard)" do
+    test "server_not_claimed_use_claim_token when no Owner membership exists",
+         %{server: server, owner: owner} do
+      {:ok, invite} =
+        Servers.mint_server_invite(%{server_id: server.id}, actor: owner)
+
+      {:ok, owner_role} = Servers.get_system_role_for_server("Owner", server.id)
+      require Ash.Query
+
+      Yawp.Servers.Membership
+      |> Ash.Query.filter(server_id == ^server.id and role_id == ^owner_role.id)
+      |> Ash.read!(authorize?: false)
+      |> Enum.each(&Ash.destroy!(&1, authorize?: false))
+
+      refute Yawp.Servers.SetupState.claimed?()
+
+      args = build_redeem_args(invite.token)
+      assert {:error, error} = do_redeem(args)
+      assert error_type(error) == "server_not_claimed_use_claim_token"
+    end
+  end
+
   describe "redeem (errors)" do
     test "invite_token_invalid for unknown token" do
       args = build_redeem_args("NOSUCHTOKEN12345678901234")

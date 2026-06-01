@@ -1,9 +1,9 @@
 /**
- * Render smoke + integration test for the Add-server screen.
- * Exercises the form via react-test-renderer:
- * - inputs accept text and Submit is gated until both are filled,
- * - submit posts and on 200 the new server lands in the workspace bar,
- * - 4xx slug renders inline via the testID="add-server-error" view.
+ * Render + integration test for the paste-first Add-server screen.
+ *
+ * The screen is server-state driven: a `/.well-known/yawp/server-info`
+ * probe decides whether step 2 expects a claim token (unclaimed server)
+ * or an invite token (claimed server). There is no manual kind toggle.
  */
 
 import React from 'react';
@@ -20,21 +20,59 @@ function findByTestId(
   return tree.findByProps({testID});
 }
 
-function ServersProbe({onLoaded}: {onLoaded: (servers: unknown[]) => void}) {
-  const {servers} = useWorkspaceServers();
-  React.useEffect(() => {
-    onLoaded(servers);
-  }, [servers, onLoaded]);
-  return null;
+function queryByTestId(
+  tree: ReactTestRenderer.ReactTestInstance,
+  testID: string,
+) {
+  const matches = tree.findAllByProps({testID});
+  return matches.length > 0 ? matches[0] : null;
 }
 
-describe('AddServerScreen', () => {
+function isProbe(input: RequestInfo | URL): boolean {
+  return (
+    typeof input === 'string' && input.includes('/.well-known/yawp/server-info')
+  );
+}
+
+function probeResponse(claimed: boolean): Response {
+  return {
+    ok: true,
+    status: 200,
+    json: async () => ({claimed, serverName: 'Yawp', fingerprint: 'ab12:cd34'}),
+  } as unknown as Response;
+}
+
+async function flush() {
+  await ReactTestRenderer.act(async () => {
+    await Promise.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
+  });
+}
+
+function gatherText(node: ReactTestRenderer.ReactTestInstance): string {
+  const texts: string[] = [];
+  node
+    .findAll(
+      n =>
+        (n.type as unknown) === 'Text' ||
+        (n.type as Function)?.name === 'Text',
+    )
+    .forEach(n => {
+      const c = n.props.children;
+      if (typeof c === 'string') texts.push(c);
+    });
+  return texts.join(' ');
+}
+
+describe('AddServerScreen (paste-first)', () => {
   beforeEach(async () => {
     await clearIdentity();
     await getOrCreateIdentity();
   });
 
-  test('renders inputs, submit button, and cancel button', async () => {
+  test('has no claim-vs-invite segmented toggle', async () => {
     let root: ReactTestRenderer.ReactTestRenderer | null = null;
     await ReactTestRenderer.act(async () => {
       root = ReactTestRenderer.create(
@@ -43,29 +81,30 @@ describe('AddServerScreen', () => {
         </IdentityProvider>,
       );
     });
-    await ReactTestRenderer.act(async () => {
-      await Promise.resolve();
-    });
+    await flush();
 
     const tree = root!.root;
+    expect(queryByTestId(tree, 'token-kind-toggle')).toBeNull();
+    expect(queryByTestId(tree, 'token-kind-claim')).toBeNull();
+    expect(queryByTestId(tree, 'token-kind-invite')).toBeNull();
     expect(findByTestId(tree, 'server-url-input')).toBeTruthy();
-    expect(findByTestId(tree, 'claim-token-input')).toBeTruthy();
-    expect(findByTestId(tree, 'add-server-submit')).toBeTruthy();
-    expect(findByTestId(tree, 'add-server-cancel')).toBeTruthy();
+    expect(findByTestId(tree, 'add-server-next')).toBeTruthy();
   });
 
-  test('successful submit calls onAdded and adds to workspace bar', async () => {
+  test('plain URL path: Next probes then shows a two-step claim flow on an unclaimed server', async () => {
     let callIdx = 0;
     const fetchSpy = jest
       .spyOn(global, 'fetch')
-      .mockImplementation(async (_input, init) => {
+      .mockImplementation(async (input, init) => {
+        if (isProbe(input)) {
+          return probeResponse(false);
+        }
         const body = JSON.parse((init?.body as string) ?? '{}');
         callIdx += 1;
         if (body.action === 'claim_chat_owner') {
           return {
             ok: true,
             status: 200,
-            statusText: 'OK',
             json: async () => ({
               success: true,
               data: {id: 'id-abc', did: 'did:yawp:abc'},
@@ -75,7 +114,6 @@ describe('AddServerScreen', () => {
         return {
           ok: true,
           status: 200,
-          statusText: 'OK',
           json: async () => ({
             success: true,
             data: {id: 'id-abc', did: 'did:yawp:abc', profileVersion: 1},
@@ -89,13 +127,11 @@ describe('AddServerScreen', () => {
       });
 
     let added: unknown = null;
-    let serversSnapshot: unknown[] = [];
 
     let root: ReactTestRenderer.ReactTestRenderer | null = null;
     await ReactTestRenderer.act(async () => {
       root = ReactTestRenderer.create(
         <IdentityProvider>
-          <ServersProbe onLoaded={s => (serversSnapshot = s)} />
           <AddServerScreen
             onCancel={() => {}}
             onAdded={s => {
@@ -105,55 +141,61 @@ describe('AddServerScreen', () => {
         </IdentityProvider>,
       );
     });
-    await ReactTestRenderer.act(async () => {
-      await Promise.resolve();
-    });
+    await flush();
 
     const tree = root!.root;
+
     await ReactTestRenderer.act(async () => {
       findByTestId(tree, 'server-url-input').props.onChangeText(
         'http://localhost:4000',
       );
-      findByTestId(tree, 'claim-token-input').props.onChangeText('TOKEN123');
     });
 
+    expect(queryByTestId(tree, 'claim-token-input')).toBeNull();
+
+    await ReactTestRenderer.act(async () => {
+      findByTestId(tree, 'add-server-next').props.onPress();
+    });
+    await flush();
+
+    const codeField = findByTestId(tree, 'claim-token-input');
+    expect(codeField).toBeTruthy();
+    expect(gatherText(tree).toLowerCase()).toContain('claim token');
+
+    await ReactTestRenderer.act(async () => {
+      findByTestId(tree, 'claim-token-input').props.onChangeText('TOKEN123');
+    });
     await ReactTestRenderer.act(async () => {
       findByTestId(tree, 'add-server-submit').props.onPress();
     });
-    await ReactTestRenderer.act(async () => {
-      await Promise.resolve();
-      await Promise.resolve();
-      await Promise.resolve();
-      await Promise.resolve();
-    });
+    await flush();
 
-    expect(fetchSpy).toHaveBeenCalledTimes(2);
-    expect(fetchSpy.mock.calls[0][0]).toBe('http://localhost:4000/rpc/run');
-    expect(fetchSpy.mock.calls[1][0]).toBe('http://localhost:4000/rpc/run');
     expect(added).toMatchObject({
       url: 'http://localhost:4000',
       did: 'did:yawp:abc',
       role: 'Owner',
     });
-    expect(serversSnapshot).toEqual(
-      expect.arrayContaining([expect.objectContaining({did: 'did:yawp:abc'})]),
-    );
+
+    const probeCalls = fetchSpy.mock.calls.filter(c => isProbe(c[0]));
+    expect(probeCalls.length).toBe(1);
 
     fetchSpy.mockRestore();
   });
 
-  test('invite-kind toggle dispatches redeem_server_invite and adds Member', async () => {
+  test('pasting a full invite link auto-advances and redeems against a claimed server', async () => {
     let callIdx = 0;
     const fetchSpy = jest
       .spyOn(global, 'fetch')
-      .mockImplementation(async (_input, init) => {
+      .mockImplementation(async (input, init) => {
+        if (isProbe(input)) {
+          return probeResponse(true);
+        }
         const body = JSON.parse((init?.body as string) ?? '{}');
         callIdx += 1;
         if (body.action === 'redeem_server_invite') {
           return {
             ok: true,
             status: 200,
-            statusText: 'OK',
             json: async () => ({
               success: true,
               data: {serverId: 'server-uuid-1', role: 'Member'},
@@ -163,7 +205,6 @@ describe('AddServerScreen', () => {
         return {
           ok: true,
           status: 200,
-          statusText: 'OK',
           json: async () => ({
             success: true,
             data: {id: 'id-xyz', did: 'did:yawp:xyz', profileVersion: 1},
@@ -176,7 +217,7 @@ describe('AddServerScreen', () => {
         } as unknown as Response;
       });
 
-    let added: unknown = null;
+    const navigated: unknown[] = [];
 
     let root: ReactTestRenderer.ReactTestRenderer | null = null;
     await ReactTestRenderer.act(async () => {
@@ -184,46 +225,50 @@ describe('AddServerScreen', () => {
         <IdentityProvider>
           <AddServerScreen
             onCancel={() => {}}
-            onAdded={s => {
-              added = s;
-            }}
+            onAdded={() => {}}
+            onNavigateToServer={s => navigated.push(s)}
           />
         </IdentityProvider>,
       );
     });
-    await ReactTestRenderer.act(async () => {
-      await Promise.resolve();
-    });
+    await flush();
 
     const tree = root!.root;
+
     await ReactTestRenderer.act(async () => {
-      findByTestId(tree, 'token-kind-invite').props.onPress();
       findByTestId(tree, 'server-url-input').props.onChangeText(
-        'http://localhost:4000',
-      );
-      findByTestId(tree, 'claim-token-input').props.onChangeText(
-        'INVITETOKEN1234567890ABCDE',
+        'http://localhost:4000/invite#INVITETOKEN1234567890ABCDE',
       );
     });
+    await ReactTestRenderer.act(async () => {
+      findByTestId(tree, 'add-server-next').props.onPress();
+    });
+    await flush();
+
+    expect(findByTestId(tree, 'add-server-resolved-url').props.children).toBe(
+      'http://localhost:4000',
+    );
+    expect(findByTestId(tree, 'claim-token-input').props.value).toBe(
+      'INVITETOKEN1234567890ABCDE',
+    );
+    expect(gatherText(tree).toLowerCase()).toContain('invite token');
 
     await ReactTestRenderer.act(async () => {
       findByTestId(tree, 'add-server-submit').props.onPress();
     });
-    await ReactTestRenderer.act(async () => {
-      await Promise.resolve();
-      await Promise.resolve();
-      await Promise.resolve();
-      await Promise.resolve();
+    await flush();
+
+    const redeemCall = fetchSpy.mock.calls.find(c => {
+      if (isProbe(c[0])) return false;
+      const body = JSON.parse((c[1]?.body as string) ?? '{}');
+      return body.action === 'redeem_server_invite';
     });
+    expect(redeemCall).toBeTruthy();
+    const redeemBody = JSON.parse((redeemCall![1]?.body as string) ?? '{}');
+    expect(redeemBody.input.token).toBe('INVITETOKEN1234567890ABCDE');
 
-    expect(fetchSpy).toHaveBeenCalledTimes(2);
-    const firstBody = JSON.parse(
-      (fetchSpy.mock.calls[0][1]?.body as string) ?? '{}',
-    );
-    expect(firstBody.action).toBe('redeem_server_invite');
-    expect(firstBody.input.token).toBe('INVITETOKEN1234567890ABCDE');
-
-    expect(added).toMatchObject({
+    expect(navigated).toHaveLength(1);
+    expect(navigated[0]).toMatchObject({
       url: 'http://localhost:4000',
       role: 'Member',
     });
@@ -231,18 +276,20 @@ describe('AddServerScreen', () => {
     fetchSpy.mockRestore();
   });
 
-  test('4xx renders inline error message', async () => {
+  test('submitting an invite token to an unclaimed server surfaces the inline error', async () => {
     const fetchSpy = jest
       .spyOn(global, 'fetch')
-      .mockImplementation(async () => {
+      .mockImplementation(async input => {
+        if (isProbe(input)) {
+          return probeResponse(false);
+        }
         return {
           ok: true,
           status: 200,
-          statusText: 'OK',
           json: async () => ({
             success: false,
             errors: [
-              {type: 'claim_token_consumed', message: 'claim_token_consumed'},
+              {type: 'claim_token_invalid', message: 'claim_token_invalid'},
             ],
           }),
         } as unknown as Response;
@@ -256,34 +303,71 @@ describe('AddServerScreen', () => {
         </IdentityProvider>,
       );
     });
-    await ReactTestRenderer.act(async () => {
-      await Promise.resolve();
-    });
+    await flush();
 
     const tree = root!.root;
     await ReactTestRenderer.act(async () => {
       findByTestId(tree, 'server-url-input').props.onChangeText(
         'http://localhost:4000',
       );
-      findByTestId(tree, 'claim-token-input').props.onChangeText('USED');
+    });
+    await ReactTestRenderer.act(async () => {
+      findByTestId(tree, 'add-server-next').props.onPress();
+    });
+    await flush();
+
+    await ReactTestRenderer.act(async () => {
+      findByTestId(tree, 'claim-token-input').props.onChangeText('WRONGKIND');
     });
     await ReactTestRenderer.act(async () => {
       findByTestId(tree, 'add-server-submit').props.onPress();
     });
-    await ReactTestRenderer.act(async () => {
-      await Promise.resolve();
-      await Promise.resolve();
-    });
+    await flush();
 
     const err = findByTestId(tree, 'add-server-error');
     expect(err).toBeTruthy();
-    const texts: string[] = [];
-    err.findAll(n => (n.type as unknown) === 'Text' || (n.type as Function)?.name === 'Text')
-      .forEach(n => {
-        const c = n.props.children;
-        if (typeof c === 'string') texts.push(c);
+    expect(gatherText(err).toLowerCase()).toContain('not recognized');
+
+    fetchSpy.mockRestore();
+  });
+
+  test('probe failure shows a warning banner but still allows manual entry', async () => {
+    const fetchSpy = jest
+      .spyOn(global, 'fetch')
+      .mockImplementation(async input => {
+        if (isProbe(input)) {
+          throw new Error('network down');
+        }
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({success: true, data: {}}),
+        } as unknown as Response;
       });
-    expect(texts.join(' ')).toMatch(/already been used/i);
+
+    let root: ReactTestRenderer.ReactTestRenderer | null = null;
+    await ReactTestRenderer.act(async () => {
+      root = ReactTestRenderer.create(
+        <IdentityProvider>
+          <AddServerScreen onCancel={() => {}} onAdded={() => {}} />
+        </IdentityProvider>,
+      );
+    });
+    await flush();
+
+    const tree = root!.root;
+    await ReactTestRenderer.act(async () => {
+      findByTestId(tree, 'server-url-input').props.onChangeText(
+        'http://localhost:4000',
+      );
+    });
+    await ReactTestRenderer.act(async () => {
+      findByTestId(tree, 'add-server-next').props.onPress();
+    });
+    await flush();
+
+    expect(findByTestId(tree, 'add-server-probe-error')).toBeTruthy();
+    expect(findByTestId(tree, 'claim-token-input')).toBeTruthy();
 
     fetchSpy.mockRestore();
   });

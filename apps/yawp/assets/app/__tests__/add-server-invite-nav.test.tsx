@@ -1,13 +1,10 @@
 /**
- * after a successful invite redeem + bind, AddServerScreen
- * must invoke the navigation primitive so the SPA lands on `#general` of
- * the newly-joined server.
+ * After a successful invite redeem + bind, AddServerScreen must invoke
+ * the navigation primitive so the SPA lands on `#general` of the
+ * newly-joined server. The claim (operator) branch keeps using onAdded.
  *
- * This test exercises AddServerScreen directly (RPC-mock pattern from
- * add-server-screen.test.tsx) and asserts that the new
- * `onNavigateToServer` prop is called with the server tile that was
- * just added — instead of the legacy `onAdded` callback which lands on
- * home.
+ * Path selection is server-state driven via the `/.well-known` probe:
+ * a claimed server → invite redeem; an unclaimed server → operator claim.
  */
 
 import React from 'react';
@@ -24,24 +21,70 @@ function findByTestId(
   return tree.findByProps({testID});
 }
 
-describe('AddServerScreen — invite redeem post-bind navigation', () => {
+function isProbe(input: RequestInfo | URL): boolean {
+  return (
+    typeof input === 'string' && input.includes('/.well-known/yawp/server-info')
+  );
+}
+
+function probeResponse(claimed: boolean): Response {
+  return {
+    ok: true,
+    status: 200,
+    json: async () => ({claimed, serverName: 'Yawp', fingerprint: null}),
+  } as unknown as Response;
+}
+
+async function flush() {
+  await ReactTestRenderer.act(async () => {
+    await Promise.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
+  });
+}
+
+async function driveTwoStep(
+  tree: ReactTestRenderer.ReactTestInstance,
+  url: string,
+  token: string,
+) {
+  await ReactTestRenderer.act(async () => {
+    findByTestId(tree, 'server-url-input').props.onChangeText(url);
+  });
+  await ReactTestRenderer.act(async () => {
+    findByTestId(tree, 'add-server-next').props.onPress();
+  });
+  await flush();
+  await ReactTestRenderer.act(async () => {
+    findByTestId(tree, 'claim-token-input').props.onChangeText(token);
+  });
+  await ReactTestRenderer.act(async () => {
+    findByTestId(tree, 'add-server-submit').props.onPress();
+  });
+  await flush();
+}
+
+describe('AddServerScreen — post-bind navigation', () => {
   beforeEach(async () => {
     await clearIdentity();
     await getOrCreateIdentity();
   });
 
-  test('invite branch calls onNavigateToServer with the new server and not onAdded', async () => {
+  test('claimed server: invite redeem calls onNavigateToServer, not onAdded', async () => {
     let callIdx = 0;
     const fetchSpy = jest
       .spyOn(global, 'fetch')
-      .mockImplementation(async (_input, init) => {
+      .mockImplementation(async (input, init) => {
+        if (isProbe(input)) {
+          return probeResponse(true);
+        }
         const body = JSON.parse((init?.body as string) ?? '{}');
         callIdx += 1;
         if (body.action === 'redeem_server_invite') {
           return {
             ok: true,
             status: 200,
-            statusText: 'OK',
             json: async () => ({
               success: true,
               data: {serverId: 'server-uuid-1', role: 'Member'},
@@ -51,7 +94,6 @@ describe('AddServerScreen — invite redeem post-bind navigation', () => {
         return {
           ok: true,
           status: 200,
-          statusText: 'OK',
           json: async () => ({
             success: true,
             data: {id: 'id-xyz', did: 'did:yawp:xyz', profileVersion: 1},
@@ -73,42 +115,19 @@ describe('AddServerScreen — invite redeem post-bind navigation', () => {
         <IdentityProvider>
           <AddServerScreen
             onCancel={() => {}}
-            onAdded={s => {
-              addedCalls.push(s);
-            }}
-            onNavigateToServer={s => {
-              navigated.push(s);
-            }}
+            onAdded={s => addedCalls.push(s)}
+            onNavigateToServer={s => navigated.push(s)}
           />
         </IdentityProvider>,
       );
     });
-    await ReactTestRenderer.act(async () => {
-      await Promise.resolve();
-    });
+    await flush();
 
-    const tree = root!.root;
-    await ReactTestRenderer.act(async () => {
-      findByTestId(tree, 'token-kind-invite').props.onPress();
-      findByTestId(tree, 'server-url-input').props.onChangeText(
-        'http://localhost:4000',
-      );
-      findByTestId(tree, 'claim-token-input').props.onChangeText(
-        'INVITETOKEN1234567890ABCDE',
-      );
-    });
-
-    await ReactTestRenderer.act(async () => {
-      findByTestId(tree, 'add-server-submit').props.onPress();
-    });
-    await ReactTestRenderer.act(async () => {
-      await Promise.resolve();
-      await Promise.resolve();
-      await Promise.resolve();
-      await Promise.resolve();
-    });
-
-    expect(fetchSpy).toHaveBeenCalledTimes(2);
+    await driveTwoStep(
+      root!.root,
+      'http://localhost:4000',
+      'INVITETOKEN1234567890ABCDE',
+    );
 
     expect(navigated).toHaveLength(1);
     expect(navigated[0]).toMatchObject({
@@ -120,18 +139,20 @@ describe('AddServerScreen — invite redeem post-bind navigation', () => {
     fetchSpy.mockRestore();
   });
 
-  test('claim branch still uses onAdded (no navigate on operator path)', async () => {
+  test('unclaimed server: operator claim still uses onAdded (no navigate)', async () => {
     let callIdx = 0;
     const fetchSpy = jest
       .spyOn(global, 'fetch')
-      .mockImplementation(async (_input, init) => {
+      .mockImplementation(async (input, init) => {
+        if (isProbe(input)) {
+          return probeResponse(false);
+        }
         const body = JSON.parse((init?.body as string) ?? '{}');
         callIdx += 1;
         if (body.action === 'claim_chat_owner') {
           return {
             ok: true,
             status: 200,
-            statusText: 'OK',
             json: async () => ({
               success: true,
               data: {id: 'id-abc', did: 'did:yawp:abc'},
@@ -141,7 +162,6 @@ describe('AddServerScreen — invite redeem post-bind navigation', () => {
         return {
           ok: true,
           status: 200,
-          statusText: 'OK',
           json: async () => ({
             success: true,
             data: {id: 'id-abc', did: 'did:yawp:abc', profileVersion: 1},
@@ -163,36 +183,15 @@ describe('AddServerScreen — invite redeem post-bind navigation', () => {
         <IdentityProvider>
           <AddServerScreen
             onCancel={() => {}}
-            onAdded={s => {
-              addedCalls.push(s);
-            }}
-            onNavigateToServer={s => {
-              navigated.push(s);
-            }}
+            onAdded={s => addedCalls.push(s)}
+            onNavigateToServer={s => navigated.push(s)}
           />
         </IdentityProvider>,
       );
     });
-    await ReactTestRenderer.act(async () => {
-      await Promise.resolve();
-    });
+    await flush();
 
-    const tree = root!.root;
-    await ReactTestRenderer.act(async () => {
-      findByTestId(tree, 'server-url-input').props.onChangeText(
-        'http://localhost:4000',
-      );
-      findByTestId(tree, 'claim-token-input').props.onChangeText('TOKEN123');
-    });
-    await ReactTestRenderer.act(async () => {
-      findByTestId(tree, 'add-server-submit').props.onPress();
-    });
-    await ReactTestRenderer.act(async () => {
-      await Promise.resolve();
-      await Promise.resolve();
-      await Promise.resolve();
-      await Promise.resolve();
-    });
+    await driveTwoStep(root!.root, 'http://localhost:4000', 'TOKEN123');
 
     expect(addedCalls).toHaveLength(1);
     expect(navigated).toHaveLength(0);

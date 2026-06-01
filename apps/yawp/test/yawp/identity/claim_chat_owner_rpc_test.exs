@@ -124,7 +124,27 @@ defmodule Yawp.Identity.ClaimChatOwnerRpcTest do
       assert success?(run(input)) == true
       result = run(input)
       assert success?(result) == false
-      assert "claim_token_consumed" in error_types(result)
+
+      types = error_types(result)
+      assert "server_already_claimed" in types or "claim_token_consumed" in types
+    end
+
+    test "second operator claim on an already-claimed server returns server_already_claimed" do
+      account = create_account!()
+      claim = issue_token!(account)
+      {input, _pk} = build_input(claim.token)
+      assert success?(run(input)) == true
+
+      account2 = create_account!("op2@example.com")
+      claim2 = issue_token!(account2)
+      {input2, _pk2} = build_input(claim2.token)
+
+      result = run(input2)
+      assert success?(result) == false
+      assert "server_already_claimed" in error_types(result)
+
+      {:ok, refetched} = Admin.get_claim_token_by_id(claim2.id)
+      assert refetched.consumed_at == nil
     end
   end
 
@@ -292,7 +312,10 @@ defmodule Yawp.Identity.ClaimChatOwnerRpcTest do
         failures
         |> Enum.flat_map(fn {_ok, res, _did} -> error_types(res) end)
 
-      assert Enum.all?(failure_types, &(&1 == "claim_token_consumed"))
+      assert Enum.all?(
+               failure_types,
+               &(&1 in ["claim_token_consumed", "server_already_claimed"])
+             )
     end
   end
 end

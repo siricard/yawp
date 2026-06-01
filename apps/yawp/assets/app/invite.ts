@@ -34,6 +34,8 @@ const SLUG_MESSAGES: Record<string, string> = {
   invite_token_exhausted: 'This invite token has no uses remaining.',
   invite_token_expired: 'This invite token has expired.',
   invite_token_revoked: 'This invite token has been revoked by the chat owner.',
+  server_not_claimed_use_claim_token:
+    "This server hasn't been set up yet. Paste the operator claim token instead.",
   internal_error: 'The server hit an internal error. Try again later.',
   network_error:
     'Could not reach the server. Check the URL and your connection.',

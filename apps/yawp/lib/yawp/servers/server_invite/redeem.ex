@@ -38,9 +38,18 @@ defmodule Yawp.Servers.ServerInvite.Redeem do
     with {:ok, pk_bytes, sig_bytes} <- decode(input.arguments),
          :ok <- verify_signature(input.arguments, pk_bytes, sig_bytes),
          :ok <- verify_did(input.arguments.did, pk_bytes),
+         :ok <- check_claimed(),
          {:ok, invite} <- load_invite(input.arguments.token),
          :ok <- check_state(invite) do
       do_redeem(invite, input.arguments, pk_bytes)
+    end
+  end
+
+  defp check_claimed do
+    if Yawp.Servers.SetupState.claimed?() do
+      :ok
+    else
+      {:error, rpc("server_not_claimed_use_claim_token")}
     end
   end
 

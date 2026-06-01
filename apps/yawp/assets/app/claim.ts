@@ -45,6 +45,8 @@ const SLUG_MESSAGES: Record<string, string> = {
   claim_token_consumed: 'This claim token has already been used.',
   claim_token_revoked: 'This claim token has been revoked by the operator.',
   claim_token_expired: 'This claim token has expired.',
+  server_already_claimed:
+    'This server has already been set up. Ask the chat owner for an invite token instead.',
   did_mismatch: 'The DID did not match the public key.',
   invalid_signature: 'The server rejected the request signature.',
   internal_error: 'The server hit an internal error. Try again later.',
