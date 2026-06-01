@@ -29,6 +29,11 @@ defmodule Yawp.Servers.Server do
       description "Records the DID of the server owner."
       accept [:owner_did]
     end
+
+    update :set_body_archive do
+      description "Toggles whether deletes archive the original body to the admin-only store."
+      accept [:body_archive_enabled]
+    end
   end
 
   attributes do
@@ -48,6 +53,17 @@ defmodule Yawp.Servers.Server do
       allow_nil? true
       public? true
       description "DID of the single server owner (ADR 017). Nil until claimed."
+    end
+
+    attribute :body_archive_enabled, :boolean do
+      allow_nil? false
+      default false
+      public? true
+
+      description """
+      When on, deleting a message archives the original body to the
+      admin-only store rather than discarding it. Off by default.
+      """
     end
 
     create_timestamp :inserted_at

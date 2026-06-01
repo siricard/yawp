@@ -86,6 +86,25 @@ defmodule Yawp.Servers do
 
       define :list_active_server_invites, action: :list_active_for_server, args: [:server_id]
     end
+
+    resource Yawp.Servers.Message do
+      define :send_server_message, action: :send
+      define :list_channel_messages, action: :list_for_channel, args: [:channel_id]
+    end
+
+    resource Yawp.Servers.MessageEdit do
+      define :edit_server_message, action: :append
+      define :list_message_edits, action: :list_for_message, args: [:message_id]
+    end
+
+    resource Yawp.Servers.MessageTombstone do
+      define :delete_server_message, action: :create
+      define :list_message_tombstones, action: :list_for_message, args: [:message_id]
+    end
+
+    resource Yawp.Servers.ArchivedMessageBody do
+      define :list_archived_bodies_for_message, action: :list_for_message, args: [:message_id]
+    end
   end
 
   @doc """
