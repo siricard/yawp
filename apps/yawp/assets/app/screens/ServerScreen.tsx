@@ -25,6 +25,7 @@ type Props = {
   initialChannelId: string;
   initialChannelName: string;
   onBack: () => void;
+  onOpenDmList?: () => void;
 };
 
 const EMPTY_TREE: ServerTree = {categories: [], channels: []};
@@ -36,6 +37,7 @@ export function ServerScreen({
   initialChannelId,
   initialChannelName,
   onBack,
+  onOpenDmList,
 }: Props) {
   const [tree, setTree] = useState<ServerTree>(EMPTY_TREE);
   const [pendingDelete, setPendingDelete] = useState<TreeChannel | null>(null);
@@ -141,6 +143,7 @@ export function ServerScreen({
         groups={groups}
         activeChannelId={activeChannel.id}
         onSelectChannel={handleSelectChannel}
+        onOpenDmList={onOpenDmList}
         editMode={editMode.enabled}
         editAvailable={editMode.available}
         onToggleEdit={editMode.toggle}

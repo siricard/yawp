@@ -177,6 +177,7 @@ function AppShell() {
           initialChannelId={screen.channelId}
           initialChannelName={screen.channelName}
           onBack={() => setScreen({kind: 'home'})}
+          onOpenDmList={() => setScreen({kind: 'dm'})}
         />
       );
       break;
