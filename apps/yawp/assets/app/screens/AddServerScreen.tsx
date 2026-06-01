@@ -95,7 +95,31 @@ export function AddServerScreen({onCancel, onAdded, onNavigateToServer}: Props) 
     const parsed = parseInviteLink(raw);
     if (parsed) {
       setServerUrl(parsed.serverUrl);
-      await probeAndAdvance(parsed.serverUrl, parsed.token);
+      setProbing(true);
+      setProbeError(null);
+      setErrorMessage(null);
+
+      const result = await probeServerInfo(parsed.serverUrl);
+      setProbing(false);
+
+      if (result.ok) {
+        setInfo(result.info);
+        const ok = await runBind(
+          parsed.serverUrl,
+          parsed.token,
+          result.info.claimed,
+        );
+        if (!ok) {
+          setTokenValue(parsed.token);
+          setStep('code');
+        }
+        return;
+      }
+
+      setInfo(null);
+      setProbeError(result.message);
+      setTokenValue(parsed.token);
+      setStep('code');
       return;
     }
 
@@ -153,16 +177,18 @@ export function AddServerScreen({onCancel, onAdded, onNavigateToServer}: Props) 
     }
   }
 
-  async function handleSubmitCode() {
-    if (!identityReady || submitting) return;
-    const url = serverUrl.trim();
-    const token = tokenValue.trim();
-    if (url.length === 0 || token.length === 0) return;
+  async function runBind(
+    rawUrl: string,
+    rawToken: string,
+    claimed: boolean,
+  ): Promise<boolean> {
+    if (!identityReady) return false;
+    const url = rawUrl.trim();
+    const token = rawToken.trim();
+    if (url.length === 0 || token.length === 0) return false;
 
     setSubmitting(true);
     setErrorMessage(null);
-
-    const claimed = info?.claimed === true;
 
     if (claimed) {
       const redeem = await submitRedeemInvite({
@@ -174,7 +200,7 @@ export function AddServerScreen({onCancel, onAdded, onNavigateToServer}: Props) 
       if (!redeem.ok) {
         setSubmitting(false);
         setErrorMessage(redeem.message);
-        return;
+        return false;
       }
 
       const bind = await submitBindDevice({
@@ -186,7 +212,7 @@ export function AddServerScreen({onCancel, onAdded, onNavigateToServer}: Props) 
 
       if (!bind.ok) {
         setErrorMessage(bind.message);
-        return;
+        return false;
       }
 
       await recordFirstBound();
@@ -203,7 +229,7 @@ export function AddServerScreen({onCancel, onAdded, onNavigateToServer}: Props) 
       } else {
         onAdded(server);
       }
-      return;
+      return true;
     }
 
     const result = await submitClaim({
@@ -222,7 +248,7 @@ export function AddServerScreen({onCancel, onAdded, onNavigateToServer}: Props) 
 
       if (!bind.ok) {
         setErrorMessage(bind.message);
-        return;
+        return false;
       }
 
       await recordFirstBound();
@@ -235,11 +261,17 @@ export function AddServerScreen({onCancel, onAdded, onNavigateToServer}: Props) 
       };
       addServer(server);
       onAdded(server);
-      return;
+      return true;
     }
 
     setSubmitting(false);
     setErrorMessage(result.message);
+    return false;
+  }
+
+  async function handleSubmitCode() {
+    if (!identityReady || submitting) return;
+    await runBind(serverUrl, tokenValue, info?.claimed === true);
   }
 
   const codeLabel = info?.claimed ? 'Invite token' : 'Claim token';

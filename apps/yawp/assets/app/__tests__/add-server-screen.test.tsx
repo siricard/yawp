@@ -182,7 +182,7 @@ describe('AddServerScreen (paste-first)', () => {
     fetchSpy.mockRestore();
   });
 
-  test('pasting a full invite link auto-advances and redeems against a claimed server', async () => {
+  test('pasting a full invite link binds in one step without a code screen', async () => {
     let callIdx = 0;
     const fetchSpy = jest
       .spyOn(global, 'fetch')
@@ -245,18 +245,8 @@ describe('AddServerScreen (paste-first)', () => {
     });
     await flush();
 
-    expect(findByTestId(tree, 'add-server-resolved-url').props.children).toBe(
-      'http://localhost:4000',
-    );
-    expect(findByTestId(tree, 'claim-token-input').props.value).toBe(
-      'INVITETOKEN1234567890ABCDE',
-    );
-    expect(gatherText(tree).toLowerCase()).toContain('invite token');
-
-    await ReactTestRenderer.act(async () => {
-      findByTestId(tree, 'add-server-submit').props.onPress();
-    });
-    await flush();
+    expect(queryByTestId(tree, 'claim-token-input')).toBeNull();
+    expect(queryByTestId(tree, 'add-server-submit')).toBeNull();
 
     const redeemCall = fetchSpy.mock.calls.find(c => {
       if (isProbe(c[0])) return false;
