@@ -1,6 +1,13 @@
 
 import React, {useRef, useState} from 'react';
-import {Platform, Pressable, ScrollView, Text, View} from 'react-native';
+import {
+  Platform,
+  Pressable,
+  ScrollView,
+  Text,
+  useWindowDimensions,
+  View,
+} from 'react-native';
 
 import {
   useDisplayName,
@@ -8,8 +15,16 @@ import {
   type WorkspaceServer,
 } from '../identity-context';
 import {pointerCursor} from '../ui/cursor';
+import {WorkspacesDrawer} from './WorkspacesDrawer';
 
 export const WORKSPACE_BAR_HEIGHT = 59;
+
+/**
+ * Below this viewport width the full multi-server strip collapses behind a
+ * single workspace toggle (v16 "Mobile compromise"). Branch on WIDTH, never
+ * Platform.OS — a narrow native window gets the drawer, a wide one the strip.
+ */
+export const WORKSPACE_BAR_NARROW_BREAKPOINT = 640;
 
 type Props = {
   onAddServer: () => void;
@@ -64,8 +79,65 @@ export function WorkspaceBar({
     ? effectiveDisplayName.charAt(0).toUpperCase()
     : '?';
   const isWeb = Platform.OS === 'web';
+  const {width} = useWindowDimensions();
+  const narrow = width < WORKSPACE_BAR_NARROW_BREAKPOINT;
+  const [drawerOpen, setDrawerOpen] = useState(false);
   const [dragUrl, setDragUrl] = useState<string | null>(null);
   const dragRef = useRef<string | null>(null);
+
+  const activeServer = servers.find(s => s.url === activeServerUrl) ?? null;
+  const toggleLabel = dmActive
+    ? '@'
+    : activeServer
+      ? initials(activeServer.label)
+      : selfInitial;
+
+  if (narrow) {
+    return (
+      <>
+        <View
+          testID="workspace-bar"
+          accessibilityLabel="workspace bar"
+          className="bg-bg border-b border-border"
+          style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            paddingHorizontal: 16,
+            paddingVertical: 10,
+          }}>
+          <Pressable
+            testID="workspace-toggle"
+            accessibilityRole="button"
+            accessibilityLabel="open workspaces"
+            onPress={() => setDrawerOpen(true)}
+            onLongPress={() => setDrawerOpen(true)}
+            delayLongPress={250}
+            style={[{width: 38, height: 38}, pointerCursor]}
+            className={[
+              'rounded-xl items-center justify-center active:bg-surface-3',
+              dmActive ? 'bg-surface-2' : 'bg-primary',
+            ].join(' ')}>
+            <Text
+              className={[
+                'text-sm font-bold',
+                dmActive ? 'text-text' : 'text-on-primary',
+              ].join(' ')}>
+              {toggleLabel}
+            </Text>
+          </Pressable>
+        </View>
+        <WorkspacesDrawer
+          visible={drawerOpen}
+          onClose={() => setDrawerOpen(false)}
+          onSelectServer={onSelectServer}
+          onSelectDm={onSelectDm}
+          onAddServer={onAddServer}
+          activeServerUrl={activeServerUrl}
+          dmActive={dmActive}
+        />
+      </>
+    );
+  }
 
   function startDrag(url: string) {
     dragRef.current = url;
