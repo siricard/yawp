@@ -73,7 +73,7 @@ config :spark,
 config :yawp,
   ecto_repos: [Yawp.Repo],
   generators: [timestamp_type: :utc_datetime],
-  ash_domains: [Yawp.Admin, Yawp.Identity, Yawp.Servers, Yawp.Federation, Yawp.Channels]
+  ash_domains: [Yawp.Admin, Yawp.Identity, Yawp.Servers, Yawp.Federation]
 
 config :yawp, YawpWeb.Endpoint,
   url: [host: "localhost"],

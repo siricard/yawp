@@ -14,7 +14,6 @@ defmodule YawpWeb.UserSocket do
   use Phoenix.Socket
 
   channel "server:*", YawpWeb.ServerChannelTopic
-  channel "channel:*", YawpWeb.ChannelTopic
 
   @impl true
   def connect(%{"token" => token}, socket, _connect_info) when is_binary(token) do
