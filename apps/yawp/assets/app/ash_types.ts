@@ -111,13 +111,14 @@ export type ServerCategoryAttributesOnlySchema = {
 // ServerChannel Schema
 export type ServerChannelResourceSchema = {
   __type: "Resource";
-  __primitiveFields: "id" | "name" | "type" | "position" | "visibility" | "joinPolicy" | "categoryId";
+  __primitiveFields: "id" | "name" | "type" | "position" | "visibility" | "joinPolicy" | "serverId" | "categoryId";
   id: UUID;
   name: string;
   type: "text" | "voice";
   position: number;
   visibility: "private" | "server_public";
   joinPolicy: "invite_only" | "open";
+  serverId: UUID;
   categoryId: UUID | null;
   category: { __type: "Relationship"; __resource: ServerCategoryResourceSchema | null; };
 };
@@ -126,13 +127,14 @@ export type ServerChannelResourceSchema = {
 
 export type ServerChannelAttributesOnlySchema = {
   __type: "Resource";
-  __primitiveFields: "id" | "name" | "type" | "position" | "visibility" | "joinPolicy" | "categoryId";
+  __primitiveFields: "id" | "name" | "type" | "position" | "visibility" | "joinPolicy" | "serverId" | "categoryId";
   id: UUID;
   name: string;
   type: "text" | "voice";
   position: number;
   visibility: "private" | "server_public";
   joinPolicy: "invite_only" | "open";
+  serverId: UUID;
   categoryId: UUID | null;
 };
 
@@ -401,6 +403,12 @@ export type ServerChannelFilterInput = {
     in?: Array<"invite_only" | "open">;
   };
 
+  serverId?: {
+    eq?: UUID;
+    notEq?: UUID;
+    in?: Array<UUID>;
+  };
+
   categoryId?: {
     eq?: UUID;
     notEq?: UUID;
@@ -508,7 +516,7 @@ export type RefreshTokenFilterField = (typeof refreshTokenFilterFields)[number];
 export const serverCategoryFilterFields = ["id", "name", "position", "serverId", "parentId", "server", "parent"] as const;
 export type ServerCategoryFilterField = (typeof serverCategoryFilterFields)[number];
 
-export const serverChannelFilterFields = ["id", "name", "type", "position", "visibility", "joinPolicy", "categoryId", "category"] as const;
+export const serverChannelFilterFields = ["id", "name", "type", "position", "visibility", "joinPolicy", "serverId", "categoryId", "server", "category"] as const;
 export type ServerChannelFilterField = (typeof serverChannelFilterFields)[number];
 
 export const serverInviteFilterFields = ["id", "token", "kind", "usesRemaining", "expiresAt", "consumedAt", "revokedAt", "serverId", "createdByIdentityId", "server", "createdByIdentity"] as const;
@@ -527,7 +535,7 @@ export type RefreshTokenSortField = (typeof refreshTokenSortFields)[number];
 export const serverCategorySortFields = ["id", "name", "position", "serverId", "parentId"] as const;
 export type ServerCategorySortField = (typeof serverCategorySortFields)[number];
 
-export const serverChannelSortFields = ["id", "name", "type", "position", "visibility", "joinPolicy", "categoryId"] as const;
+export const serverChannelSortFields = ["id", "name", "type", "position", "visibility", "joinPolicy", "serverId", "categoryId"] as const;
 export type ServerChannelSortField = (typeof serverChannelSortFields)[number];
 
 export const serverInviteSortFields = ["id", "token", "kind", "usesRemaining", "expiresAt", "consumedAt", "revokedAt", "serverId", "createdByIdentityId"] as const;

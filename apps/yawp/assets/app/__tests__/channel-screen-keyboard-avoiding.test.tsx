@@ -25,6 +25,7 @@ function render() {
     root = ReactTestRenderer.create(
       <ChannelScreen
         serverUrl="http://localhost:4000"
+        serverId="srv-1"
         serverLabel="localhost:4000"
         channelId="chan-1"
         channelName="general"

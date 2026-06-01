@@ -13,6 +13,7 @@ defmodule YawpWeb.UserSocket do
 
   use Phoenix.Socket
 
+  channel "server:*", YawpWeb.ServerChannelTopic
   channel "channel:*", YawpWeb.ChannelTopic
 
   @impl true

@@ -48,6 +48,7 @@ type Screen =
   | {
       kind: 'channel';
       serverUrl: string;
+      serverId: string;
       serverLabel: string;
       channelId: string;
       channelName: string;
@@ -94,6 +95,7 @@ function AppShell() {
       setScreen({
         kind: 'channel',
         serverUrl: server.url,
+        serverId: general.serverId,
         serverLabel: server.label,
         channelId: general.id,
         channelName: general.name,
@@ -165,6 +167,7 @@ function AppShell() {
       body = (
         <ChannelScreen
           serverUrl={screen.serverUrl}
+          serverId={screen.serverId}
           serverLabel={screen.serverLabel}
           channelId={screen.channelId}
           channelName={screen.channelName}

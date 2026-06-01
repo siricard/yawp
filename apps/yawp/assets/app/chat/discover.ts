@@ -4,6 +4,7 @@ import {listTextChannels} from '../ash_generated';
 export type DiscoveredChannel = {
   id: string;
   name: string;
+  serverId: string;
 };
 
 function normalizeServerUrl(raw: string): string {
@@ -25,13 +26,17 @@ export async function discoverGeneralChannel(
 
   try {
     const result = await listTextChannels({
-      fields: ['id', 'name'],
+      fields: ['id', 'name', 'serverId'],
       customFetch,
     });
     if (!result.success) return null;
     const general = result.data.find(c => c.name === 'general') ?? result.data[0];
     if (!general) return null;
-    return {id: general.id as string, name: general.name as string};
+    return {
+      id: general.id as string,
+      name: general.name as string,
+      serverId: general.serverId as string,
+    };
   } catch {
     return null;
   }

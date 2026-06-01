@@ -114,6 +114,7 @@ defmodule Yawp.Servers.Channel do
     belongs_to :server, Yawp.Servers.Server do
       allow_nil? false
       attribute_writable? true
+      public? true
     end
 
     belongs_to :category, Yawp.Servers.Category do

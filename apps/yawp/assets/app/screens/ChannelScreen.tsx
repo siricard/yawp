@@ -17,6 +17,7 @@ import {WORKSPACE_BAR_HEIGHT} from './WorkspaceBar';
 
 type Props = {
   serverUrl: string;
+  serverId: string;
   serverLabel: string;
   channelId: string;
   channelName: string;
@@ -61,9 +62,9 @@ function MessageRow({
   selfDid: string | null;
   selfDisplayName: string | null;
 }) {
-  const isSelf = selfDid !== null && message.author_did === selfDid;
+  const isSelf = selfDid !== null && message.sender_did === selfDid;
   const label =
-    isSelf && selfDisplayName ? selfDisplayName : displayAuthor(message.author_did);
+    isSelf && selfDisplayName ? selfDisplayName : displayAuthor(message.sender_did);
   return (
     <View
       testID={`channel-message-${message.id}`}
@@ -80,19 +81,30 @@ function MessageRow({
           {formatTimestamp(message.server_inserted_at)}
         </Text>
       </View>
-      <Text className="text-sm text-text mt-1 leading-5">{message.body}</Text>
+      <Text
+        className={[
+          'text-sm mt-1 leading-5',
+          message.body === null ? 'text-text-tertiary italic' : 'text-text',
+        ].join(' ')}>
+        {message.body === null ? '[deleted]' : message.body}
+      </Text>
     </View>
   );
 }
 
 export function ChannelScreen({
   serverUrl,
+  serverId,
   serverLabel,
   channelId,
   channelName,
   onBack,
 }: Props) {
-  const {status, errorMessage, messages, send} = useChannel(serverUrl, channelId);
+  const {status, errorMessage, messages, send} = useChannel(
+    serverUrl,
+    serverId,
+    channelId,
+  );
   const insets = useSafeAreaInsets();
   const identityState = useIdentityState();
   const {effectiveDisplayName} = useDisplayName();

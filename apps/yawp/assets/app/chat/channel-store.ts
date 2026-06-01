@@ -4,7 +4,7 @@ import type {Channel, Socket} from 'phoenix';
 
 import {useIdentity} from '../identity-context';
 import {getSocket} from './socket';
-import {signMessage} from './sign-message';
+import {signDelete, signEdit, signSend} from './sign-message';
 
 export type ChannelMessage = {
   id: string;
@@ -14,11 +14,26 @@ export type ChannelMessage = {
    * prefix stripped on the wire). Matches every other use of
    * `identity.did` — the client prefixes `did:yawp:` for display.
    */
-  author_did: string;
-  body: string;
+  sender_did: string;
+  body: string | null;
+  reply_to_message_id: string | null;
+  mentions: string[];
+  attachments: Record<string, unknown>[];
   signed_by: string;
   signature: string;
+  server_serial: number;
   server_inserted_at: string;
+};
+
+type MessageEdited = {
+  message_id: string;
+  body: string;
+  edit_serial: number;
+};
+
+type MessageDeleted = {
+  message_id: string;
+  reason: string;
 };
 
 export type UseChannelStatus = 'connecting' | 'joined' | 'error';
@@ -28,10 +43,17 @@ export type UseChannelResult = {
   errorMessage: string | null;
   messages: ChannelMessage[];
   send: (body: string) => void;
+  edit: (messageId: string, body: string) => void;
+  remove: (messageId: string) => void;
 };
+
+function sortBySerial(list: ChannelMessage[]): ChannelMessage[] {
+  return [...list].sort((a, b) => a.server_serial - b.server_serial);
+}
 
 export function useChannel(
   serverUrl: string | null,
+  serverId: string | null,
   channelId: string | null,
 ): UseChannelResult {
   const identity = useIdentity();
@@ -41,7 +63,7 @@ export function useChannel(
   const channelRef = useRef<Channel | null>(null);
 
   useEffect(() => {
-    if (!serverUrl || !channelId) {
+    if (!serverUrl || !serverId || !channelId) {
       return;
     }
     let cancelled = false;
@@ -59,26 +81,41 @@ export function useChannel(
         return;
       }
       localSocket = result.socket;
-      localChannel = localSocket.channel(`channel:${channelId}`, {});
+      localChannel = localSocket.channel(
+        `server:${serverId}:channel:${channelId}`,
+        {},
+      );
       channelRef.current = localChannel;
 
       localChannel.on('history', (payload: {messages: ChannelMessage[]}) => {
         if (cancelled) return;
-        setMessages(payload?.messages ?? []);
+        setMessages(sortBySerial(payload?.messages ?? []));
       });
 
       localChannel.on('new_message', (msg: ChannelMessage) => {
         if (cancelled) return;
         setMessages(prev => {
           if (prev.some(m => m.id === msg.id)) return prev;
-          return [...prev, msg].sort((a, b) =>
-            a.server_inserted_at < b.server_inserted_at
-              ? -1
-              : a.server_inserted_at > b.server_inserted_at
-                ? 1
-                : 0,
-          );
+          return sortBySerial([...prev, msg]);
         });
+      });
+
+      localChannel.on('message_edited', (edit: MessageEdited) => {
+        if (cancelled) return;
+        setMessages(prev =>
+          prev.map(m =>
+            m.id === edit.message_id ? {...m, body: edit.body} : m,
+          ),
+        );
+      });
+
+      localChannel.on('message_deleted', (del: MessageDeleted) => {
+        if (cancelled) return;
+        setMessages(prev =>
+          prev.map(m =>
+            m.id === del.message_id ? {...m, body: null} : m,
+          ),
+        );
       });
 
       localChannel
@@ -112,25 +149,74 @@ export function useChannel(
       }
       channelRef.current = null;
     };
-  }, [serverUrl, channelId]);
+  }, [serverUrl, serverId, channelId]);
 
   function send(body: string): void {
     const trimmed = body.trim();
     if (!trimmed) return;
     const channel = channelRef.current;
-    if (!channel) return;
+    if (!channel || !channelId) return;
     const ts = Date.now();
-    const signature = signMessage(
-      {channel_id: channelId!, body: trimmed, ts},
+    const signature = signSend(
+      {
+        channel_id: channelId,
+        sender_did: identity.didFull,
+        body: trimmed,
+        reply_to_message_id: null,
+        mentions: [],
+        attachments: [],
+        ts,
+      },
       identity.signDevice,
     );
-    channel.push('send', {
+    channel.push('send_message', {
       body: trimmed,
-      signature,
       signed_by: identity.deviceId,
+      signature,
       ts,
     });
   }
 
-  return {status, errorMessage, messages, send};
+  function edit(messageId: string, body: string): void {
+    const trimmed = body.trim();
+    if (!trimmed) return;
+    const channel = channelRef.current;
+    if (!channel) return;
+    const ts = Date.now();
+    const signature = signEdit(
+      {message_id: messageId, body: trimmed, ts},
+      identity.signDevice,
+    );
+    channel.push('edit_message', {
+      message_id: messageId,
+      body: trimmed,
+      signed_by: identity.deviceId,
+      signature,
+      ts,
+    });
+  }
+
+  function remove(messageId: string): void {
+    const channel = channelRef.current;
+    if (!channel) return;
+    const ts = Date.now();
+    const signature = signDelete(
+      {
+        message_id: messageId,
+        reason: 'sender',
+        actor_did: identity.didFull,
+        ts,
+      },
+      identity.signDevice,
+    );
+    channel.push('delete_message', {
+      message_id: messageId,
+      reason: 'sender',
+      signed_by: identity.deviceId,
+      signature,
+      ts,
+    });
+  }
+
+  return {status, errorMessage, messages, send, edit, remove};
 }
