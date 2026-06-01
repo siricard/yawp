@@ -24,12 +24,14 @@ function msg(over: Partial<ChannelMessage>): ChannelMessage {
 }
 
 let mockMessages: ChannelMessage[] = [];
+let mockEffectiveBits = 0;
 
 jest.mock('../chat/channel-store', () => ({
   useChannel: () => ({
     status: 'joined',
     errorMessage: null,
     messages: mockMessages,
+    effectiveBits: mockEffectiveBits,
     send: jest.fn(),
     edit: jest.fn(),
     remove: jest.fn(),
@@ -49,6 +51,7 @@ import {ChannelScreen} from '../screens/ChannelScreen';
 const roots: ReactTestRenderer.ReactTestRenderer[] = [];
 
 function render(effectiveBits: number) {
+  mockEffectiveBits = effectiveBits;
   let root: ReactTestRenderer.ReactTestRenderer | null = null;
   ReactTestRenderer.act(() => {
     root = ReactTestRenderer.create(
@@ -58,7 +61,6 @@ function render(effectiveBits: number) {
         serverLabel="localhost:4000"
         channelId="chan-1"
         channelName="general"
-        effectiveBits={effectiveBits}
         onBack={() => {}}
       />,
     );

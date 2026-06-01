@@ -1,7 +1,7 @@
 import React, {useCallback, useEffect, useState} from 'react';
 import {Pressable, Text, View} from 'react-native';
 
-import {bitsForRole, useEditMode} from '../chat/edit-mode';
+import {useEditMode} from '../chat/edit-mode';
 import {TabRow} from '../chat/TabRow';
 import {pointerCursor} from '../ui/cursor';
 import {
@@ -22,7 +22,6 @@ type Props = {
   serverUrl: string;
   serverId: string;
   serverLabel: string;
-  role: string;
   initialChannelId: string;
   initialChannelName: string;
   onBack: () => void;
@@ -34,19 +33,18 @@ export function ServerScreen({
   serverUrl,
   serverId,
   serverLabel,
-  role,
   initialChannelId,
   initialChannelName,
   onBack,
 }: Props) {
   const [tree, setTree] = useState<ServerTree>(EMPTY_TREE);
   const [pendingDelete, setPendingDelete] = useState<TreeChannel | null>(null);
+  const [effectiveBits, setEffectiveBits] = useState(0);
   const [activeChannel, setActiveChannel] = useState<{
     id: string;
     name: string;
   }>({id: initialChannelId, name: initialChannelName});
 
-  const effectiveBits = bitsForRole(role);
   const editMode = useEditMode(effectiveBits);
 
   const refresh = useCallback(async () => {
@@ -192,7 +190,7 @@ export function ServerScreen({
           serverLabel={serverLabel}
           channelId={activeChannel.id}
           channelName={activeChannel.name}
-          effectiveBits={effectiveBits}
+          onEffectiveBits={setEffectiveBits}
           onBack={onBack}
         />
       </View>

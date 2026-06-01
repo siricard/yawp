@@ -42,6 +42,7 @@ export type UseChannelResult = {
   status: UseChannelStatus;
   errorMessage: string | null;
   messages: ChannelMessage[];
+  effectiveBits: number;
   send: (body: string, replyToMessageId?: string | null) => void;
   edit: (messageId: string, body: string) => void;
   remove: (messageId: string) => void;
@@ -60,6 +61,7 @@ export function useChannel(
   const [status, setStatus] = useState<UseChannelStatus>('connecting');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [messages, setMessages] = useState<ChannelMessage[]>([]);
+  const [effectiveBits, setEffectiveBits] = useState(0);
   const channelRef = useRef<Channel | null>(null);
 
   useEffect(() => {
@@ -120,14 +122,18 @@ export function useChannel(
 
       localChannel
         .join()
-        .receive('ok', () => {
+        .receive('ok', (resp: {effective_bits?: number} | undefined) => {
           if (cancelled) return;
           setStatus('joined');
           setErrorMessage(null);
+          setEffectiveBits(
+            typeof resp?.effective_bits === 'number' ? resp.effective_bits : 0,
+          );
         })
         .receive('error', (resp: {reason?: string} | undefined) => {
           if (cancelled) return;
           setStatus('error');
+          setEffectiveBits(0);
           setErrorMessage(
             typeof resp?.reason === 'string'
               ? resp.reason
@@ -137,6 +143,7 @@ export function useChannel(
         .receive('timeout', () => {
           if (cancelled) return;
           setStatus('error');
+          setEffectiveBits(0);
           setErrorMessage('Joining the channel timed out.');
         });
     })();
@@ -219,5 +226,5 @@ export function useChannel(
     });
   }
 
-  return {status, errorMessage, messages, send, edit, remove};
+  return {status, errorMessage, messages, effectiveBits, send, edit, remove};
 }

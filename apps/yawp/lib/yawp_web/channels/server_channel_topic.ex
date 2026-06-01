@@ -9,8 +9,10 @@ defmodule YawpWeb.ServerChannelTopic do
   On join the connecting identity must hold the `read_messages` bit for
   the channel, resolved through `Yawp.Servers.Permissions.effective_bits/3`
   (owners short-circuit to all bits; banned/kicked members resolve to 0).
-  A successful join pushes the channel history and the current presence
-  roster, then tracks the joiner.
+  The join reply carries `effective_bits` so the client can gate its
+  destructive affordances on the authoritative mask. A successful join
+  pushes the channel history and the current presence roster, then tracks
+  the joiner.
 
   Inbound events (all signature-verified through the message store):
 
@@ -43,7 +45,7 @@ defmodule YawpWeb.ServerChannelTopic do
          true <- Permissions.has?(bits, :read_messages) do
       send(self(), :after_join)
 
-      {:ok,
+      {:ok, %{effective_bits: bits},
        socket
        |> assign(:server, server)
        |> assign(:channel, channel)

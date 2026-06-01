@@ -26,13 +26,7 @@ type Props = {
   channelId: string;
   channelName: string;
   onBack: () => void;
-  /**
-   * The current identity's effective permission bits for this channel.
-   * Each destructive affordance is gated on its own bit so a user only
-   * sees the controls they can actually use; the server enforces the
-   * same gates independently.
-   */
-  effectiveBits?: number;
+  onEffectiveBits?: (bits: number) => void;
 };
 
 const monospace = Platform.select({
@@ -328,13 +322,13 @@ export function ChannelScreen({
   channelId,
   channelName,
   onBack,
-  effectiveBits = 0,
+  onEffectiveBits,
 }: Props) {
-  const {status, errorMessage, messages, send, edit, remove} = useChannel(
-    serverUrl,
-    serverId,
-    channelId,
-  );
+  const {status, errorMessage, messages, effectiveBits, send, edit, remove} =
+    useChannel(serverUrl, serverId, channelId);
+  useEffect(() => {
+    onEffectiveBits?.(effectiveBits);
+  }, [effectiveBits, onEffectiveBits]);
   const canManageMessages = hasPermission(effectiveBits, 'manage_messages');
   const canKick = hasPermission(effectiveBits, 'kick_members');
   const canBan = hasPermission(effectiveBits, 'ban_members');

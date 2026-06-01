@@ -52,7 +52,6 @@ type Screen =
       serverUrl: string;
       serverId: string;
       serverLabel: string;
-      serverRole: string;
       channelId: string;
       channelName: string;
     };
@@ -100,7 +99,6 @@ function AppShell() {
         serverUrl: server.url,
         serverId: general.serverId,
         serverLabel: server.label,
-        serverRole: server.role,
         channelId: general.id,
         channelName: general.name,
       });
@@ -176,7 +174,6 @@ function AppShell() {
           serverUrl={screen.serverUrl}
           serverId={screen.serverId}
           serverLabel={screen.serverLabel}
-          role={screen.serverRole}
           initialChannelId={screen.channelId}
           initialChannelName={screen.channelName}
           onBack={() => setScreen({kind: 'home'})}

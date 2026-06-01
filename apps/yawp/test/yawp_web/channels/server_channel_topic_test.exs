@@ -116,7 +116,20 @@ defmodule YawpWeb.ServerChannelTopicTest do
       assert Map.has_key?(state, did)
     end
 
-    test "owner short-circuits to all bits and joins", ctx do
+    test "the join reply carries the resolved effective_bits for the joiner", ctx do
+      actor = seed_identity()
+      seed_membership(actor, ctx.server, [:read_messages, :send_messages])
+
+      assert {:ok, reply, _socket} = join_channel(actor, ctx.server, ctx.channel)
+
+      expected =
+        Permissions.bit(:read_messages) ||| Permissions.bit(:send_messages)
+
+      assert reply == %{effective_bits: expected}
+      refute Permissions.has?(reply.effective_bits, :manage_messages)
+    end
+
+    test "owner short-circuits to all bits and the join reply carries them", ctx do
       actor = seed_identity()
 
       {:ok, _} =
@@ -126,7 +139,27 @@ defmodule YawpWeb.ServerChannelTopicTest do
 
       seed_membership(actor, ctx.server, [])
 
-      assert {:ok, _, _socket} = join_channel(actor, ctx.server, ctx.channel)
+      assert {:ok, reply, _socket} = join_channel(actor, ctx.server, ctx.channel)
+      assert reply == %{effective_bits: Permissions.all_bits()}
+      assert Permissions.has?(reply.effective_bits, :manage_messages)
+      assert Permissions.has?(reply.effective_bits, :ban_members)
+    end
+
+    test "a channel allow override widens the effective_bits in the join reply", ctx do
+      actor = seed_identity()
+      membership = seed_membership(actor, ctx.server, [:read_messages])
+
+      [role_id] = membership.role_ids
+
+      Ash.Seed.seed!(Yawp.Servers.ChannelOverride, %{
+        channel_id: ctx.channel.id,
+        role_id: role_id,
+        allow_bits: Permissions.bit(:manage_messages),
+        deny_bits: 0
+      })
+
+      assert {:ok, reply, _socket} = join_channel(actor, ctx.server, ctx.channel)
+      assert Permissions.has?(reply.effective_bits, :manage_messages)
     end
 
     test "identity without read_messages is rejected", ctx do
