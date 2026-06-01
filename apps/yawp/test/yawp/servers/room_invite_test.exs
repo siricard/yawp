@@ -209,6 +209,63 @@ defmodule Yawp.Servers.RoomInviteTest do
     end
   end
 
+  describe "redeem (moderated memberships)" do
+    defp seed_redeemer_member!(server, args) do
+      redeemer =
+        Ash.Seed.seed!(Yawp.Identity.Identity, %{did: args.did, master_public_key: args._pk_bytes})
+
+      {:ok, member_role} = Servers.get_system_role_for_server("Member", server.id)
+      {:ok, _} = Servers.assign_role(redeemer.id, server.id, [member_role.id])
+      redeemer
+    end
+
+    defp set_moderation!(identity_id, server_id, attrs) do
+      Yawp.Servers.Membership
+      |> Ash.Query.filter(identity_id == ^identity_id and server_id == ^server_id)
+      |> Ash.read_one!(authorize?: false)
+      |> Ash.Changeset.for_update(:set_moderation, attrs)
+      |> Ash.update!(authorize?: false)
+    end
+
+    test "a banned identity cannot redeem and the invite is not consumed",
+         %{server: server, channel: channel} do
+      owner = owner!(server)
+      {:ok, invite} = Servers.create_room_invite(%{channel_id: channel.id}, actor: owner)
+
+      args = build_redeem_args(invite.token)
+      redeemer = seed_redeemer_member!(server, args)
+      set_moderation!(redeemer.id, server.id, %{banned: true})
+
+      assert {:error, error} = do_redeem(args)
+      assert error_type(error) == "membership_banned"
+
+      {:ok, refetched} = Servers.get_room_invite_by_id(invite.id)
+      assert refetched.consumed_at == nil
+    end
+
+    test "a kicked identity can redeem a fresh invite, which re-admits them",
+         %{server: server, channel: channel} do
+      owner = owner!(server)
+      {:ok, invite} = Servers.create_room_invite(%{channel_id: channel.id}, actor: owner)
+
+      args = build_redeem_args(invite.token)
+      redeemer = seed_redeemer_member!(server, args)
+      set_moderation!(redeemer.id, server.id, %{kicked: true})
+
+      assert {:ok, %{kind: "anchored"}} = do_redeem(args)
+
+      membership =
+        Yawp.Servers.Membership
+        |> Ash.Query.filter(identity_id == ^redeemer.id and server_id == ^server.id)
+        |> Ash.read_one!(authorize?: false)
+
+      assert membership.kicked == false
+
+      bits = Permissions.effective_bits(redeemer, server, channel)
+      assert Permissions.has?(bits, :read_messages)
+    end
+  end
+
   describe "redeem (errors)" do
     test "invite_token_invalid for unknown token" do
       args = build_redeem_args("NOSUCHTOKEN12345678901234")

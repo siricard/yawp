@@ -22,7 +22,8 @@ defmodule Yawp.Servers.RoomInvite do
 
   Redeem error vocabulary: `invite_token_invalid`, `invite_token_consumed`,
   `invite_token_exhausted`, `invite_token_expired`, `invite_token_revoked`,
-  `invalid_signature`, `did_mismatch`, `invalid_payload`.
+  `invalid_signature`, `did_mismatch`, `invalid_payload`,
+  `membership_banned`.
   """
 
   use Ash.Resource,

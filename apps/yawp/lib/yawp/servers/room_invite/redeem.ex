@@ -110,6 +110,7 @@ defmodule Yawp.Servers.RoomInvite.Redeem do
   defp do_redeem(invite, args, pk_bytes) do
     Yawp.Repo.transaction(fn ->
       with {:ok, identity, n1} <- upsert_identity(args.did, pk_bytes),
+           :ok <- reject_if_banned(identity.id, invite.server_id),
            {:ok, _consumed, n2} <- atomic_consume(invite),
            {:ok, kind, n3} <- ensure_membership(identity.id, invite.server_id),
            {:ok, _override, n4} <- ensure_channel_access(identity.id, invite.channel_id),
@@ -175,8 +176,19 @@ defmodule Yawp.Servers.RoomInvite.Redeem do
   defp normalize_consume({:error, %Ash.Error.Invalid{}}), do: {:error, :stale}
   defp normalize_consume({:error, _}), do: {:error, :stale}
 
+  defp reject_if_banned(identity_id, server_id) do
+    case fetch_membership(identity_id, server_id) do
+      %Servers.Membership{banned: true} -> {:error, rpc("membership_banned")}
+      _ -> :ok
+    end
+  end
+
   defp ensure_membership(identity_id, server_id) do
     case fetch_membership(identity_id, server_id) do
+      %Servers.Membership{kicked: true} = membership ->
+        {:ok, cleared, n} = clear_kicked(membership)
+        {:ok, cleared.kind, n}
+
       %Servers.Membership{kind: kind} ->
         {:ok, kind, []}
 
@@ -194,6 +206,17 @@ defmodule Yawp.Servers.RoomInvite.Redeem do
           {:ok, _membership} -> {:ok, :guest, []}
           {:error, _} = err -> err
         end
+    end
+  end
+
+  defp clear_kicked(membership) do
+    membership
+    |> Ash.Changeset.for_update(:set_moderation, %{kicked: false})
+    |> Ash.update(authorize?: false, return_notifications?: true)
+    |> case do
+      {:ok, cleared, n} -> {:ok, cleared, n}
+      {:ok, cleared} -> {:ok, cleared, []}
+      {:error, _} = err -> err
     end
   end
 

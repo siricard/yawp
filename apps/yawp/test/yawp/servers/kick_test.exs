@@ -81,6 +81,32 @@ defmodule Yawp.Servers.KickTest do
     assert {:error, :invalid_session} = Identity.verify_session(session.token)
   end
 
+  test "kicking an identity that is not a member of this server does not revoke their sessions",
+       %{server: server} do
+    owner = owner!(server)
+    stranger = seed_identity!()
+
+    {:ok, %{session_token: session, refresh_token: refresh}} =
+      Identity.issue_pair(stranger.id, Ecto.UUID.generate())
+
+    assert {:ok, _kick} =
+             Servers.kick_member(%{server_id: server.id, identity_id: stranger.id}, actor: owner)
+
+    untouched_session =
+      Yawp.Identity.SessionToken
+      |> Ash.Query.filter(id == ^session.id)
+      |> Ash.read_one!(authorize?: false)
+
+    untouched_refresh =
+      Yawp.Identity.RefreshToken
+      |> Ash.Query.filter(id == ^refresh.id)
+      |> Ash.read_one!(authorize?: false)
+
+    assert untouched_session.revoked_at == nil
+    assert untouched_refresh.revoked_at == nil
+    assert {:ok, _} = Identity.verify_session(session.token)
+  end
+
   test "owner kicks a member by did", %{server: server} do
     owner = owner!(server)
     member = member!(server)

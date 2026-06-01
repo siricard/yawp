@@ -33,8 +33,15 @@ defmodule Yawp.Servers.Changes.ApplyModeration do
     changeset
     |> stamp_moderator(flag, actor)
     |> Ash.Changeset.after_action(fn _changeset, record ->
-      apply_flag(record, flag)
-      maybe_revoke(record, flag)
+      case fetch_membership(record.identity_id, record.server_id) do
+        nil ->
+          :ok
+
+        membership ->
+          apply_flag(membership, flag)
+          maybe_revoke(record, flag)
+      end
+
       {:ok, record}
     end)
   end
@@ -49,18 +56,12 @@ defmodule Yawp.Servers.Changes.ApplyModeration do
 
   defp stamp_moderator(changeset, _flag, _actor), do: changeset
 
-  defp apply_flag(record, flag) do
-    case fetch_membership(record.identity_id, record.server_id) do
-      nil ->
-        :ok
+  defp apply_flag(membership, flag) do
+    membership
+    |> Ash.Changeset.for_update(:set_moderation, %{flag => true})
+    |> Ash.update!(authorize?: false)
 
-      membership ->
-        membership
-        |> Ash.Changeset.for_update(:set_moderation, %{flag => true})
-        |> Ash.update!(authorize?: false)
-
-        :ok
-    end
+    :ok
   end
 
   defp maybe_revoke(record, :kicked) do
