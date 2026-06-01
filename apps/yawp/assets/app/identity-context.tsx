@@ -129,12 +129,6 @@ type State =
       status: 'locked';
       /** Pinned at load time; used by `unlock()` and `changePassphrase()`. */
       sealedEnvelope: SealedEnvelopeV2;
-      /**
-       * Leading slice of the sealed identity's DID, persisted beside the
-       * envelope so the locked screen can tell the user which identity
-       * they're unlocking. `null` for envelopes written before the prefix
-       * was stored.
-       */
       didPrefix: string | null;
       identity: null;
       error: null;
@@ -879,11 +873,6 @@ export function useOnboarding(): {
  */
 export function usePassphrase(): {
   sealed: boolean;
-  /**
-   * Leading slice of the locked identity's DID, available while
-   * `status === 'locked'`. `null` when not locked or when the stored
-   * envelope predates the prefix being persisted.
-   */
   lockedDidPrefix: string | null;
   unlock: (passphrase: string) => Promise<UnlockResult>;
   changePassphrase: (opts: {

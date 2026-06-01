@@ -1,12 +1,3 @@
-/**
- * LockedScreen identity-context rendering.
- *
- * The locked screen must show which identity is about to be unlocked. When
- * the sealed envelope carries a `didPrefix`, the screen renders a
- * `<DidPill>` with that prefix. Legacy envelopes (sealed before the prefix
- * was persisted) fall back to a generic placeholder without crashing.
- */
-
 import React from 'react';
 import ReactTestRenderer from 'react-test-renderer';
 

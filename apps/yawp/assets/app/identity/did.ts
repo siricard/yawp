@@ -9,11 +9,6 @@ export function didFromPubkey(pk: Uint8Array): string {
 
 export const DID_PREFIX_LEN = 16;
 
-/**
- * The leading slice of a DID, long enough to tell two identities apart on
- * the same device without persisting the full identifier in cleartext
- * beside a sealed envelope.
- */
 export function didPrefix(did: string, len: number = DID_PREFIX_LEN): string {
   return did.slice(0, len);
 }
