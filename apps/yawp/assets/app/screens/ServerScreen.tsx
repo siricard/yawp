@@ -129,10 +129,14 @@ export function ServerScreen({
     if (!pendingDelete) return;
     const target = pendingDelete;
     setPendingDelete(null);
-    setTree({
-      ...tree,
-      channels: tree.channels.filter(c => c.id !== target.id),
-    });
+    const remaining = tree.channels.filter(c => c.id !== target.id);
+    setTree({...tree, channels: remaining});
+    if (activeChannel.id === target.id) {
+      const next = remaining[0];
+      setActiveChannel(
+        next ? {id: next.id, name: next.name} : {id: '', name: ''},
+      );
+    }
     await destroyServerChannel(serverUrl, target.id);
     refresh();
   }
@@ -186,16 +190,26 @@ export function ServerScreen({
         </View>
       ) : null}
       <View style={{flex: 1}}>
-        <ChannelScreen
-          key={activeChannel.id}
-          serverUrl={serverUrl}
-          serverId={serverId}
-          serverLabel={serverLabel}
-          channelId={activeChannel.id}
-          channelName={activeChannel.name}
-          onEffectiveBits={setEffectiveBits}
-          onBack={onBack}
-        />
+        {activeChannel.id ? (
+          <ChannelScreen
+            key={activeChannel.id}
+            serverUrl={serverUrl}
+            serverId={serverId}
+            serverLabel={serverLabel}
+            channelId={activeChannel.id}
+            channelName={activeChannel.name}
+            onEffectiveBits={setEffectiveBits}
+            onBack={onBack}
+          />
+        ) : (
+          <View
+            testID="server-no-channels"
+            className="flex-1 items-center justify-center px-6">
+            <Text className="text-sm text-text-tertiary text-center">
+              No channels yet. Create one to get started.
+            </Text>
+          </View>
+        )}
       </View>
     </View>
   );
