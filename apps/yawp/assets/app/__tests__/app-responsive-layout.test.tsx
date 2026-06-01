@@ -1,21 +1,13 @@
 /**
- * Workspace-bar placement is driven purely by window WIDTH, never by
- * Platform.OS: a wide window renders the vertical desktop side rail, a
- * narrow window falls back to the horizontal/top bar. This holds on every
- * platform (web AND native), so macOS at a wide width matches desktop web.
+ * The workspaces bar is a horizontal strip at the TOP on every width and
+ * platform (web AND native) — there is no left side rail anywhere. macOS at
+ * a wide width matches desktop web: the bar is on top, content below.
  */
 
 import React from 'react';
 import ReactTestRenderer from 'react-test-renderer';
 
 import type {Identity, WorkspaceServer} from '../identity-context';
-
-let mockWidth = 1280;
-
-jest.mock('react-native/Libraries/Utilities/useWindowDimensions', () => ({
-  __esModule: true,
-  default: () => ({width: mockWidth, height: 800, scale: 1, fontScale: 1}),
-}));
 
 const SERVER: WorkspaceServer = {
   url: 'http://localhost:4000',
@@ -83,8 +75,7 @@ function barStyle(root: ReactTestRenderer.ReactTestInstance) {
   return flatStyle(hosts[0]);
 }
 
-async function renderAt(width: number) {
-  mockWidth = width;
+async function render() {
   let root: ReactTestRenderer.ReactTestRenderer | null = null;
   await ReactTestRenderer.act(async () => {
     root = ReactTestRenderer.create(<App />);
@@ -92,7 +83,7 @@ async function renderAt(width: number) {
   return root!;
 }
 
-describe('App — responsive workspace-bar placement by width', () => {
+describe('App — workspace bar is a top horizontal strip at every width', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     (useIdentityState as jest.Mock).mockReturnValue({
@@ -106,15 +97,15 @@ describe('App — responsive workspace-bar placement by width', () => {
     });
   });
 
-  test('wide window → vertical side rail', async () => {
-    const root = await renderAt(1280);
+  test('wide window → horizontal top strip, no fixed-width rail', async () => {
+    const root = await render();
     const style = barStyle(root.root);
-    expect(style.width).toBe(72);
-    expect(style.flexDirection).toBeUndefined();
+    expect(style.flexDirection).toBe('row');
+    expect(style.width).toBeUndefined();
   });
 
-  test('narrow window → horizontal top bar', async () => {
-    const root = await renderAt(400);
+  test('narrow window → horizontal top strip', async () => {
+    const root = await render();
     const style = barStyle(root.root);
     expect(style.flexDirection).toBe('row');
     expect(style.width).toBeUndefined();

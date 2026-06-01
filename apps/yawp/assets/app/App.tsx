@@ -1,6 +1,6 @@
 
 import React, {useEffect, useState} from 'react';
-import {Platform, StatusBar, View, useWindowDimensions} from 'react-native';
+import {Platform, StatusBar, View} from 'react-native';
 
 import {submitBindDevice} from './bind';
 import {discoverGeneralChannel} from './chat/discover';
@@ -52,8 +52,6 @@ type Screen =
       channelName: string;
     };
 
-const MOBILE_BREAKPOINT = 480;
-
 export default function App() {
   return (
     <IdentityProvider>
@@ -67,8 +65,6 @@ function AppShell() {
   const [screen, setScreen] = useState<Screen>({kind: 'home'});
   const [bindingUrl, setBindingUrl] = useState<string | null>(null);
   const [bindError, setBindError] = useState<string | null>(null);
-  const {width} = useWindowDimensions();
-  const horizontalBar = width < MOBILE_BREAKPOINT;
 
   useEffect(() => {
     if (Platform.OS !== 'web') return;
@@ -172,13 +168,8 @@ function AppShell() {
   return (
     <View className="flex-1 bg-bg" nativeID="app-root">
       {Platform.OS !== 'web' ? <StatusBar barStyle="light-content" /> : null}
-      <View
-        style={{
-          flex: 1,
-          flexDirection: horizontalBar ? 'column' : 'row',
-        }}>
+      <View style={{flex: 1, flexDirection: 'column'}}>
         <WorkspaceBar
-          orientation={horizontalBar ? 'horizontal' : 'vertical'}
           onAddServer={() => setScreen({kind: 'add-server'})}
           onSelectServer={handleSelectServer}
           bindingUrl={bindingUrl}
