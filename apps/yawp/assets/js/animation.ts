@@ -309,7 +309,7 @@ export function initLandingPage(container: HTMLElement): () => void {
     dots.forEach((dot, i) => {
       dot.classList.toggle("bg-primary", i === index);
       dot.classList.toggle("opacity-100", i === index);
-      dot.classList.toggle("bg-base-content", i !== index);
+      dot.classList.toggle("bg-text-tertiary", i !== index);
       dot.classList.toggle("opacity-30", i !== index);
       dot.classList.toggle("scale-125", i === index);
     });
@@ -356,7 +356,7 @@ export function initLandingPage(container: HTMLElement): () => void {
 
 function buildHTML(): string {
   const dotHTML = stages.map((s, i) =>
-    `<button class="stage-dot w-3 h-3 rounded-full transition-all duration-300 cursor-pointer ${i === 0 ? "bg-primary opacity-100 scale-125" : "bg-base-content opacity-30"}" title="${s.name}"></button>`
+    `<button class="stage-dot w-3 h-3 rounded-full transition-all duration-300 cursor-pointer ${i === 0 ? "bg-primary opacity-100 scale-125" : "bg-text-tertiary opacity-30"}" title="${s.name}"></button>`
   ).join("");
 
   return `
@@ -369,11 +369,11 @@ function buildHTML(): string {
       <div class="space-y-3">
         <div class="relative">
           <div class="absolute top-2 right-3 text-xs opacity-40 font-mono select-none">Elixir</div>
-          <pre class="bg-base-300 rounded-lg p-4 pt-8 text-sm font-mono leading-relaxed overflow-x-auto"><code id="elixir-code" class="text-gray-300"></code></pre>
+          <pre class="bg-bg-2 rounded-lg p-4 pt-8 text-sm font-mono leading-relaxed overflow-x-auto"><code id="elixir-code" class="text-gray-300"></code></pre>
         </div>
         <div id="ts-panel" class="relative transition-opacity duration-500" style="opacity:0" hidden>
           <div class="absolute top-2 right-3 text-xs opacity-40 font-mono select-none">TypeScript</div>
-          <pre class="bg-base-300 rounded-lg p-4 pt-8 text-sm font-mono leading-relaxed overflow-x-auto"><code id="ts-code" class="text-gray-300"></code></pre>
+          <pre class="bg-bg-2 rounded-lg p-4 pt-8 text-sm font-mono leading-relaxed overflow-x-auto"><code id="ts-code" class="text-gray-300"></code></pre>
         </div>
       </div>
     </div>`;
