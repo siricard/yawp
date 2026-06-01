@@ -1,13 +1,12 @@
 defmodule Yawp.Servers.Role do
   @moduledoc """
-  A role on a server.
+  A role on a server (ADR 017).
 
-   scope-locked minimal schema: id (uuid), server_id (uuid, FK),
-  name (string), system (boolean), permissions (map; `%{}` placeholder),
-  inserted_at. Real RBAC grammar lands .
-
-  The three system roles (`Owner`, `Admin`, `Member`) are seeded for
-  every server with `system: true`.
+  Carries a `permission_bits` bitmask (see `Yawp.Servers.Permissions`), a
+  `position` for hierarchy ordering, and a `system` flag. The three
+  system roles (`Owner`, `Admin`, `Member`) are seeded for every server
+  with `system: true` and cannot be deleted from the UI. Custom roles
+  share the same shape with `system: false`.
   """
 
   use Ash.Resource,
@@ -29,7 +28,7 @@ defmodule Yawp.Servers.Role do
 
     create :create do
       primary? true
-      accept [:server_id, :name, :system, :permissions]
+      accept [:server_id, :name, :system, :permission_bits, :position]
     end
 
     read :list_for_server do
@@ -61,11 +60,18 @@ defmodule Yawp.Servers.Role do
       public? true
     end
 
-    attribute :permissions, :map do
+    attribute :permission_bits, :integer do
       allow_nil? false
-      default %{}
+      default 0
       public? true
-      description "Placeholder for the RBAC grammar (not implemented yet)."
+      description "64-bit permission bitmask (see Yawp.Servers.Permissions)."
+    end
+
+    attribute :position, :integer do
+      allow_nil? false
+      default 0
+      public? true
+      description "Hierarchy ordering; higher sits above lower."
     end
 
     create_timestamp :inserted_at

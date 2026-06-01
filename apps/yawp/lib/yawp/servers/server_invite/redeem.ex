@@ -130,7 +130,7 @@ defmodule Yawp.Servers.ServerInvite.Redeem do
            {:ok, server} <- load_server(invite.server_id),
            {:ok, member_role} <- load_member_role(invite.server_id),
            {:ok, _membership, n3} <-
-             Servers.assign_role(identity.id, server.id, member_role.id,
+             Servers.assign_role(identity.id, server.id, [member_role.id],
                return_notifications?: true
              ),
            {:ok, _audit, n4} <-

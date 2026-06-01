@@ -20,7 +20,8 @@ defmodule Yawp.Identity.Identity.Changes.AssignOwnerRole do
   defp assign(_changeset, identity) do
     with {:ok, %Servers.Server{} = server} <- get_server(),
          {:ok, %Servers.Role{} = role} <- get_owner_role(server),
-         {:ok, _membership} <- Servers.assign_role(identity.id, server.id, role.id) do
+         {:ok, _membership} <- Servers.assign_role(identity.id, server.id, [role.id]),
+         {:ok, _server} <- Servers.set_server_owner(server, identity.did) do
       {:ok, identity}
     end
   end

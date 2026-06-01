@@ -29,7 +29,7 @@ defmodule Yawp.Servers.ServerInviteTest do
 
     {:ok, server} = Servers.get_singleton_server()
     {:ok, owner_role} = Servers.get_system_role_for_server("Owner", server.id)
-    {:ok, _} = Servers.assign_role(owner.id, server.id, owner_role.id)
+    {:ok, _} = Servers.assign_role(owner.id, server.id, [owner_role.id])
 
     %{server: server, owner: owner}
   end
@@ -176,7 +176,7 @@ defmodule Yawp.Servers.ServerInviteTest do
       memberships =
         Yawp.Servers.Membership
         |> Ash.Query.filter(
-          identity_id == ^identity.id and server_id == ^server.id and role_id == ^role_row.id
+          identity_id == ^identity.id and server_id == ^server.id and ^role_row.id in role_ids
         )
         |> Ash.read!(authorize?: false)
 
@@ -215,7 +215,7 @@ defmodule Yawp.Servers.ServerInviteTest do
       require Ash.Query
 
       Yawp.Servers.Membership
-      |> Ash.Query.filter(server_id == ^server.id and role_id == ^owner_role.id)
+      |> Ash.Query.filter(server_id == ^server.id and ^owner_role.id in role_ids)
       |> Ash.read!(authorize?: false)
       |> Enum.each(&Ash.destroy!(&1, authorize?: false))
 

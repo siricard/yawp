@@ -22,7 +22,7 @@ defmodule YawpWeb.ServerInfoControllerTest do
 
     {:ok, server} = Servers.get_singleton_server()
     {:ok, owner_role} = Servers.get_system_role_for_server("Owner", server.id)
-    {:ok, _} = Servers.assign_role(owner.id, server.id, owner_role.id)
+    {:ok, _} = Servers.assign_role(owner.id, server.id, [owner_role.id])
     owner
   end
 

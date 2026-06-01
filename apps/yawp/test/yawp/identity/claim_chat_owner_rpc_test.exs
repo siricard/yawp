@@ -101,7 +101,7 @@ defmodule Yawp.Identity.ClaimChatOwnerRpcTest do
       memberships =
         Yawp.Servers.Membership
         |> Ash.Query.filter(
-          identity_id == ^identity.id and server_id == ^server.id and role_id == ^owner_role.id
+          identity_id == ^identity.id and server_id == ^server.id and ^owner_role.id in role_ids
         )
         |> Ash.read!(authorize?: false)
 
@@ -299,7 +299,7 @@ defmodule Yawp.Identity.ClaimChatOwnerRpcTest do
 
       memberships =
         Yawp.Servers.Membership
-        |> Ash.Query.filter(server_id == ^server.id and role_id == ^owner_role.id)
+        |> Ash.Query.filter(server_id == ^server.id and ^owner_role.id in role_ids)
         |> Ash.read!(authorize?: false)
 
       assert length(memberships) == 1

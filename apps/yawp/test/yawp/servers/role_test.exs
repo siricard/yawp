@@ -10,12 +10,26 @@ defmodule Yawp.Servers.RoleTest do
 
   test "create_role/1 inserts a system role with the given name", %{server: server} do
     {:ok, role} =
-      Servers.create_role(%{server_id: server.id, name: "Owner", system: true, permissions: %{}})
+      Servers.create_role(%{
+        server_id: server.id,
+        name: "Owner",
+        system: true,
+        permission_bits: 7,
+        position: 100
+      })
 
     assert role.server_id == server.id
     assert role.name == "Owner"
     assert role.system == true
-    assert role.permissions == %{}
+    assert role.permission_bits == 7
+    assert role.position == 100
+  end
+
+  test "create_role/1 defaults permission_bits and position to 0", %{server: server} do
+    {:ok, role} = Servers.create_role(%{server_id: server.id, name: "Custom"})
+
+    assert role.permission_bits == 0
+    assert role.position == 0
   end
 
   test "unique_server_id_name identity rejects duplicates", %{server: server} do

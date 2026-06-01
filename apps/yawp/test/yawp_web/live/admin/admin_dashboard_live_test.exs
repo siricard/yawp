@@ -199,7 +199,7 @@ defmodule YawpWeb.AdminDashboardLiveTest do
     identity = Ash.Seed.seed!(Yawp.Identity.Identity, %{did: did, master_public_key: pk})
     {:ok, server} = Yawp.Servers.get_singleton_server()
     {:ok, owner_role} = Yawp.Servers.get_system_role_for_server("Owner", server.id)
-    {:ok, _} = Yawp.Servers.assign_role(identity.id, server.id, owner_role.id)
+    {:ok, _} = Yawp.Servers.assign_role(identity.id, server.id, [owner_role.id])
     identity
   end
 

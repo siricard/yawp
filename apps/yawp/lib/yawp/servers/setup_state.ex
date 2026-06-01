@@ -79,7 +79,7 @@ defmodule Yawp.Servers.SetupState do
 
   defp owner_membership?(server_id, owner_role_id) do
     Servers.Membership
-    |> Ash.Query.filter(server_id == ^server_id and role_id == ^owner_role_id)
+    |> Ash.Query.filter(server_id == ^server_id and ^owner_role_id in role_ids)
     |> Ash.Query.limit(1)
     |> Ash.read!(authorize?: false)
     |> case do

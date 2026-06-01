@@ -60,7 +60,7 @@ defmodule Yawp.Servers.ServerInvite.Changes.VerifyServerOwnership do
   defp list_memberships(identity_id, server_id, role_id) do
     Servers.Membership
     |> Ash.Query.filter(
-      identity_id == ^identity_id and server_id == ^server_id and role_id == ^role_id
+      identity_id == ^identity_id and server_id == ^server_id and ^role_id in role_ids
     )
     |> Ash.read(authorize?: false)
     |> case do

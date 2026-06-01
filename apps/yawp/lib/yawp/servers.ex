@@ -26,6 +26,7 @@ defmodule Yawp.Servers do
     resource Yawp.Servers.Server do
       define :create_server, action: :create, args: [:name]
       define :list_servers, action: :read
+      define :set_server_owner, action: :set_owner, args: [:owner_did]
     end
 
     resource Yawp.Servers.Role do
@@ -45,7 +46,15 @@ defmodule Yawp.Servers do
     resource Yawp.Servers.Membership do
       define :assign_role,
         action: :create,
-        args: [:identity_id, :server_id, :role_id]
+        args: [:identity_id, :server_id, :role_ids]
+
+      define :set_membership_roles, action: :set_roles, args: [:role_ids]
+      define :set_membership_moderation, action: :set_moderation
+    end
+
+    resource Yawp.Servers.ChannelOverride do
+      define :create_channel_override, action: :create
+      define :list_channel_overrides, action: :list_for_channel, args: [:channel_id]
     end
 
     resource Yawp.Servers.ServerInvite do

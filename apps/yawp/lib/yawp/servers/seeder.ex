@@ -11,7 +11,13 @@ defmodule Yawp.Servers.Seeder do
 
   require Logger
 
-  @system_role_names ["Owner", "Admin", "Member"]
+  alias Yawp.Servers.Permissions
+
+  @system_roles [
+    {"Owner", &Permissions.owner_bits/0, 100},
+    {"Admin", &Permissions.admin_bits/0, 50},
+    {"Member", &Permissions.member_bits/0, 1}
+  ]
   @default_channels [
     %{name: "general", type: :text},
     %{name: "General", type: :voice}
@@ -59,14 +65,15 @@ defmodule Yawp.Servers.Seeder do
     Logger.info("Yawp.Servers.Seeder: created server #{server.id}")
 
     role_notifications =
-      for role_name <- @system_role_names do
+      for {role_name, bits_fun, position} <- @system_roles do
         {:ok, _role, n} =
           Yawp.Servers.create_role(
             %{
               server_id: server.id,
               name: role_name,
               system: true,
-              permissions: %{}
+              permission_bits: bits_fun.(),
+              position: position
             },
             notify_opts
           )

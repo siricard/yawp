@@ -2,9 +2,9 @@ defmodule Yawp.Servers.Server do
   @moduledoc """
   The singleton server row representing this anchor.
 
-   scope-locked minimal schema: id (uuid), name (string), inserted_at,
-  updated_at. The richer columns — icon, banner, profile_version,
-  federation fields — land .
+  Carries the server name, an optional description, and the `owner_did`
+  of the single server owner who holds unconditional authority over the
+  server (set when the operator claims the anchor).
   """
 
   use Ash.Resource,
@@ -22,7 +22,12 @@ defmodule Yawp.Servers.Server do
 
     create :create do
       primary? true
-      accept [:name]
+      accept [:name, :description]
+    end
+
+    update :set_owner do
+      description "Records the DID of the server owner."
+      accept [:owner_did]
     end
   end
 
@@ -32,6 +37,17 @@ defmodule Yawp.Servers.Server do
     attribute :name, :string do
       allow_nil? false
       public? true
+    end
+
+    attribute :description, :string do
+      allow_nil? true
+      public? true
+    end
+
+    attribute :owner_did, :string do
+      allow_nil? true
+      public? true
+      description "DID of the single server owner (ADR 017). Nil until claimed."
     end
 
     create_timestamp :inserted_at

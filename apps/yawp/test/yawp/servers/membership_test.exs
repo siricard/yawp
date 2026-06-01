@@ -2,7 +2,7 @@ defmodule Yawp.Servers.MembershipTest do
   @moduledoc """
   `Yawp.Servers.Membership` resource + `assign_role/3`.
 
-  Minimal join row between an Identity and a Role on a Server.
+  Join row between an Identity and a Server carrying a role-id set.
   """
   use Yawp.DataCase, async: false
 
@@ -16,8 +16,7 @@ defmodule Yawp.Servers.MembershipTest do
       Servers.create_role(%{
         server_id: server.id,
         name: "Owner",
-        system: true,
-        permissions: %{}
+        system: true
       })
 
     {pk, _sk} = :crypto.generate_key(:eddsa, :ed25519)
@@ -32,18 +31,21 @@ defmodule Yawp.Servers.MembershipTest do
   test "assign_role/3 inserts a membership row" do
     %{server: server, role: role, identity: identity} = seed()
 
-    {:ok, m} = Servers.assign_role(identity.id, server.id, role.id)
+    {:ok, m} = Servers.assign_role(identity.id, server.id, [role.id])
 
     assert m.identity_id == identity.id
     assert m.server_id == server.id
-    assert m.role_id == role.id
+    assert m.role_ids == [role.id]
+    assert m.kind == :anchored
+    refute m.banned
+    refute m.kicked
   end
 
-  test "re-assigning the same triple is idempotent" do
+  test "re-assigning the same identity/server is idempotent" do
     %{server: server, role: role, identity: identity} = seed()
 
-    {:ok, m1} = Servers.assign_role(identity.id, server.id, role.id)
-    {:ok, m2} = Servers.assign_role(identity.id, server.id, role.id)
+    {:ok, m1} = Servers.assign_role(identity.id, server.id, [role.id])
+    {:ok, m2} = Servers.assign_role(identity.id, server.id, [role.id])
 
     assert m1.id == m2.id
   end

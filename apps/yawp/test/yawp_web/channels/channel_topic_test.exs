@@ -13,8 +13,7 @@ defmodule YawpWeb.ChannelTopicTest do
       Yawp.Servers.create_role(%{
         server_id: server.id,
         name: "Owner",
-        system: true,
-        permissions: %{}
+        system: true
       })
 
     {master_pk, _master_sk} = :crypto.generate_key(:eddsa, :ed25519)
@@ -39,7 +38,7 @@ defmodule YawpWeb.ChannelTopicTest do
       })
 
     {:ok, _membership} =
-      Yawp.Servers.assign_role(identity.id, server.id, role.id)
+      Yawp.Servers.assign_role(identity.id, server.id, [role.id])
 
     {:ok, _, socket} =
       YawpWeb.UserSocket

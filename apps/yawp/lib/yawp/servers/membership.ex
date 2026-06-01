@@ -1,11 +1,12 @@
 defmodule Yawp.Servers.Membership do
   @moduledoc """
-  Join row between an `Yawp.Identity.Identity` and a `Yawp.Servers.Role`
-  on a `Yawp.Servers.Server`.
+  Join row between an `Yawp.Identity.Identity` and a `Yawp.Servers.Server`
+  (ADR 017).
 
-  b lands the minimal columns needed to record the chat-owner →
-  `Owner`-role assignment after a successful claim. Richer membership
-  data (profile, joined_at, channel-level overrides) lands .
+  A membership carries the set of `role_ids` assigned to the identity on
+  this server, the membership `kind` (`:anchored` for users who anchor
+  here, `:guest` for visitors), and the `banned` / `kicked` moderation
+  flags consulted by `Yawp.Servers.Permissions.effective_bits/3`.
   """
 
   use Ash.Resource,
@@ -19,7 +20,6 @@ defmodule Yawp.Servers.Membership do
 
     references do
       reference :server, on_delete: :delete
-      reference :role, on_delete: :delete
       reference :identity, on_delete: :delete
     end
   end
@@ -29,16 +29,52 @@ defmodule Yawp.Servers.Membership do
 
     create :create do
       primary? true
-      accept [:identity_id, :server_id, :role_id]
+      accept [:identity_id, :server_id, :role_ids, :kind]
       upsert? true
       upsert_identity :unique_identity_server
+    end
+
+    update :set_roles do
+      description "Replaces the role set assigned to this membership."
+      accept [:role_ids]
+    end
+
+    update :set_moderation do
+      description "Sets the banned / kicked moderation flags."
+      accept [:banned, :kicked]
     end
   end
 
   attributes do
     uuid_primary_key :id
 
-    create_timestamp :inserted_at
+    attribute :role_ids, {:array, :uuid} do
+      allow_nil? false
+      default []
+      public? true
+      description "Role IDs assigned to this identity on this server."
+    end
+
+    attribute :kind, :atom do
+      allow_nil? false
+      default :anchored
+      constraints one_of: [:anchored, :guest]
+      public? true
+    end
+
+    attribute :banned, :boolean do
+      allow_nil? false
+      default false
+      public? true
+    end
+
+    attribute :kicked, :boolean do
+      allow_nil? false
+      default false
+      public? true
+    end
+
+    create_timestamp :joined_at
   end
 
   relationships do
@@ -49,11 +85,6 @@ defmodule Yawp.Servers.Membership do
     end
 
     belongs_to :server, Yawp.Servers.Server do
-      allow_nil? false
-      attribute_writable? true
-    end
-
-    belongs_to :role, Yawp.Servers.Role do
       allow_nil? false
       attribute_writable? true
     end
