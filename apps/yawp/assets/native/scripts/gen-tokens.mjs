@@ -199,21 +199,11 @@ function parseFontStack(value) {
     .filter(Boolean);
 }
 
-// Cal Sans is not packaged for the native bundles yet, so its name must not
-// appear in a native font stack — React Native does not fall through an
-// absent family the way a browser does; an unresolved first entry yields a
-// blank glyph run instead of cascading to Geist. Strip it here so the native
-// display stack resolves to a bundled font. Drop this once Cal Sans ships as
-// a native asset.
-const NATIVE_UNBUNDLED_FONTS = new Set(['Cal Sans']);
-
 function buildFontFamily() {
   const out = {};
   for (const [key, value] of Object.entries(rawFontFamilies)) {
     const mapped = FONT_FAMILY_STACK_OVERRIDES[key] || key;
-    out[mapped] = parseFontStack(value).filter(
-      (family) => !NATIVE_UNBUNDLED_FONTS.has(family),
-    );
+    out[mapped] = parseFontStack(value);
   }
   return out;
 }

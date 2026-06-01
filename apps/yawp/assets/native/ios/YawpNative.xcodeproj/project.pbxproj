@@ -18,6 +18,7 @@
 		B4B85E60FB9843A3894469ED /* Geist-Regular.ttf in Resources */ = {isa = PBXBuildFile; fileRef = B9227E927CE54370907FCA45 /* Geist-Regular.ttf */; };
 		DFE7B14B745F4B9A9EFF94DE /* Geist-Medium.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 9FF7C24B4A2C497A9AD2FD89 /* Geist-Medium.ttf */; };
 		F0C97EE415E44DA989E61229 /* Geist-Bold.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 7458EAF704944AF68CB08C8A /* Geist-Bold.ttf */; };
+		7594B6D8759140B29FB6D68A /* CalSans-Regular.otf in Resources */ = {isa = PBXBuildFile; fileRef = 8D70299252CB4C62955A352A /* CalSans-Regular.otf */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -37,6 +38,7 @@
 		9FF7C24B4A2C497A9AD2FD89 /* Geist-Medium.ttf */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = undefined; includeInIndex = 0; lastKnownFileType = unknown; name = "Geist-Medium.ttf"; path = "../assets/fonts/Geist-Medium.ttf"; sourceTree = "<group>"; };
 		B9227E927CE54370907FCA45 /* Geist-Regular.ttf */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = undefined; includeInIndex = 0; lastKnownFileType = unknown; name = "Geist-Regular.ttf"; path = "../assets/fonts/Geist-Regular.ttf"; sourceTree = "<group>"; };
 		ED297162215061F000B7C4FE /* JavaScriptCore.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = JavaScriptCore.framework; path = System/Library/Frameworks/JavaScriptCore.framework; sourceTree = SDKROOT; };
+		8D70299252CB4C62955A352A /* CalSans-Regular.otf */ = {isa = PBXFileReference; name = "CalSans-Regular.otf"; path = "../assets/fonts/CalSans-Regular.otf"; sourceTree = "<group>"; fileEncoding = undefined; lastKnownFileType = unknown; explicitFileType = undefined; includeInIndex = 0; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -81,6 +83,7 @@
 				264C734CA7C74F76BABEC490 /* GeistMono-Regular.ttf */,
 				717DBFC40F61406488247255 /* Geist-SemiBold.ttf */,
 				9E79B8E749D04C798BEB6120 /* GeistMono-Bold.ttf */,
+				8D70299252CB4C62955A352A /* CalSans-Regular.otf */,
 			);
 			name = Resources;
 			path = "";
@@ -194,6 +197,7 @@
 				18AE15F008E247B294E5732F /* GeistMono-Regular.ttf in Resources */,
 				A93DB8863EBE43C7995E3DC1 /* Geist-SemiBold.ttf in Resources */,
 				B3AA941EA83F416CA4DED504 /* GeistMono-Bold.ttf in Resources */,
+				7594B6D8759140B29FB6D68A /* CalSans-Regular.otf in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

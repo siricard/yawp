@@ -32,7 +32,7 @@
 		<true/>
 	</dict>
 	<key>NSLocationWhenInUseUsageDescription</key>
-	<string></string>
+	<string/>
 	<key>RCTNewArchEnabled</key>
 	<true/>
 	<key>UIAppFonts</key>
@@ -43,6 +43,7 @@
 		<string>GeistMono-Regular.ttf</string>
 		<string>Geist-SemiBold.ttf</string>
 		<string>GeistMono-Bold.ttf</string>
+		<string>CalSans-Regular.otf</string>
 	</array>
 	<key>UILaunchStoryboardName</key>
 	<string>LaunchScreen</string>

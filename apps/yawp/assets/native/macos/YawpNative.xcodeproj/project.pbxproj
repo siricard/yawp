@@ -20,6 +20,7 @@
 		FAFA000000000000000000A4 /* GeistMono-Regular.ttf in Resources */ = {isa = PBXBuildFile; fileRef = FAFA000000000000000000B4 /* GeistMono-Regular.ttf */; };
 		FAFA000000000000000000A5 /* Geist-SemiBold.ttf in Resources */ = {isa = PBXBuildFile; fileRef = FAFA000000000000000000B5 /* Geist-SemiBold.ttf */; };
 		FAFA000000000000000000A6 /* GeistMono-Bold.ttf in Resources */ = {isa = PBXBuildFile; fileRef = FAFA000000000000000000B6 /* GeistMono-Bold.ttf */; };
+		FAFA000000000000000000A7 /* CalSans-Regular.otf in Resources */ = {isa = PBXBuildFile; fileRef = FAFA000000000000000000B7 /* CalSans-Regular.otf */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -43,6 +44,7 @@
 		FAFA000000000000000000B4 /* GeistMono-Regular.ttf */ = {isa = PBXFileReference; lastKnownFileType = unknown; name = "GeistMono-Regular.ttf"; path = "../assets/fonts/GeistMono-Regular.ttf"; sourceTree = "<group>"; };
 		FAFA000000000000000000B5 /* Geist-SemiBold.ttf */ = {isa = PBXFileReference; lastKnownFileType = unknown; name = "Geist-SemiBold.ttf"; path = "../assets/fonts/Geist-SemiBold.ttf"; sourceTree = "<group>"; };
 		FAFA000000000000000000B6 /* GeistMono-Bold.ttf */ = {isa = PBXFileReference; lastKnownFileType = unknown; name = "GeistMono-Bold.ttf"; path = "../assets/fonts/GeistMono-Bold.ttf"; sourceTree = "<group>"; };
+		FAFA000000000000000000B7 /* CalSans-Regular.otf */ = {isa = PBXFileReference; lastKnownFileType = unknown; name = "CalSans-Regular.otf"; path = "../assets/fonts/CalSans-Regular.otf"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -137,6 +139,7 @@
 				FAFA000000000000000000B4 /* GeistMono-Regular.ttf */,
 				FAFA000000000000000000B5 /* Geist-SemiBold.ttf */,
 				FAFA000000000000000000B6 /* GeistMono-Bold.ttf */,
+				FAFA000000000000000000B7 /* CalSans-Regular.otf */,
 			);
 			name = Fonts;
 			sourceTree = "<group>";
@@ -243,6 +246,7 @@
 				FAFA000000000000000000A4 /* GeistMono-Regular.ttf in Resources */,
 				FAFA000000000000000000A5 /* Geist-SemiBold.ttf in Resources */,
 				FAFA000000000000000000A6 /* GeistMono-Bold.ttf in Resources */,
+				FAFA000000000000000000A7 /* CalSans-Regular.otf in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
