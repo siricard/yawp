@@ -1,6 +1,6 @@
 defmodule Yawp.Servers.MessageTombstone do
   @moduledoc """
-  A signed delete event for a `Yawp.Servers.Message` (ADR 019).
+  A signed delete event for a `Yawp.Servers.Message`.
 
   A tombstone wipes the message `body` while preserving its timeline
   slot (the `server_serial` is untouched), and records who deleted it and
@@ -8,12 +8,13 @@ defmodule Yawp.Servers.MessageTombstone do
 
     * `:sender` — the original author deleted their own message.
     * `:moderator` — a role holding `manage_messages` deleted it.
-    * `:retention` — produced by the retention sweep, signed by the
-      server keypair.
+    * `:retention` — produced by the automated retention sweep, signed by
+      the server keypair on a trusted path (never client-submittable).
 
-  The `:create` action verifies the actor's device-subkey signature over
-  the canonical-JSON envelope, authorises the delete (sender deletes own;
-  moderator needs `manage_messages`), and — when the server's
+  The client-submittable `:create` action only accepts `:sender` and
+  `:moderator` reasons. It verifies the actor's device-subkey signature
+  over the canonical-JSON envelope, authorises the delete (sender deletes
+  own; moderator needs `manage_messages`), and — when the server's
   `body_archive_enabled` flag is on — archives the original body to the
   admin-only `Yawp.Servers.ArchivedMessageBody` store before wiping it.
   """
@@ -51,6 +52,8 @@ defmodule Yawp.Servers.MessageTombstone do
 
       argument :signature, :string, allow_nil?: false
       argument :ts, :integer, allow_nil?: false
+
+      validate one_of(:reason, [:sender, :moderator])
 
       change Yawp.Servers.MessageTombstone.Changes.VerifyDeleteSignature
       change Yawp.Servers.MessageTombstone.Changes.AuthorizeDelete

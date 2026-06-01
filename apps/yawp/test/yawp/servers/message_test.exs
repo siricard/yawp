@@ -301,6 +301,25 @@ defmodule Yawp.Servers.MessageTest do
       assert message.body == "secret"
     end
 
+    test "rejects a client-submitted retention-reason delete from a non-privileged identity",
+         ctx do
+      member = seed_identity()
+      seed_membership_with_bits(member, ctx.server, [])
+
+      assert {:error, _error} = tombstone(ctx.message, member, "retention")
+
+      {:ok, [message]} = Servers.list_channel_messages(ctx.channel_a.id)
+      assert message.body == "secret"
+      assert {:ok, []} = Servers.list_message_tombstones(ctx.message.id)
+    end
+
+    test "rejects a client-submitted retention-reason delete even from the sender", ctx do
+      assert {:error, _error} = tombstone(ctx.message, ctx.sender, "retention")
+
+      {:ok, [message]} = Servers.list_channel_messages(ctx.channel_a.id)
+      assert message.body == "secret"
+    end
+
     test "rejects a tombstone with a mismatched signature", ctx do
       ts = System.system_time(:millisecond)
 
@@ -336,7 +355,12 @@ defmodule Yawp.Servers.MessageTest do
 
       {:ok, _tomb} = tombstone(ctx.message, ctx.sender, "sender")
 
-      {:ok, [archived]} = Servers.list_archived_bodies_for_message(ctx.message.id)
+      operator = seed_identity()
+      seed_membership_with_bits(operator, ctx.server, [:manage_messages])
+
+      {:ok, [archived]} =
+        Servers.list_archived_bodies_for_message(ctx.message.id, actor: operator.identity)
+
       assert archived.body == "secret"
 
       {:ok, [message]} = Servers.list_channel_messages(ctx.channel_a.id)
@@ -345,7 +369,39 @@ defmodule Yawp.Servers.MessageTest do
 
     test "does not archive the body when body_archive_enabled is off", ctx do
       {:ok, _tomb} = tombstone(ctx.message, ctx.sender, "sender")
-      assert {:ok, []} = Servers.list_archived_bodies_for_message(ctx.message.id)
+
+      operator = seed_identity()
+      seed_membership_with_bits(operator, ctx.server, [:manage_messages])
+
+      assert {:ok, []} =
+               Servers.list_archived_bodies_for_message(ctx.message.id, actor: operator.identity)
+    end
+
+    test "denies archived-body reads to a non-privileged identity", ctx do
+      {:ok, _} =
+        ctx.server
+        |> Ash.Changeset.for_update(:set_body_archive, %{body_archive_enabled: true})
+        |> Ash.update(authorize?: false)
+
+      {:ok, _tomb} = tombstone(ctx.message, ctx.sender, "sender")
+
+      member = seed_identity()
+      seed_membership_with_bits(member, ctx.server, [])
+
+      assert {:error, %Ash.Error.Forbidden{}} =
+               Servers.list_archived_bodies_for_message(ctx.message.id, actor: member.identity)
+    end
+
+    test "denies archived-body reads to an actorless caller", ctx do
+      {:ok, _} =
+        ctx.server
+        |> Ash.Changeset.for_update(:set_body_archive, %{body_archive_enabled: true})
+        |> Ash.update(authorize?: false)
+
+      {:ok, _tomb} = tombstone(ctx.message, ctx.sender, "sender")
+
+      assert {:error, %Ash.Error.Forbidden{}} =
+               Servers.list_archived_bodies_for_message(ctx.message.id, actor: nil)
     end
   end
 

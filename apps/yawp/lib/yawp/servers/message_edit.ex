@@ -1,7 +1,6 @@
 defmodule Yawp.Servers.MessageEdit do
   @moduledoc """
-  An append-only signed edit superseding a `Yawp.Servers.Message` body
-  (ADR 019).
+  An append-only signed edit superseding a `Yawp.Servers.Message` body.
 
   Edits never overwrite: the original message and every subsequent edit
   are retained. Each edit is signed by the original sender's device

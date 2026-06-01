@@ -1,9 +1,13 @@
 defmodule Yawp.Servers.MessageTombstone.Changes.AuthorizeDelete do
   @moduledoc """
-  Authorises a delete per ADR 019: the original sender may always delete
-  their own message; anyone else needs the `manage_messages` bit on the
-  message's server, resolved via `Yawp.Servers.Permissions`. A
-  `:retention` tombstone is server-driven and bypasses this gate.
+  Authorises a participant-driven delete: the original sender may always
+  delete their own message; anyone else needs the `manage_messages` bit
+  on the message's server, resolved via `Yawp.Servers.Permissions`.
+
+  This runs on the client-submittable delete path, so it never grants on
+  the `reason` field alone — every delete here must be sender-own or
+  backed by `manage_messages`. Automated retention deletes use a separate
+  trusted action and do not pass through this check.
   """
   use Ash.Resource.Change
 
@@ -17,14 +21,10 @@ defmodule Yawp.Servers.MessageTombstone.Changes.AuthorizeDelete do
   defp authorize(%{valid?: false} = changeset), do: changeset
 
   defp authorize(changeset) do
-    reason = Ash.Changeset.get_attribute(changeset, :reason)
     actor = changeset.context[:actor_identity]
     message = changeset.context[:target_message]
 
     cond do
-      reason == :retention ->
-        changeset
-
       sender?(actor, message) ->
         changeset
 

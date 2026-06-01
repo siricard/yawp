@@ -1,6 +1,6 @@
 defmodule Yawp.Servers.Message do
   @moduledoc """
-  A text message in a server channel (ADR 019).
+  A text message in a server channel.
 
   Each row carries the sender's DID, the device-subkey ed25519
   `sender_signature` over the canonical-JSON envelope, and a
