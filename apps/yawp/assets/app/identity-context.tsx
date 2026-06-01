@@ -5,7 +5,7 @@ import {Platform} from 'react-native';
 import {entropyToMnemonic, mnemonicToSeed, validateMnemonic} from './identity/bip39';
 import {b64UrlToBytes, bytesToB64Url, type IdentityBundleV1} from './identity/bundle';
 import {generateDeviceSubkey, signWithDevice} from './identity/device';
-import {didFromPubkey, fingerprintFromPubkey} from './identity/did';
+import {didFromPubkey, didPrefix, fingerprintFromPubkey} from './identity/did';
 import {masterFromMnemonicSeed, masterPkFromSk, signWithMaster} from './identity/master';
 import {
   loadIdentity,
@@ -124,6 +124,13 @@ type State =
       status: 'locked';
       /** Pinned at load time; used by `unlock()` and `changePassphrase()`. */
       sealedEnvelope: SealedEnvelopeV2;
+      /**
+       * Leading slice of the sealed identity's DID, persisted beside the
+       * envelope so the locked screen can tell the user which identity
+       * they're unlocking. `null` for envelopes written before the prefix
+       * was stored.
+       */
+      didPrefix: string | null;
       identity: null;
       error: null;
     }
@@ -385,6 +392,7 @@ export function IdentityProvider({children}: {children: React.ReactNode}) {
           applyState({
             status: 'locked',
             sealedEnvelope: entry.envelope,
+            didPrefix: entry.didPrefix ?? null,
             identity: null,
             error: null,
           });
@@ -481,7 +489,7 @@ export function IdentityProvider({children}: {children: React.ReactNode}) {
           current.sealKey,
           current.sealSalt,
         );
-        await saveSealedEnvelope(envelope);
+        await saveSealedEnvelope(envelope, didPrefix(current.identity.didFull));
       } else {
         await saveIdentity(nextBundle);
       }
@@ -548,7 +556,10 @@ export function IdentityProvider({children}: {children: React.ReactNode}) {
           const salt = randomSaltBytes();
           const sealKey = deriveSealKey(passphrase, salt);
           const envelope = sealBundleWithKey(bundle, sealKey, salt);
-          await saveSealedEnvelope(envelope);
+          await saveSealedEnvelope(
+            envelope,
+            didPrefix(didFromPubkey(draft.masterPk)),
+          );
           draftSealedRef.current = true;
           draftSealRef.current = {sealKey, salt};
         } else {
@@ -721,7 +732,10 @@ export function IdentityProvider({children}: {children: React.ReactNode}) {
           const salt = randomSaltBytes();
           const sealKey = deriveSealKey(next, salt);
           const envelope = sealBundleWithKey(bundle, sealKey, salt);
-          await saveSealedEnvelope(envelope);
+          await saveSealedEnvelope(
+            envelope,
+            didPrefix(currentState.identity.didFull),
+          );
           applyState({
             ...currentState,
             sealed: true,
@@ -835,6 +849,12 @@ export function useOnboarding(): {
  */
 export function usePassphrase(): {
   sealed: boolean;
+  /**
+   * Leading slice of the locked identity's DID, available while
+   * `status === 'locked'`. `null` when not locked or when the stored
+   * envelope predates the prefix being persisted.
+   */
+  lockedDidPrefix: string | null;
   unlock: (passphrase: string) => Promise<UnlockResult>;
   changePassphrase: (opts: {
     current: string | null;
@@ -851,6 +871,8 @@ export function usePassphrase(): {
       : ctx.state.status === 'locked';
   return {
     sealed,
+    lockedDidPrefix:
+      ctx.state.status === 'locked' ? ctx.state.didPrefix : null,
     unlock: ctx.unlock,
     changePassphrase: ctx.changePassphrase,
   };

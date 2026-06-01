@@ -119,6 +119,27 @@ describe('storage-bundle.web (IndexedDB)', () => {
     }
   });
 
+  test('persists didPrefix alongside a sealed envelope and reads it back', async () => {
+    const envelope = makeSealedEnvelope();
+    await saveSealedEnvelope(envelope, 'did:yawp:z6MkPx12');
+    const entry = await loadStoredEntry();
+    expect(entry!.kind).toBe('sealed');
+    if (entry!.kind === 'sealed') {
+      expect(entry!.envelope).toEqual(envelope);
+      expect(entry!.didPrefix).toBe('did:yawp:z6MkPx12');
+    }
+  });
+
+  test('a legacy sealed envelope (no didPrefix) reads back with didPrefix undefined', async () => {
+    const envelope = makeSealedEnvelope();
+    await saveSealedEnvelope(envelope);
+    const entry = await loadStoredEntry();
+    expect(entry!.kind).toBe('sealed');
+    if (entry!.kind === 'sealed') {
+      expect(entry!.didPrefix).toBeUndefined();
+    }
+  });
+
   test('round-trips the nudge metadata (firstBoundAt + secondAnchorNudgeDismissed)', async () => {
     const bundle: IdentityBundleV1 = {
       ...makeBundle(),

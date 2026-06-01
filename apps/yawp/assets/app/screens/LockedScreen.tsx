@@ -3,10 +3,10 @@ import React, {useState} from 'react';
 import {ScrollView, Text, View} from 'react-native';
 
 import {usePassphrase} from '../identity-context';
-import {Button, Card, Field, Input} from '../ui';
+import {Button, Card, DidPill, Field, Input} from '../ui';
 
 export function LockedScreen() {
-  const {unlock} = usePassphrase();
+  const {unlock, lockedDidPrefix} = usePassphrase();
   const [passphrase, setPassphrase] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
@@ -47,13 +47,21 @@ export function LockedScreen() {
             This device is protected by a passphrase. Enter it to continue.
           </Text>
 
-          <View
-            testID="locked-identity-context"
-            className="bg-surface-2 rounded-md py-3 px-3 mb-6">
-            <Text className="text-sm text-text-secondary text-center">
-              Enter your passphrase to unlock your identity on this device.
-            </Text>
-          </View>
+          {lockedDidPrefix ? (
+            <View testID="locked-identity-context" className="mb-6">
+              <DidPill testID="locked-did-pill" did={lockedDidPrefix} />
+            </View>
+          ) : (
+            <View
+              testID="locked-identity-context"
+              className="bg-surface-2 rounded-md py-3 px-3 mb-6">
+              <Text
+                testID="locked-identity-placeholder"
+                className="text-sm text-text-secondary text-center">
+                Unknown identity — enter passphrase to unlock.
+              </Text>
+            </View>
+          )}
 
           <Field
             label="Passphrase"

@@ -6,7 +6,7 @@ import {isSealedEnvelopeV2, type SealedEnvelopeV2} from './seal';
 
 export type StoredIdentityEntry =
   | {kind: 'unsealed'; bundle: IdentityBundleV1}
-  | {kind: 'sealed'; envelope: SealedEnvelopeV2};
+  | {kind: 'sealed'; envelope: SealedEnvelopeV2; didPrefix?: string};
 
 export class KeychainReadError extends Error {
   readonly cause?: unknown;
@@ -38,7 +38,14 @@ export async function loadStoredEntry(): Promise<StoredIdentityEntry | null> {
     );
   }
   if (isSealedEnvelopeV2(parsed)) {
-    return {kind: 'sealed', envelope: parsed};
+    const {didPrefix, ...envelope} = parsed as SealedEnvelopeV2 & {
+      didPrefix?: unknown;
+    };
+    return {
+      kind: 'sealed',
+      envelope,
+      didPrefix: typeof didPrefix === 'string' ? didPrefix : undefined,
+    };
   }
   if (isIdentityBundleV1(parsed)) {
     return {kind: 'unsealed', bundle: parsed};
@@ -47,7 +54,12 @@ export async function loadStoredEntry(): Promise<StoredIdentityEntry | null> {
 }
 
 export async function saveStoredEntry(entry: StoredIdentityEntry): Promise<void> {
-  const payload = entry.kind === 'unsealed' ? entry.bundle : entry.envelope;
+  const payload =
+    entry.kind === 'unsealed'
+      ? entry.bundle
+      : entry.didPrefix
+        ? {...entry.envelope, didPrefix: entry.didPrefix}
+        : entry.envelope;
   await Keychain.setGenericPassword(STORAGE_KEY_V1, JSON.stringify(payload), {
     service: STORAGE_KEY_V1,
   });
@@ -62,8 +74,11 @@ export async function saveIdentity(bundle: IdentityBundleV1): Promise<void> {
   await saveStoredEntry({kind: 'unsealed', bundle});
 }
 
-export async function saveSealedEnvelope(envelope: SealedEnvelopeV2): Promise<void> {
-  await saveStoredEntry({kind: 'sealed', envelope});
+export async function saveSealedEnvelope(
+  envelope: SealedEnvelopeV2,
+  didPrefix?: string,
+): Promise<void> {
+  await saveStoredEntry({kind: 'sealed', envelope, didPrefix});
 }
 
 export async function clearIdentityBundle(): Promise<void> {

@@ -7,6 +7,17 @@ export function didFromPubkey(pk: Uint8Array): string {
   return `did:yawp:${bs58.encode(sha256(pk))}`;
 }
 
+export const DID_PREFIX_LEN = 16;
+
+/**
+ * The leading slice of a DID, long enough to tell two identities apart on
+ * the same device without persisting the full identifier in cleartext
+ * beside a sealed envelope.
+ */
+export function didPrefix(did: string, len: number = DID_PREFIX_LEN): string {
+  return did.slice(0, len);
+}
+
 /**
  * Peer-verification fingerprint: the first 128 bits of
  * `sha256(master_pk)`, rendered as `yp:` followed by four groups of four

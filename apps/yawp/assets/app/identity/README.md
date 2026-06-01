@@ -15,7 +15,7 @@ recover it from storage. **No user-facing onboarding screens.**
 | --- | --- |
 | `master.ts` | Generate a fresh master Ed25519 keypair (`generateMaster`); derive a public key from a master seed; sign with the master key. |
 | `device.ts` | Generate a device subkey + master-signed delegation (`generateDeviceSubkey(masterPrivateKey, opts?)`); sign with the device subkey; expose the canonical-JSON delegation message for verifiers. |
-| `did.ts` | `didFromPubkey(pk)` → `did:yawp:<base58(sha256(pk))>`; `fingerprintFromPubkey(pk)` → `yp:8f3a · d21c · 47ee · 0b91`. |
+| `did.ts` | `didFromPubkey(pk)` → `did:yawp:<base58(sha256(pk))>`; `fingerprintFromPubkey(pk)` → `yp:8f3a · d21c · 47ee · 0b91`; `didPrefix(did)` → leading 16 chars for the locked-screen context. |
 | `bundle.ts` | Persisted JSON shape (`IdentityBundleV1`) + base64url helpers. |
 | `storage-bundle.web.ts` / `storage-bundle.native.ts` | Platform-specific `loadIdentity` / `saveIdentity`. Web uses IndexedDB (origin-scoped, database `yawp.identity`, object store `yawp.identity`, single record under key `'v1'`); native uses `react-native-keychain` under service `yawp.identity.v1`. The web backend includes a one-shot best-effort migration from a pre-fix `yawp.identity.v1` database. |
 | `uuid.ts` | Cross-platform UUID v4 generator (uses `crypto.randomUUID` when available; falls back to `crypto.getRandomValues`). |
@@ -69,6 +69,40 @@ The shorthand `sk`/`pk` field names are deliberate: the long-form names trip Dro
 The delegation `signature` covers
 `canonicalJson({device_id, pk, issued_at})` signed by the master private key
 (RFC-8785 canonical-JSON; see `apps/yawp/assets/app/canonical-json.ts`).
+
+## Sealed-envelope shape on disk (passphrase-protected)
+
+When a passphrase is configured the bundle is wrapped before storage. The
+stored record then looks like:
+
+```json
+{
+  "version": 2,
+  "sealed": true,
+  "salt": "<base64url 16 bytes>",
+  "nonce": "<base64url 12 bytes>",
+  "ciphertext": "<base64url ChaCha20-Poly1305 ciphertext || tag>",
+  "didPrefix": "did:yawp:z6Mk…"
+}
+```
+
+`didPrefix` is the leading `DID_PREFIX_LEN` (16) characters of the DID,
+captured at seal time when the plaintext DID is still available. It is the
+**only** cleartext identifier kept beside the sealed envelope — just enough
+to tell the locked screen which identity is about to be unlocked when more
+than one sealed identity exists on a device. The full DID is never stored
+unencrypted.
+
+### `didPrefix` migration story
+
+Envelopes written before `didPrefix` was persisted simply omit the key.
+`loadStoredEntry` returns `didPrefix: undefined` for those, and the locked
+screen falls back to a generic "Unknown identity — enter passphrase to
+unlock." placeholder. We do **not** rewrite legacy envelopes on read to
+backfill the prefix; the next normal write (set/change passphrase, or any
+metadata mutation on the unlocked bundle) persists it. No version bump is
+needed — `didPrefix` is an additive, optional sibling of the envelope, not a
+change to the sealed payload format.
 
 ## Deferred to
 
