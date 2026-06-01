@@ -1,6 +1,6 @@
 defmodule YawpWeb.ServerChannelTopic do
   @moduledoc """
-  Phoenix channel for one server text channel (ADR 017 / ADR 019).
+  Phoenix channel for one server text channel.
 
   Topic: `server:<server_id>:channel:<channel_id>` where both segments
   are UUIDs of a `Yawp.Servers.Server` and a `Yawp.Servers.Channel` that
@@ -116,6 +116,9 @@ defmodule YawpWeb.ServerChannelTopic do
       not valid_edit_payload?(payload) ->
         {:reply, {:error, %{reason: "invalid_payload"}}, socket}
 
+      not message_in_topic_channel?(Map.fetch!(payload, "message_id"), socket) ->
+        {:reply, {:error, %{reason: "unauthorized"}}, socket}
+
       true ->
         attrs = %{
           message_id: Map.fetch!(payload, "message_id"),
@@ -139,27 +142,36 @@ defmodule YawpWeb.ServerChannelTopic do
 
   @impl true
   def handle_in("delete_message", payload, socket) do
-    if valid_delete_payload?(payload) do
-      attrs = %{
-        message_id: Map.fetch!(payload, "message_id"),
-        reason: Map.fetch!(payload, "reason"),
-        actor_did: socket.assigns.current_identity.did,
-        signed_by: Map.fetch!(payload, "signed_by"),
-        signature: Map.fetch!(payload, "signature"),
-        ts: Map.fetch!(payload, "ts")
-      }
+    cond do
+      not valid_delete_payload?(payload) ->
+        {:reply, {:error, %{reason: "invalid_payload"}}, socket}
 
-      case Servers.delete_server_message(attrs) do
-        {:ok, tombstone} ->
-          serialized = serialize_tombstone(tombstone)
-          broadcast!(socket, "message_deleted", serialized)
-          {:reply, {:ok, serialized}, socket}
+      not message_in_topic_channel?(Map.fetch!(payload, "message_id"), socket) ->
+        {:reply, {:error, %{reason: "unauthorized"}}, socket}
 
-        {:error, _} ->
-          {:reply, {:error, %{reason: "unauthorized"}}, socket}
-      end
-    else
-      {:reply, {:error, %{reason: "invalid_payload"}}, socket}
+      true ->
+        handle_delete(payload, socket)
+    end
+  end
+
+  defp handle_delete(payload, socket) do
+    attrs = %{
+      message_id: Map.fetch!(payload, "message_id"),
+      reason: Map.fetch!(payload, "reason"),
+      actor_did: socket.assigns.current_identity.did,
+      signed_by: Map.fetch!(payload, "signed_by"),
+      signature: Map.fetch!(payload, "signature"),
+      ts: Map.fetch!(payload, "ts")
+    }
+
+    case Servers.delete_server_message(attrs) do
+      {:ok, tombstone} ->
+        serialized = serialize_tombstone(tombstone)
+        broadcast!(socket, "message_deleted", serialized)
+        {:reply, {:ok, serialized}, socket}
+
+      {:error, _} ->
+        {:reply, {:error, %{reason: "unauthorized"}}, socket}
     end
   end
 
@@ -185,6 +197,15 @@ defmodule YawpWeb.ServerChannelTopic do
     case Ash.get(Servers.Channel, channel_id, authorize?: false) do
       {:ok, %Servers.Channel{server_id: ^server_id} = channel} -> {:ok, channel}
       _ -> :error
+    end
+  end
+
+  defp message_in_topic_channel?(message_id, socket) do
+    channel_id = socket.assigns.channel.id
+
+    case Ash.get(Servers.Message, message_id, authorize?: false) do
+      {:ok, %Servers.Message{channel_id: ^channel_id}} -> true
+      _ -> false
     end
   end
 

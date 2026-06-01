@@ -258,6 +258,36 @@ defmodule YawpWeb.ServerChannelTopicTest do
       assert reason in ["invalid_signature", "unauthorized"]
       refute_broadcast "message_edited", _
     end
+
+    test "author cannot edit their message from a different channel topic", ctx do
+      {:ok, other_channel} =
+        Servers.create_channel(
+          %{server_id: ctx.server.id, name: "other", type: :text},
+          authorize?: false
+        )
+
+      {:ok, _, other_socket} = join_channel(ctx.actor, ctx.server, other_channel)
+      assert_push "history", _
+      assert_push "presence_state", _
+
+      ts = System.system_time(:millisecond)
+      envelope = %{"message_id" => ctx.message_id, "body" => "cross", "ts" => ts}
+
+      ref =
+        push(other_socket, "edit_message", %{
+          "message_id" => ctx.message_id,
+          "body" => "cross",
+          "signed_by" => ctx.actor.device_id,
+          "signature" => sign(envelope, ctx.actor.device_sk),
+          "ts" => ts
+        })
+
+      assert_reply ref, :error, %{reason: "unauthorized"}
+      refute_broadcast "message_edited", _
+
+      {:ok, [message]} = Servers.list_channel_messages(ctx.channel.id)
+      assert message.body == "v1"
+    end
   end
 
   describe "delete_message" do
@@ -348,6 +378,33 @@ defmodule YawpWeb.ServerChannelTopicTest do
         )
 
       assert_reply ref, :error, %{reason: _}
+      refute_broadcast "message_deleted", _
+
+      {:ok, [message]} = Servers.list_channel_messages(ctx.channel.id)
+      assert message.body == "secret"
+    end
+
+    test "author cannot delete their message from a different channel topic", ctx do
+      {:ok, other_channel} =
+        Servers.create_channel(
+          %{server_id: ctx.server.id, name: "other", type: :text},
+          authorize?: false
+        )
+
+      {:ok, _, other_socket} = join_channel(ctx.actor, ctx.server, other_channel)
+      assert_push "history", _
+      assert_push "presence_state", _
+
+      ts = System.system_time(:millisecond)
+
+      ref =
+        push(
+          other_socket,
+          "delete_message",
+          delete_payload(ctx.message_id, ctx.actor, "sender", ts)
+        )
+
+      assert_reply ref, :error, %{reason: "unauthorized"}
       refute_broadcast "message_deleted", _
 
       {:ok, [message]} = Servers.list_channel_messages(ctx.channel.id)
