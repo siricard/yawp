@@ -1,8 +1,9 @@
 
 import React from 'react';
-import {Platform, Pressable, ScrollView, Text, View} from 'react-native';
+import {Pressable, ScrollView, Text, View} from 'react-native';
 
 import {useDisplayName, useWorkspaceServers, type WorkspaceServer} from '../identity-context';
+import {pointerCursor} from '../ui/cursor';
 
 type Props = {
   onAddServer: () => void;
@@ -51,9 +52,7 @@ export function WorkspaceBar({
       style={
         horizontal
           ? {flexDirection: 'row', alignItems: 'center'}
-          : Platform.OS === 'web'
-            ? {width: 72}
-            : {width: 72}
+          : {width: 72}
       }>
       <ScrollView
         horizontal={horizontal}
@@ -85,6 +84,7 @@ export function WorkspaceBar({
               accessibilityLabel={`server ${server.label}`}
               onPress={() => onSelectServer?.(server)}
               disabled={isBinding}
+              style={isBinding ? undefined : pointerCursor}
               className={[
                 'w-12 h-12 rounded-lg bg-surface-2 items-center justify-center active:bg-surface-3',
                 isBinding ? 'opacity-60 animate-pulse' : '',
@@ -110,6 +110,7 @@ export function WorkspaceBar({
           accessibilityRole="button"
           accessibilityLabel="add server"
           onPress={onAddServer}
+          style={pointerCursor}
           className="w-12 h-12 rounded-lg bg-surface-2 border border-border-soft items-center justify-center active:bg-surface-3">
           <Text className="text-2xl font-bold text-primary">+</Text>
         </Pressable>

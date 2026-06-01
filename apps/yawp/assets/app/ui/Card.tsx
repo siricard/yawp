@@ -1,6 +1,8 @@
 import React from 'react';
 import {Pressable, View, type ViewProps} from 'react-native';
 
+import {pointerCursor} from './cursor';
+
 export type CardVariant = 'default' | 'elevated' | 'interactive';
 
 export type CardProps = ViewProps & {
@@ -45,7 +47,7 @@ export function Card({
         accessibilityLabel={accessibilityLabel}
         onPress={onPress}
         className={className}
-        style={combined}>
+        style={[pointerCursor, combined]}>
         {children}
       </Pressable>
     );

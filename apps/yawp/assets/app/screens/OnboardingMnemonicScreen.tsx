@@ -52,6 +52,7 @@ export function OnboardingMnemonicScreen({
   const [inputs, setInputs] = useState<string[]>(() =>
     Array.from({length: VERIFY_WORD_COUNT}, () => ''),
   );
+  const [focusedIndex, setFocusedIndex] = useState<number | null>(null);
 
   useEffect(() => {
     if (step !== 'display') return;
@@ -162,22 +163,33 @@ export function OnboardingMnemonicScreen({
                 return next;
               });
             return (
-              <Field key={pos} label={`Word #${pos + 1}`}>
-                <Autocomplete
-                  inputTestID={`verify-input-${i}`}
-                  overlayTestID={`verify-suggestions-${i}`}
-                  optionTestID={s => `verify-suggestion-${i}-${s}`}
-                  accessibilityLabel={`verify word position ${pos + 1}`}
-                  value={inputs[i]}
-                  onChangeText={setVerifyWord}
-                  onSelect={setVerifyWord}
-                  suggestions={suggestionsFor(inputs[i])}
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                  spellCheck={false}
-                  placeholder="word"
-                />
-              </Field>
+              <View
+                key={pos}
+                style={{
+                  zIndex: focusedIndex === i ? 50 : undefined,
+                  elevation: focusedIndex === i ? 8 : undefined,
+                }}>
+                <Field label={`Word #${pos + 1}`}>
+                  <Autocomplete
+                    inputTestID={`verify-input-${i}`}
+                    overlayTestID={`verify-suggestions-${i}`}
+                    optionTestID={s => `verify-suggestion-${i}-${s}`}
+                    accessibilityLabel={`verify word position ${pos + 1}`}
+                    value={inputs[i]}
+                    onChangeText={setVerifyWord}
+                    onSelect={setVerifyWord}
+                    onFocus={() => setFocusedIndex(i)}
+                    onBlur={() =>
+                      setFocusedIndex(prev => (prev === i ? null : prev))
+                    }
+                    suggestions={suggestionsFor(inputs[i])}
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                    spellCheck={false}
+                    placeholder="word"
+                  />
+                </Field>
+              </View>
             );
           })}
 

@@ -9,6 +9,7 @@ import {
   View,
 } from 'react-native';
 
+import {pointerCursor} from './cursor';
 import {Input, type InputProps} from './Input';
 import {tokens} from './tokens';
 
@@ -34,6 +35,8 @@ export const Autocomplete = React.forwardRef<TextInput, AutocompleteProps>(
       inputTestID,
       overlayTestID = 'autocomplete-overlay',
       optionTestID,
+      onFocus,
+      onBlur,
       ...inputProps
     },
     ref,
@@ -43,15 +46,26 @@ export const Autocomplete = React.forwardRef<TextInput, AutocompleteProps>(
   const shown = suggestions.slice(0, maxVisible);
 
   return (
-    <View style={{position: 'relative'}}>
+    <View
+      style={{
+        position: 'relative',
+        zIndex: visible ? (Platform.OS === 'web' ? 50 : 1) : undefined,
+        elevation: visible ? 8 : undefined,
+      }}>
       <Input
         {...inputProps}
         ref={ref}
         testID={inputTestID}
         value={value}
         onChangeText={onChangeText}
-        onFocus={() => setFocused(true)}
-        onBlur={() => setTimeout(() => setFocused(false), 100)}
+        onFocus={e => {
+          setFocused(true);
+          onFocus?.(e);
+        }}
+        onBlur={e => {
+          setTimeout(() => setFocused(false), 100);
+          onBlur?.(e);
+        }}
       />
       {visible ? (
         <View
@@ -82,6 +96,7 @@ export const Autocomplete = React.forwardRef<TextInput, AutocompleteProps>(
                 }}
                 style={state => [
                   styles.option,
+                  pointerCursor,
                   (state.pressed ||
                     (state as {hovered?: boolean}).hovered) &&
                     styles.optionHighlighted,

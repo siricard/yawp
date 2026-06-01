@@ -1,6 +1,8 @@
 import React from 'react';
 import {Pressable, Text, View} from 'react-native';
 
+import {pointerCursor} from './cursor';
+
 export type TileProps = {
   label: string;
   active?: boolean;
@@ -33,6 +35,7 @@ export function Tile({
     borderRadius: 12,
     alignItems: 'center' as const,
     justifyContent: 'center' as const,
+    ...pointerCursor,
   };
   const className = [
     add

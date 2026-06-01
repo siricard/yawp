@@ -43,6 +43,7 @@ export function RestoreMnemonicScreen({onRestore, onCancel}: Props) {
   );
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [focusedIndex, setFocusedIndex] = useState<number | null>(null);
   const inputRefs = useRef<Array<TextInput | null>>([]);
 
   const normalized = useMemo(
@@ -100,7 +101,13 @@ export function RestoreMnemonicScreen({onRestore, onCancel}: Props) {
         {words.map((word, idx) => {
           const suggestions = suggestionsFor(word);
           return (
-            <View key={idx} className="w-1/2 px-1 py-1">
+            <View
+              key={idx}
+              className="w-1/2 px-1 py-1"
+              style={{
+                zIndex: focusedIndex === idx ? 50 : undefined,
+                elevation: focusedIndex === idx ? 8 : undefined,
+              }}>
               <View className="flex-row items-center mb-1" style={{gap: 6}}>
                 <Text className="text-xs text-text-tertiary font-mono w-6">
                   {idx + 1}
@@ -117,6 +124,10 @@ export function RestoreMnemonicScreen({onRestore, onCancel}: Props) {
                     value={word}
                     onChangeText={v => setWord(idx, v)}
                     onSelect={s => selectWord(idx, s)}
+                    onFocus={() => setFocusedIndex(idx)}
+                    onBlur={() =>
+                      setFocusedIndex(prev => (prev === idx ? null : prev))
+                    }
                     suggestions={suggestions}
                     autoCapitalize="none"
                     autoCorrect={false}

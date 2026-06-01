@@ -37,6 +37,22 @@ function findHostByTestId(
   return host ?? matches[matches.length - 1];
 }
 
+function flattenStyle(
+  style: unknown,
+): Record<string, unknown> {
+  if (Array.isArray(style)) {
+    return Object.assign({}, ...style.filter(Boolean).map(flattenStyle));
+  }
+  return (style as Record<string, unknown>) ?? {};
+}
+
+function hostStyle(
+  tree: ReactTestRenderer.ReactTestInstance,
+  testID: string,
+) {
+  return flattenStyle(findHostByTestId(tree, testID).props.style);
+}
+
 async function render(node: React.ReactElement) {
   let root: ReactTestRenderer.ReactTestRenderer | null = null;
   await ReactTestRenderer.act(async () => {
@@ -85,6 +101,15 @@ describe('Button', () => {
       <Button testID="icon" iconOnly={<></>} accessibilityLabel="close" />,
     );
     expect(findByTestId(root.root, 'icon')).toBeTruthy();
+  });
+
+  test('enabled button gets a pointer cursor; disabled does not', async () => {
+    const enabled = await render(<Button testID="cur-on" label="Go" />);
+    expect(hostStyle(enabled.root, 'cur-on').cursor).toBe('pointer');
+    const disabled = await render(
+      <Button testID="cur-off" label="Go" disabled />,
+    );
+    expect(hostStyle(disabled.root, 'cur-off').cursor).toBeUndefined();
   });
 });
 
@@ -162,6 +187,77 @@ describe('Autocomplete', () => {
     expect(overlay.props.style.position).toBe('absolute');
   });
 
+  test('focused container is elevated above sibling rows while open', async () => {
+    const root = await render(
+      <Autocomplete
+        inputTestID="ac-input-z"
+        value="ab"
+        onChangeText={() => {}}
+        suggestions={['abandon']}
+        onSelect={() => {}}
+      />,
+    );
+    const containerStyle = () => {
+      const host = root.root
+        .findAll(n => typeof n.type === 'string')
+        .map(n => ({n, s: flattenStyle(n.props.style)}))
+        .find(({s}) => s.position === 'relative');
+      return host!.s;
+    };
+    expect(containerStyle().zIndex).toBeUndefined();
+    expect(containerStyle().elevation).toBeUndefined();
+    await ReactTestRenderer.act(async () => {
+      findByTestId(root.root, 'ac-input-z').props.onFocus();
+    });
+    expect(containerStyle().zIndex).toBeDefined();
+    expect(containerStyle().elevation).toBe(8);
+  });
+
+  test('forwards onFocus / onBlur so callers can elevate the focused cell', async () => {
+    const onFocus = jest.fn();
+    const onBlur = jest.fn();
+    const root = await render(
+      <Autocomplete
+        inputTestID="ac-input-cb"
+        value="ab"
+        onChangeText={() => {}}
+        suggestions={['abandon']}
+        onSelect={() => {}}
+        onFocus={onFocus}
+        onBlur={onBlur}
+      />,
+    );
+    await ReactTestRenderer.act(async () => {
+      findByTestId(root.root, 'ac-input-cb').props.onFocus();
+    });
+    expect(onFocus).toHaveBeenCalledTimes(1);
+    await ReactTestRenderer.act(async () => {
+      findByTestId(root.root, 'ac-input-cb').props.onBlur();
+    });
+    expect(onBlur).toHaveBeenCalledTimes(1);
+  });
+
+  test('option rows carry a pointer cursor for web/macOS hover', async () => {
+    const root = await render(
+      <Autocomplete
+        inputTestID="ac-input-cur"
+        value="ab"
+        onChangeText={() => {}}
+        suggestions={['abandon']}
+        onSelect={() => {}}
+      />,
+    );
+    await ReactTestRenderer.act(async () => {
+      findByTestId(root.root, 'ac-input-cur').props.onFocus();
+    });
+    const opt = findByTestId(root.root, 'autocomplete-option-0');
+    const flat = Object.assign(
+      {},
+      ...opt.props.style({pressed: false, hovered: false}).filter(Boolean),
+    );
+    expect(flat.cursor).toBe('pointer');
+  });
+
   test('row highlight is a per-row background, not a floating bar', async () => {
     const root = await render(
       <Autocomplete
@@ -213,6 +309,13 @@ describe('Card', () => {
       findByTestId(root.root, 'c2').props.onPress();
     });
     expect(onPress).toHaveBeenCalled();
+  });
+
+  test('interactive card carries a pointer cursor', async () => {
+    const root = await render(
+      <Card testID="c-cur" variant="interactive" onPress={() => {}} />,
+    );
+    expect(hostStyle(root.root, 'c-cur').cursor).toBe('pointer');
   });
 });
 
@@ -364,6 +467,11 @@ describe('Tile', () => {
     );
     expect(findByTestId(dotRoot.root, 'dot-dot')).toBeTruthy();
   });
+
+  test('carries a pointer cursor for web/macOS hover', async () => {
+    const root = await render(<Tile testID="tile-cur" label="Friends" />);
+    expect(hostStyle(root.root, 'tile-cur').cursor).toBe('pointer');
+  });
 });
 
 describe('DidPill', () => {
@@ -387,6 +495,16 @@ describe('DidPill', () => {
       findByTestId(root.root, 'dp-copy').props.onPress();
     });
     expect(onCopy).toHaveBeenCalled();
+    await ReactTestRenderer.act(async () => {
+      jest.advanceTimersByTime(700);
+    });
+  });
+
+  test('copy affordance carries a pointer cursor', async () => {
+    const root = await render(
+      <DidPill testID="dp-cur" did="did:yawp:abcdef0123456789" />,
+    );
+    expect(hostStyle(root.root, 'dp-cur-copy').cursor).toBe('pointer');
     await ReactTestRenderer.act(async () => {
       jest.advanceTimersByTime(700);
     });

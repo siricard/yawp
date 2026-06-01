@@ -1,6 +1,8 @@
 import React from 'react';
 import {Pressable, Text, View} from 'react-native';
 
+import {pointerCursor} from './cursor';
+
 export type DidPillProps = {
   did: string;
   prefixLen?: number;
@@ -53,6 +55,7 @@ export function DidPill({
         accessibilityRole="button"
         accessibilityLabel="copy did"
         onPress={handleCopy}
+        style={pointerCursor}
         className="active:opacity-70">
         <Text
           testID={`${testID}-copy-label`}

@@ -68,7 +68,7 @@ function AppShell() {
   const [bindingUrl, setBindingUrl] = useState<string | null>(null);
   const [bindError, setBindError] = useState<string | null>(null);
   const {width} = useWindowDimensions();
-  const horizontalBar = Platform.OS !== 'web' || width < MOBILE_BREAKPOINT;
+  const horizontalBar = width < MOBILE_BREAKPOINT;
 
   useEffect(() => {
     if (Platform.OS !== 'web') return;

@@ -1,6 +1,8 @@
 import React from 'react';
 import {Pressable, Text, View, type PressableProps} from 'react-native';
 
+import {pointerCursor} from './cursor';
+
 export type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'danger';
 export type ButtonSize = 'sm' | 'md' | 'lg';
 
@@ -80,6 +82,7 @@ export function Button({
       accessibilityState={accessibilityState ?? {disabled}}
       disabled={disabled}
       onPress={onPress}
+      style={disabled ? undefined : pointerCursor}
       className={baseClass}>
       {isIconOnly ? (
         iconOnly
