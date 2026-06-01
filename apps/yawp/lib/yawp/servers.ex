@@ -15,6 +15,15 @@ defmodule Yawp.Servers do
   typescript_rpc do
     resource Yawp.Servers.Channel do
       rpc_action :list_text_channels, :list_text_channels
+      rpc_action :create_channel, :create
+      rpc_action :recategorize_channel, :recategorize
+      rpc_action :reorder_channels, :reorder
+    end
+
+    resource Yawp.Servers.Category do
+      rpc_action :create_category, :create
+      rpc_action :reorder_categories, :reorder
+      rpc_action :list_categories_for_server, :list_for_server
     end
 
     resource Yawp.Servers.ServerInvite do
@@ -41,6 +50,14 @@ defmodule Yawp.Servers do
 
     resource Yawp.Servers.Channel do
       define :create_channel, action: :create
+      define :recategorize_channel, action: :recategorize
+      define :reorder_channels, action: :reorder
+    end
+
+    resource Yawp.Servers.Category do
+      define :create_category, action: :create
+      define :reorder_categories, action: :reorder
+      define :list_categories_for_server, action: :list_for_server, args: [:server_id]
     end
 
     resource Yawp.Servers.Membership do
