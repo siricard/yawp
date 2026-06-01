@@ -29,6 +29,19 @@ defmodule Yawp.Servers do
     resource Yawp.Servers.ServerInvite do
       rpc_action :redeem_server_invite, :redeem
     end
+
+    resource Yawp.Servers.RoomInvite do
+      rpc_action :create_room_invite, :create_invite
+      rpc_action :redeem_room_invite, :redeem
+    end
+
+    resource Yawp.Servers.Kick do
+      rpc_action :kick_member, :kick
+    end
+
+    resource Yawp.Servers.Ban do
+      rpc_action :ban_member, :ban
+    end
   end
 
   resources do
@@ -85,6 +98,29 @@ defmodule Yawp.Servers do
         not_found_error?: false
 
       define :list_active_server_invites, action: :list_active_for_server, args: [:server_id]
+    end
+
+    resource Yawp.Servers.RoomInvite do
+      define :create_room_invite, action: :create_invite
+      define :revoke_room_invite, action: :revoke
+      define :get_room_invite_by_id, action: :get_by_id, args: [:id]
+
+      define :get_room_invite_by_token,
+        action: :get_by_token,
+        args: [:token],
+        not_found_error?: false
+
+      define :list_active_room_invites, action: :list_active_for_channel, args: [:channel_id]
+    end
+
+    resource Yawp.Servers.Kick do
+      define :kick_member, action: :kick
+      define :list_kicks_for_server, action: :list_for_server, args: [:server_id]
+    end
+
+    resource Yawp.Servers.Ban do
+      define :ban_member, action: :ban
+      define :list_bans_for_server, action: :list_for_server, args: [:server_id]
     end
 
     resource Yawp.Servers.Message do

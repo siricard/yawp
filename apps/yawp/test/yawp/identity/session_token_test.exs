@@ -215,6 +215,34 @@ defmodule Yawp.Identity.SessionTokenTest do
     end
   end
 
+  describe "revoke_all_for_identity/1" do
+    test "flips revoked_at on every session + refresh row across all devices for the identity" do
+      identity = seed_identity!()
+      other = seed_identity!()
+      device_a = Ecto.UUID.generate()
+      device_b = Ecto.UUID.generate()
+
+      {:ok, %{session_token: sa, refresh_token: ra}} =
+        Yawp.Identity.issue_pair(identity.id, device_a)
+
+      {:ok, %{session_token: sb, refresh_token: rb}} =
+        Yawp.Identity.issue_pair(identity.id, device_b)
+
+      {:ok, %{session_token: so, refresh_token: ro}} =
+        Yawp.Identity.issue_pair(other.id, Ecto.UUID.generate())
+
+      assert :ok = Yawp.Identity.revoke_all_for_identity(identity.id)
+
+      assert reload_session(sa).revoked_at != nil
+      assert reload_session(sb).revoked_at != nil
+      assert reload_refresh(ra).revoked_at != nil
+      assert reload_refresh(rb).revoked_at != nil
+
+      assert reload_session(so).revoked_at == nil
+      assert reload_refresh(ro).revoked_at == nil
+    end
+  end
+
   defp reload_session(s) do
     SessionToken
     |> Ash.Query.filter(id == ^s.id)

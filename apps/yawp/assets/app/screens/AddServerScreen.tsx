@@ -4,8 +4,10 @@ import {Text, View} from 'react-native';
 import {submitClaim} from '../claim';
 import {submitBindDevice} from '../bind';
 import {submitRedeemInvite} from '../invite';
+import {submitRedeemRoomInvite} from '../room-invite';
 import {useRecordFirstBoundAt} from '../nudge-store';
 import {parseInviteLink} from '../onboarding/parseInviteLink';
+import {parseRoomInviteLink} from '../onboarding/parseRoomInviteLink';
 import {
   probeServerInfo,
   type ServerInfo,
@@ -84,6 +86,12 @@ export function AddServerScreen({onCancel, onAdded, onNavigateToServer}: Props) 
     const raw = pasteValue.trim();
     if (raw.length === 0) return;
 
+    const roomInvite = parseRoomInviteLink(raw);
+    if (roomInvite) {
+      await handleJoinViaLink(roomInvite);
+      return;
+    }
+
     const parsed = parseInviteLink(raw);
     if (parsed) {
       setServerUrl(parsed.serverUrl);
@@ -93,6 +101,56 @@ export function AddServerScreen({onCancel, onAdded, onNavigateToServer}: Props) 
 
     setServerUrl(raw);
     await probeAndAdvance(raw, null);
+  }
+
+  async function handleJoinViaLink(link: {
+    serverUrl: string;
+    channelId: string;
+    token: string;
+  }) {
+    if (!identityReady) return;
+
+    setSubmitting(true);
+    setErrorMessage(null);
+
+    const redeem = await submitRedeemRoomInvite({
+      serverUrl: link.serverUrl,
+      inviteToken: link.token,
+      identity: identityState.identity,
+    });
+
+    if (!redeem.ok) {
+      setSubmitting(false);
+      setErrorMessage(redeem.message);
+      return;
+    }
+
+    const bind = await submitBindDevice({
+      serverUrl: link.serverUrl,
+      identity: identityState.identity,
+    });
+
+    setSubmitting(false);
+
+    if (!bind.ok) {
+      setErrorMessage(bind.message);
+      return;
+    }
+
+    await recordFirstBound();
+
+    const server: WorkspaceServer = {
+      url: link.serverUrl.replace(/\/+$/, ''),
+      did: `did:yawp:${identityState.identity.did}`,
+      role: redeem.kind === 'guest' ? 'Guest' : 'Member',
+      label: labelFromUrl(link.serverUrl),
+    };
+    addServer(server);
+    if (onNavigateToServer) {
+      onNavigateToServer(server);
+    } else {
+      onAdded(server);
+    }
   }
 
   async function handleSubmitCode() {
@@ -218,7 +276,7 @@ export function AddServerScreen({onCancel, onAdded, onNavigateToServer}: Props) 
         <>
           <Field
             label="Invite link or server address"
-            helper="Paste a full invite/claim link, or just the server URL.">
+            helper="Paste an invite/claim link, a join-via-link room link, or just the server URL.">
             <Input
               testID="server-url-input"
               accessibilityLabel="invite link or server url"
@@ -227,7 +285,7 @@ export function AddServerScreen({onCancel, onAdded, onNavigateToServer}: Props) 
               autoCapitalize="none"
               autoCorrect={false}
               editable={!probing}
-              placeholder="https://server.example/invite#… or http://localhost:4000"
+              placeholder="https://server.example/invite#…, yawp://…/r/…?token=…, or http://localhost:4000"
             />
           </Field>
 

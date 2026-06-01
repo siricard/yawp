@@ -244,6 +244,34 @@ defmodule Yawp.Identity do
     :ok
   end
 
+  @doc """
+  revokes every session + refresh token for the given identity across
+  all devices. Used by the kick-from-server flow to immediately
+  invalidate the kicked identity's authenticated sessions.
+  """
+  @spec revoke_all_for_identity(binary()) :: :ok
+  def revoke_all_for_identity(identity_id) when is_binary(identity_id) do
+    now = DateTime.utc_now()
+
+    import Ecto.Query
+
+    Yawp.Repo.update_all(
+      from(s in "identity_session_tokens",
+        where: s.identity_id == type(^identity_id, Ecto.UUID) and is_nil(s.revoked_at)
+      ),
+      set: [revoked_at: now]
+    )
+
+    Yawp.Repo.update_all(
+      from(r in "identity_refresh_tokens",
+        where: r.identity_id == type(^identity_id, Ecto.UUID) and is_nil(r.revoked_at)
+      ),
+      set: [revoked_at: now]
+    )
+
+    :ok
+  end
+
   @base58_alphabet ~c"123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"
 
   @doc """

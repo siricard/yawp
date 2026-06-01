@@ -153,12 +153,34 @@ Optional, for native parity verification:
   screenshot-audited; divergence report at
   `docs/design/native-parity-report.md`.
 
+## Moderation + join-via-link
+
+Once two identities share a server, the owner can moderate from a channel's
+**Members** panel, and either identity can hand out channel-scoped room links:
+
+- **Members panel.** In a channel, press **Members** (top-right) to open the
+  roster. For each other member, an owner/admin sees **Kick** and **Ban**
+  buttons. Kick flips the member's `kicked` flag and immediately invalidates
+  every session the kicked identity holds at this server, so their client lands
+  back on the add-server screen. Ban additionally short-circuits all their
+  permissions to zero. A kicked member can rejoin through a fresh invite; a
+  banned one cannot until unbanned.
+- **Channel room invite (cold link).** A member with the `create_invite`
+  permission can mint a channel invite. The cold-invite link looks like
+  `yawp://<host>/r/<channel_id>?token=<token>`. Pasting it into **Add server**
+  redeems it directly: a stranger with no prior relationship is auto-promoted
+  to a `guest` membership scoped to read that one channel, then dropped into it.
+- **Warm invite (DM-delivered).** The same invite can be delivered as a
+  structured `room_invite` DM payload. The payload shape is fixed now; live DM
+  delivery arrives with direct messaging.
+
 ## What is NOT here yet
 
-- Channels beyond `#general` (create / list / archive).
-- Per-chat roles (member / moderator / owner).
-- Bans / kicks / message moderation.
-- Channel-scoped room invites (distinct from server-level join invites).
+- Channels beyond `#general` create/list in the demo flow (the schema and RPCs
+  exist; the demo still centers on `#general`).
+- Unban / un-kick management UI.
+- Live warm-invite DM delivery (the payload shape is defined; DM transport is
+  not wired yet).
 
 These aren't available yet. The walkthrough above is the full demoable path
 today.

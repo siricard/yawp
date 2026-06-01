@@ -83,6 +83,32 @@ export type RefreshTokenAttributesOnlySchema = {
 };
 
 
+// ServerBan Schema
+export type ServerBanResourceSchema = {
+  __type: "Resource";
+  __primitiveFields: "id" | "reason" | "serverId" | "identityId" | "bannedByIdentityId";
+  id: UUID;
+  reason: string | null;
+  serverId: UUID;
+  identityId: UUID;
+  bannedByIdentityId: UUID | null;
+  identity: { __type: "Relationship"; __resource: IdentityResourceSchema; };
+  bannedByIdentity: { __type: "Relationship"; __resource: IdentityResourceSchema | null; };
+};
+
+
+
+export type ServerBanAttributesOnlySchema = {
+  __type: "Resource";
+  __primitiveFields: "id" | "reason" | "serverId" | "identityId" | "bannedByIdentityId";
+  id: UUID;
+  reason: string | null;
+  serverId: UUID;
+  identityId: UUID;
+  bannedByIdentityId: UUID | null;
+};
+
+
 // ServerCategory Schema
 export type ServerCategoryResourceSchema = {
   __type: "Resource";
@@ -136,6 +162,68 @@ export type ServerChannelAttributesOnlySchema = {
   joinPolicy: "invite_only" | "open";
   serverId: UUID;
   categoryId: UUID | null;
+};
+
+
+// ServerKick Schema
+export type ServerKickResourceSchema = {
+  __type: "Resource";
+  __primitiveFields: "id" | "reason" | "serverId" | "identityId" | "kickedByIdentityId";
+  id: UUID;
+  reason: string | null;
+  serverId: UUID;
+  identityId: UUID;
+  kickedByIdentityId: UUID | null;
+  identity: { __type: "Relationship"; __resource: IdentityResourceSchema; };
+  kickedByIdentity: { __type: "Relationship"; __resource: IdentityResourceSchema | null; };
+};
+
+
+
+export type ServerKickAttributesOnlySchema = {
+  __type: "Resource";
+  __primitiveFields: "id" | "reason" | "serverId" | "identityId" | "kickedByIdentityId";
+  id: UUID;
+  reason: string | null;
+  serverId: UUID;
+  identityId: UUID;
+  kickedByIdentityId: UUID | null;
+};
+
+
+// RoomInvite Schema
+export type RoomInviteResourceSchema = {
+  __type: "Resource";
+  __primitiveFields: "id" | "token" | "kind" | "usesRemaining" | "expiresAt" | "consumedAt" | "revokedAt" | "serverId" | "channelId" | "createdByIdentityId";
+  id: UUID;
+  token: string;
+  kind: "multi_use" | "single_use";
+  usesRemaining: number | null;
+  expiresAt: UtcDateTimeUsec;
+  consumedAt: UtcDateTimeUsec | null;
+  revokedAt: UtcDateTimeUsec | null;
+  serverId: UUID;
+  channelId: UUID;
+  createdByIdentityId: UUID;
+  channel: { __type: "Relationship"; __resource: ServerChannelResourceSchema; };
+  createdByIdentity: { __type: "Relationship"; __resource: IdentityResourceSchema; };
+};
+
+
+
+export type RoomInviteAttributesOnlySchema = {
+  __type: "Resource";
+  __primitiveFields: "id" | "token" | "kind" | "usesRemaining" | "expiresAt" | "consumedAt" | "revokedAt" | "serverId" | "channelId" | "createdByIdentityId";
+  id: UUID;
+  token: string;
+  kind: "multi_use" | "single_use";
+  usesRemaining: number | null;
+  expiresAt: UtcDateTimeUsec;
+  consumedAt: UtcDateTimeUsec | null;
+  revokedAt: UtcDateTimeUsec | null;
+  serverId: UUID;
+  channelId: UUID;
+  createdByIdentityId: UUID;
 };
 
 
@@ -314,6 +402,49 @@ export type RefreshTokenFilterInput = {
   rotatedToRefresh?: RefreshTokenFilterInput;
 
 };
+export type ServerBanFilterInput = {
+  and?: Array<ServerBanFilterInput>;
+  or?: Array<ServerBanFilterInput>;
+  not?: Array<ServerBanFilterInput>;
+
+  id?: {
+    eq?: UUID;
+    notEq?: UUID;
+    in?: Array<UUID>;
+  };
+
+  reason?: {
+    eq?: string;
+    notEq?: string;
+    in?: Array<string>;
+    isNil?: boolean;
+  };
+
+  serverId?: {
+    eq?: UUID;
+    notEq?: UUID;
+    in?: Array<UUID>;
+  };
+
+  identityId?: {
+    eq?: UUID;
+    notEq?: UUID;
+    in?: Array<UUID>;
+  };
+
+  bannedByIdentityId?: {
+    eq?: UUID;
+    notEq?: UUID;
+    in?: Array<UUID>;
+    isNil?: boolean;
+  };
+
+
+  identity?: IdentityFilterInput;
+
+  bannedByIdentity?: IdentityFilterInput;
+
+};
 export type ServerCategoryFilterInput = {
   and?: Array<ServerCategoryFilterInput>;
   or?: Array<ServerCategoryFilterInput>;
@@ -420,6 +551,139 @@ export type ServerChannelFilterInput = {
   category?: ServerCategoryFilterInput;
 
 };
+export type ServerKickFilterInput = {
+  and?: Array<ServerKickFilterInput>;
+  or?: Array<ServerKickFilterInput>;
+  not?: Array<ServerKickFilterInput>;
+
+  id?: {
+    eq?: UUID;
+    notEq?: UUID;
+    in?: Array<UUID>;
+  };
+
+  reason?: {
+    eq?: string;
+    notEq?: string;
+    in?: Array<string>;
+    isNil?: boolean;
+  };
+
+  serverId?: {
+    eq?: UUID;
+    notEq?: UUID;
+    in?: Array<UUID>;
+  };
+
+  identityId?: {
+    eq?: UUID;
+    notEq?: UUID;
+    in?: Array<UUID>;
+  };
+
+  kickedByIdentityId?: {
+    eq?: UUID;
+    notEq?: UUID;
+    in?: Array<UUID>;
+    isNil?: boolean;
+  };
+
+
+  identity?: IdentityFilterInput;
+
+  kickedByIdentity?: IdentityFilterInput;
+
+};
+export type RoomInviteFilterInput = {
+  and?: Array<RoomInviteFilterInput>;
+  or?: Array<RoomInviteFilterInput>;
+  not?: Array<RoomInviteFilterInput>;
+
+  id?: {
+    eq?: UUID;
+    notEq?: UUID;
+    in?: Array<UUID>;
+  };
+
+  token?: {
+    eq?: string;
+    notEq?: string;
+    in?: Array<string>;
+  };
+
+  kind?: {
+    eq?: "multi_use" | "single_use";
+    notEq?: "multi_use" | "single_use";
+    in?: Array<"multi_use" | "single_use">;
+  };
+
+  usesRemaining?: {
+    eq?: number;
+    notEq?: number;
+    greaterThan?: number;
+    greaterThanOrEqual?: number;
+    lessThan?: number;
+    lessThanOrEqual?: number;
+    in?: Array<number>;
+    isNil?: boolean;
+  };
+
+  expiresAt?: {
+    eq?: UtcDateTimeUsec;
+    notEq?: UtcDateTimeUsec;
+    greaterThan?: UtcDateTimeUsec;
+    greaterThanOrEqual?: UtcDateTimeUsec;
+    lessThan?: UtcDateTimeUsec;
+    lessThanOrEqual?: UtcDateTimeUsec;
+    in?: Array<UtcDateTimeUsec>;
+  };
+
+  consumedAt?: {
+    eq?: UtcDateTimeUsec;
+    notEq?: UtcDateTimeUsec;
+    greaterThan?: UtcDateTimeUsec;
+    greaterThanOrEqual?: UtcDateTimeUsec;
+    lessThan?: UtcDateTimeUsec;
+    lessThanOrEqual?: UtcDateTimeUsec;
+    in?: Array<UtcDateTimeUsec>;
+    isNil?: boolean;
+  };
+
+  revokedAt?: {
+    eq?: UtcDateTimeUsec;
+    notEq?: UtcDateTimeUsec;
+    greaterThan?: UtcDateTimeUsec;
+    greaterThanOrEqual?: UtcDateTimeUsec;
+    lessThan?: UtcDateTimeUsec;
+    lessThanOrEqual?: UtcDateTimeUsec;
+    in?: Array<UtcDateTimeUsec>;
+    isNil?: boolean;
+  };
+
+  serverId?: {
+    eq?: UUID;
+    notEq?: UUID;
+    in?: Array<UUID>;
+  };
+
+  channelId?: {
+    eq?: UUID;
+    notEq?: UUID;
+    in?: Array<UUID>;
+  };
+
+  createdByIdentityId?: {
+    eq?: UUID;
+    notEq?: UUID;
+    in?: Array<UUID>;
+  };
+
+
+  channel?: ServerChannelFilterInput;
+
+  createdByIdentity?: IdentityFilterInput;
+
+};
 export type ServerInviteFilterInput = {
   and?: Array<ServerInviteFilterInput>;
   or?: Array<ServerInviteFilterInput>;
@@ -513,11 +777,20 @@ export type IdentityFilterField = (typeof identityFilterFields)[number];
 export const refreshTokenFilterFields = ["id", "token", "identityId", "deviceId", "expiresAt", "revokedAt", "rotatedTo", "identity", "rotatedToRefresh"] as const;
 export type RefreshTokenFilterField = (typeof refreshTokenFilterFields)[number];
 
+export const serverBanFilterFields = ["id", "reason", "serverId", "identityId", "bannedByIdentityId", "server", "identity", "bannedByIdentity"] as const;
+export type ServerBanFilterField = (typeof serverBanFilterFields)[number];
+
 export const serverCategoryFilterFields = ["id", "name", "position", "serverId", "parentId", "server", "parent"] as const;
 export type ServerCategoryFilterField = (typeof serverCategoryFilterFields)[number];
 
 export const serverChannelFilterFields = ["id", "name", "type", "position", "visibility", "joinPolicy", "serverId", "categoryId", "server", "category"] as const;
 export type ServerChannelFilterField = (typeof serverChannelFilterFields)[number];
+
+export const serverKickFilterFields = ["id", "reason", "serverId", "identityId", "kickedByIdentityId", "server", "identity", "kickedByIdentity"] as const;
+export type ServerKickFilterField = (typeof serverKickFilterFields)[number];
+
+export const roomInviteFilterFields = ["id", "token", "kind", "usesRemaining", "expiresAt", "consumedAt", "revokedAt", "serverId", "channelId", "createdByIdentityId", "server", "channel", "createdByIdentity"] as const;
+export type RoomInviteFilterField = (typeof roomInviteFilterFields)[number];
 
 export const serverInviteFilterFields = ["id", "token", "kind", "usesRemaining", "expiresAt", "consumedAt", "revokedAt", "serverId", "createdByIdentityId", "server", "createdByIdentity"] as const;
 export type ServerInviteFilterField = (typeof serverInviteFilterFields)[number];
@@ -532,11 +805,20 @@ export type IdentitySortField = (typeof identitySortFields)[number];
 export const refreshTokenSortFields = ["id", "token", "identityId", "deviceId", "expiresAt", "revokedAt", "rotatedTo"] as const;
 export type RefreshTokenSortField = (typeof refreshTokenSortFields)[number];
 
+export const serverBanSortFields = ["id", "reason", "serverId", "identityId", "bannedByIdentityId"] as const;
+export type ServerBanSortField = (typeof serverBanSortFields)[number];
+
 export const serverCategorySortFields = ["id", "name", "position", "serverId", "parentId"] as const;
 export type ServerCategorySortField = (typeof serverCategorySortFields)[number];
 
 export const serverChannelSortFields = ["id", "name", "type", "position", "visibility", "joinPolicy", "serverId", "categoryId"] as const;
 export type ServerChannelSortField = (typeof serverChannelSortFields)[number];
+
+export const serverKickSortFields = ["id", "reason", "serverId", "identityId", "kickedByIdentityId"] as const;
+export type ServerKickSortField = (typeof serverKickSortFields)[number];
+
+export const roomInviteSortFields = ["id", "token", "kind", "usesRemaining", "expiresAt", "consumedAt", "revokedAt", "serverId", "channelId", "createdByIdentityId"] as const;
+export type RoomInviteSortField = (typeof roomInviteSortFields)[number];
 
 export const serverInviteSortFields = ["id", "token", "kind", "usesRemaining", "expiresAt", "consumedAt", "revokedAt", "serverId", "createdByIdentityId"] as const;
 export type ServerInviteSortField = (typeof serverInviteSortFields)[number];

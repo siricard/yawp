@@ -14,6 +14,7 @@ import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {useChannel, type ChannelMessage} from '../chat/channel-store';
 import {MessageBody} from '../chat/MessageBody';
 import {useDisplayName, useIdentityState} from '../identity-context';
+import {banServerMember, kickServerMember} from '../server-moderation';
 import {pointerCursor} from '../ui/cursor';
 import {WORKSPACE_BAR_HEIGHT} from './WorkspaceBar';
 
@@ -199,6 +200,115 @@ function MessageRow({
   );
 }
 
+function MemberSheet({
+  serverUrl,
+  serverId,
+  members,
+  selfDid,
+  canModerate,
+  onClose,
+}: {
+  serverUrl: string;
+  serverId: string;
+  members: string[];
+  selfDid: string | null;
+  canModerate: boolean;
+  onClose: () => void;
+}) {
+  const [pending, setPending] = useState<string | null>(null);
+  const [removed, setRemoved] = useState<Record<string, string>>({});
+  const [error, setError] = useState<string | null>(null);
+
+  async function act(kind: 'kick' | 'ban', did: string) {
+    setPending(`${kind}:${did}`);
+    setError(null);
+    const fn = kind === 'kick' ? kickServerMember : banServerMember;
+    const result = await fn({
+      serverUrl,
+      serverId,
+      did: `did:yawp:${did}`,
+    });
+    setPending(null);
+    if (result.ok) {
+      setRemoved(prev => ({...prev, [did]: kind === 'kick' ? 'Kicked' : 'Banned'}));
+    } else {
+      setError(result.message);
+    }
+  }
+
+  return (
+    <View
+      testID="member-sheet"
+      className="absolute top-0 right-0 bottom-0 w-72 bg-surface border-l border-border-soft"
+      style={{paddingTop: 12}}>
+      <View className="px-4 py-3 border-b border-border-soft flex-row items-center justify-between">
+        <Text className="text-sm font-bold text-text">Members</Text>
+        <Pressable
+          testID="member-sheet-close"
+          accessibilityRole="button"
+          accessibilityLabel="close members"
+          onPress={onClose}
+          style={pointerCursor}
+          className="w-7 h-7 rounded-pill bg-surface-2 items-center justify-center">
+          <Text className="text-text-secondary text-xs">×</Text>
+        </Pressable>
+      </View>
+
+      {error ? (
+        <View testID="member-sheet-error" className="px-4 py-2 bg-danger/10">
+          <Text className="text-xs text-danger">{error}</Text>
+        </View>
+      ) : null}
+
+      <ScrollView className="flex-1">
+        {members.map(did => {
+          const isSelf = did === selfDid;
+          const removedLabel = removed[did];
+          return (
+            <View
+              key={did}
+              testID={`member-row-${did}`}
+              className="px-4 py-2 flex-row items-center justify-between border-b border-border-soft">
+              <Text
+                className="text-xs text-text flex-1"
+                style={{fontFamily: monospace}}
+                numberOfLines={1}>
+                {displayAuthor(did)}
+              </Text>
+              {removedLabel ? (
+                <Text className="text-xs text-text-tertiary">{removedLabel}</Text>
+              ) : canModerate && !isSelf ? (
+                <View className="flex-row" style={{gap: 6}}>
+                  <Pressable
+                    testID={`member-kick-${did}`}
+                    accessibilityRole="button"
+                    accessibilityLabel="kick member"
+                    disabled={pending !== null}
+                    onPress={() => act('kick', did)}
+                    style={pointerCursor}
+                    className="px-2 py-1 rounded-pill bg-surface-2">
+                    <Text className="text-xs text-text-secondary">Kick</Text>
+                  </Pressable>
+                  <Pressable
+                    testID={`member-ban-${did}`}
+                    accessibilityRole="button"
+                    accessibilityLabel="ban member"
+                    disabled={pending !== null}
+                    onPress={() => act('ban', did)}
+                    style={pointerCursor}
+                    className="px-2 py-1 rounded-pill bg-danger">
+                    <Text className="text-xs text-white">Ban</Text>
+                  </Pressable>
+                </View>
+              ) : null}
+            </View>
+          );
+        })}
+      </ScrollView>
+    </View>
+  );
+}
+
 export function ChannelScreen({
   serverUrl,
   serverId,
@@ -225,7 +335,10 @@ export function ChannelScreen({
   const [pendingDelete, setPendingDelete] = useState<ChannelMessage | null>(
     null,
   );
+  const [showMembers, setShowMembers] = useState(false);
   const scrollRef = useRef<ScrollView | null>(null);
+
+  const members = Array.from(new Set(messages.map(m => m.sender_did)));
 
   const messagesById = useRef<Map<string, ChannelMessage>>(new Map());
   messagesById.current = new Map(messages.map(m => [m.id, m]));
@@ -303,6 +416,15 @@ export function ChannelScreen({
         <Text testID="channel-status" className={statusClass} style={{fontFamily: monospace}}>
           {status}
         </Text>
+        <Pressable
+          testID="channel-members-toggle"
+          accessibilityRole="button"
+          accessibilityLabel="toggle members"
+          onPress={() => setShowMembers(v => !v)}
+          style={pointerCursor}
+          className="ml-3 px-3 py-1 rounded-pill bg-surface-2 active:bg-surface-3">
+          <Text className="text-xs text-text-secondary">Members</Text>
+        </Pressable>
       </View>
 
       {errorMessage ? (
@@ -428,6 +550,17 @@ export function ChannelScreen({
           <Text className="text-on-primary font-semibold">Send</Text>
         </Pressable>
       </View>
+
+      {showMembers ? (
+        <MemberSheet
+          serverUrl={serverUrl}
+          serverId={serverId}
+          members={members}
+          selfDid={selfDid}
+          canModerate={canModerate}
+          onClose={() => setShowMembers(false)}
+        />
+      ) : null}
     </KeyboardAvoidingView>
   );
 }
