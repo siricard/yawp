@@ -1,6 +1,7 @@
 
 import React, {useEffect, useRef, useState} from 'react';
 import {
+  KeyboardAvoidingView,
   Platform,
   Pressable,
   ScrollView,
@@ -8,9 +9,11 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import {useSafeAreaInsets} from 'react-native-safe-area-context';
 
 import {useChannel, type ChannelMessage} from '../chat/channel-store';
 import {useDisplayName, useIdentityState} from '../identity-context';
+import {WORKSPACE_BAR_HEIGHT} from './WorkspaceBar';
 
 type Props = {
   serverUrl: string;
@@ -90,6 +93,7 @@ export function ChannelScreen({
   onBack,
 }: Props) {
   const {status, errorMessage, messages, send} = useChannel(serverUrl, channelId);
+  const insets = useSafeAreaInsets();
   const identityState = useIdentityState();
   const {effectiveDisplayName} = useDisplayName();
   const selfDid =
@@ -118,7 +122,13 @@ export function ChannelScreen({
         : 'text-xs text-text-tertiary';
 
   return (
-    <View testID="channel-screen" className="flex-1 bg-bg">
+    <KeyboardAvoidingView
+      testID="channel-screen"
+      className="flex-1 bg-bg"
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      keyboardVerticalOffset={
+        Platform.OS === 'ios' ? insets.top + WORKSPACE_BAR_HEIGHT : 0
+      }>
       <View className="px-6 py-3 border-b border-border-soft flex-row items-center bg-surface">
         <Pressable
           testID="channel-back-button"
@@ -199,6 +209,6 @@ export function ChannelScreen({
           <Text className="text-on-primary font-semibold">Send</Text>
         </Pressable>
       </View>
-    </View>
+    </KeyboardAvoidingView>
   );
 }

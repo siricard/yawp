@@ -5,6 +5,8 @@ import {Pressable, ScrollView, Text, View} from 'react-native';
 import {useDisplayName, useWorkspaceServers, type WorkspaceServer} from '../identity-context';
 import {pointerCursor} from '../ui/cursor';
 
+export const WORKSPACE_BAR_HEIGHT = 59;
+
 type Props = {
   onAddServer: () => void;
   onSelectServer?: (server: WorkspaceServer) => void;
