@@ -24,11 +24,6 @@ function initials(label: string): string {
   return cleaned.charAt(0).toUpperCase() || '?';
 }
 
-/**
- * Web workspaces drawer — DOM portal so the slide-out paints above the
- * whole app shell (mirrors the Modal.web.tsx portal pattern). Only ever
- * mounted at narrow width; wide viewports keep the full workspaces strip.
- */
 export function WorkspacesDrawer({
   visible,
   onClose,

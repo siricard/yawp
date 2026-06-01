@@ -23,13 +23,6 @@ function initials(label: string): string {
   return cleaned.charAt(0).toUpperCase() || '?';
 }
 
-/**
- * Native (iOS/Android) workspaces drawer. The web bundle resolves
- * `WorkspacesDrawer.web.tsx` instead (DOM portal, like the Modal pair).
- * Slide-out sheet anchored to the left listing every workspace plus the
- * DM and add-server affordances — the mobile fallback for the collapsed
- * workspaces strip (v16 "Mobile compromise").
- */
 export function WorkspacesDrawer({
   visible,
   onClose,
