@@ -3,6 +3,7 @@ import ReactTestRenderer from 'react-test-renderer';
 
 import {
   PERMISSION_BITS,
+  bitsForRole,
   canEnterEditMode,
   hasPermission,
   useEditMode,
@@ -35,6 +36,23 @@ describe('permission-bit helpers', () => {
     expect(canEnterEditMode(MEMBER_BITS)).toBe(false);
     expect(canEnterEditMode(ADMIN_BITS)).toBe(true);
     expect(canEnterEditMode(0)).toBe(false);
+  });
+});
+
+describe('bitsForRole', () => {
+  test('owner and admin can enter edit mode', () => {
+    expect(canEnterEditMode(bitsForRole('Owner'))).toBe(true);
+    expect(canEnterEditMode(bitsForRole('Admin'))).toBe(true);
+  });
+
+  test('member and guest cannot enter edit mode', () => {
+    expect(canEnterEditMode(bitsForRole('Member'))).toBe(false);
+    expect(canEnterEditMode(bitsForRole('Guest'))).toBe(false);
+  });
+
+  test('guest has read but not send', () => {
+    expect(hasPermission(bitsForRole('Guest'), 'read_messages')).toBe(true);
+    expect(hasPermission(bitsForRole('Guest'), 'send_messages')).toBe(false);
   });
 });
 

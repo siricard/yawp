@@ -54,6 +54,11 @@ export type WorkspaceServer = {
   did: string;
   role: string;
   label: string;
+  /**
+   * Per-server unread total. Wired by a later milestone; the workspace
+   * bar consumes it when present and renders an unread/mention dot.
+   */
+  unreadCount?: number;
 };
 
 /**
@@ -162,6 +167,12 @@ type Ctx = {
   state: State;
   servers: WorkspaceServer[];
   addServer: (server: WorkspaceServer) => void;
+  /**
+   * Persist a new ordering of the workspace bar. `orderedUrls` is the full
+   * set of server URLs in their new order; any server not present is kept
+   * at the end in its prior relative order. Web-only drag-reorder surface.
+   */
+  reorderServers: (orderedUrls: string[]) => void;
   /**
    * User-chosen display-name override read from the persisted identity
    * bundle's `metadata.displayNameOverride`. `null` when no override is
@@ -440,6 +451,19 @@ export function IdentityProvider({children}: {children: React.ReactNode}) {
     setServers(prev => {
       const without = prev.filter(s => s.url !== server.url);
       const next = [...without, server];
+      persistServers(next);
+      return next;
+    });
+  }, []);
+
+  const reorderServers = useCallback((orderedUrls: string[]) => {
+    setServers(prev => {
+      const rank = new Map(orderedUrls.map((url, i) => [url, i]));
+      const next = [...prev].sort((a, b) => {
+        const ra = rank.has(a.url) ? rank.get(a.url)! : Number.MAX_SAFE_INTEGER;
+        const rb = rank.has(b.url) ? rank.get(b.url)! : Number.MAX_SAFE_INTEGER;
+        return ra - rb;
+      });
       persistServers(next);
       return next;
     });
@@ -765,6 +789,7 @@ export function IdentityProvider({children}: {children: React.ReactNode}) {
         state,
         servers,
         addServer,
+        reorderServers,
         displayName,
         setDisplayNameOverride,
         mutateBundleMetadata,
@@ -806,12 +831,17 @@ export function useIdentityState(): State {
 export function useWorkspaceServers(): {
   servers: WorkspaceServer[];
   addServer: (server: WorkspaceServer) => void;
+  reorderServers: (orderedUrls: string[]) => void;
 } {
   const ctx = useContext(IdentityContext);
   if (!ctx) {
     throw new Error('useWorkspaceServers must be used inside an <IdentityProvider>');
   }
-  return {servers: ctx.servers, addServer: ctx.addServer};
+  return {
+    servers: ctx.servers,
+    addServer: ctx.addServer,
+    reorderServers: ctx.reorderServers,
+  };
 }
 
 /**

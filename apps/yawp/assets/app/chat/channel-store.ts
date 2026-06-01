@@ -42,7 +42,7 @@ export type UseChannelResult = {
   status: UseChannelStatus;
   errorMessage: string | null;
   messages: ChannelMessage[];
-  send: (body: string) => void;
+  send: (body: string, replyToMessageId?: string | null) => void;
   edit: (messageId: string, body: string) => void;
   remove: (messageId: string) => void;
 };
@@ -151,7 +151,7 @@ export function useChannel(
     };
   }, [serverUrl, serverId, channelId]);
 
-  function send(body: string): void {
+  function send(body: string, replyToMessageId: string | null = null): void {
     const trimmed = body.trim();
     if (!trimmed) return;
     const channel = channelRef.current;
@@ -162,7 +162,7 @@ export function useChannel(
         channel_id: channelId,
         sender_did: identity.didFull,
         body: trimmed,
-        reply_to_message_id: null,
+        reply_to_message_id: replyToMessageId,
         mentions: [],
         attachments: [],
         ts,
@@ -171,6 +171,7 @@ export function useChannel(
     );
     channel.push('send_message', {
       body: trimmed,
+      reply_to_message_id: replyToMessageId,
       signed_by: identity.deviceId,
       signature,
       ts,

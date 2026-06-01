@@ -12,7 +12,9 @@ import {
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 
 import {useChannel, type ChannelMessage} from '../chat/channel-store';
+import {MessageBody} from '../chat/MessageBody';
 import {useDisplayName, useIdentityState} from '../identity-context';
+import {pointerCursor} from '../ui/cursor';
 import {WORKSPACE_BAR_HEIGHT} from './WorkspaceBar';
 
 type Props = {
@@ -22,6 +24,8 @@ type Props = {
   channelId: string;
   channelName: string;
   onBack: () => void;
+  /** When true, the current identity may delete others' messages. */
+  canModerate?: boolean;
 };
 
 const monospace = Platform.select({
@@ -57,18 +61,55 @@ function MessageRow({
   message,
   selfDid,
   selfDisplayName,
+  replyTo,
+  canModerate,
+  isEditing,
+  editDraft,
+  onChangeEditDraft,
+  onStartEdit,
+  onCancelEdit,
+  onSubmitEdit,
+  onReply,
+  onDelete,
 }: {
   message: ChannelMessage;
   selfDid: string | null;
   selfDisplayName: string | null;
+  replyTo: ChannelMessage | null;
+  canModerate: boolean;
+  isEditing: boolean;
+  editDraft: string;
+  onChangeEditDraft: (text: string) => void;
+  onStartEdit: () => void;
+  onCancelEdit: () => void;
+  onSubmitEdit: () => void;
+  onReply: () => void;
+  onDelete: () => void;
 }) {
   const isSelf = selfDid !== null && message.sender_did === selfDid;
   const label =
     isSelf && selfDisplayName ? selfDisplayName : displayAuthor(message.sender_did);
+  const deleted = message.body === null;
+  const canEdit = isSelf && !deleted;
+  const canDelete = (isSelf || canModerate) && !deleted;
   return (
-    <View
-      testID={`channel-message-${message.id}`}
-      className="px-6 py-2">
+    <View testID={`channel-message-${message.id}`} className="px-6 py-2 group">
+      {replyTo ? (
+        <View
+          testID={`reply-quote-${message.id}`}
+          className="flex-row items-center mb-1 pl-3 border-l-2 border-border-soft"
+          style={{gap: 6}}>
+          <Text
+            className="text-xs text-text-secondary"
+            style={{fontFamily: monospace}}
+            numberOfLines={1}>
+            ↳ {displayAuthor(replyTo.sender_did)}
+          </Text>
+          <Text className="text-xs text-text-tertiary" numberOfLines={1}>
+            {replyTo.body === null ? '[deleted]' : replyTo.body}
+          </Text>
+        </View>
+      ) : null}
       <View className="flex-row items-baseline" style={{gap: 8}}>
         <Text
           className="text-sm font-bold text-text"
@@ -81,13 +122,79 @@ function MessageRow({
           {formatTimestamp(message.server_inserted_at)}
         </Text>
       </View>
-      <Text
-        className={[
-          'text-sm mt-1 leading-5',
-          message.body === null ? 'text-text-tertiary italic' : 'text-text',
-        ].join(' ')}>
-        {message.body === null ? '[deleted]' : message.body}
-      </Text>
+
+      {isEditing ? (
+        <View style={{marginTop: 4}}>
+          <TextInput
+            testID={`channel-message-edit-input-${message.id}`}
+            value={editDraft}
+            onChangeText={onChangeEditDraft}
+            onSubmitEditing={onSubmitEdit}
+            autoFocus
+            className="px-3 py-2 rounded-md bg-surface-2 text-text border border-border-soft"
+          />
+          <View className="flex-row mt-1" style={{gap: 8}}>
+            <Pressable
+              testID={`channel-message-edit-save-${message.id}`}
+              accessibilityRole="button"
+              accessibilityLabel="save edit"
+              onPress={onSubmitEdit}
+              style={pointerCursor}
+              className="px-3 py-1 rounded-pill bg-primary">
+              <Text className="text-xs font-semibold text-on-primary">Save</Text>
+            </Pressable>
+            <Pressable
+              testID={`channel-message-edit-cancel-${message.id}`}
+              accessibilityRole="button"
+              accessibilityLabel="cancel edit"
+              onPress={onCancelEdit}
+              style={pointerCursor}
+              className="px-3 py-1 rounded-pill bg-surface-2">
+              <Text className="text-xs font-semibold text-text-secondary">
+                Cancel
+              </Text>
+            </Pressable>
+          </View>
+        </View>
+      ) : (
+        <MessageBody body={message.body} deleted={deleted} />
+      )}
+
+      {!isEditing && !deleted ? (
+        <View
+          testID={`message-actions-${message.id}`}
+          className="flex-row mt-1"
+          style={{gap: 10}}>
+          <Pressable
+            testID={`message-reply-${message.id}`}
+            accessibilityRole="button"
+            accessibilityLabel="reply"
+            onPress={onReply}
+            style={pointerCursor}>
+            <Text className="text-xs text-text-tertiary">Reply</Text>
+          </Pressable>
+          {canEdit ? (
+            <Pressable
+              testID={`message-edit-${message.id}`}
+              accessibilityRole="button"
+              accessibilityLabel="edit"
+              onPress={onStartEdit}
+              style={pointerCursor}>
+              <Text className="text-xs text-text-tertiary">Edit</Text>
+            </Pressable>
+          ) : null}
+          {canDelete ? (
+            <Pressable
+              testID={`message-delete-${message.id}`}
+              accessibilityRole="button"
+              accessibilityLabel="delete"
+              onPress={onDelete}
+              style={pointerCursor}>
+              <Text className="text-xs text-danger">Delete</Text>
+            </Pressable>
+          ) : null}
+        </View>
+      ) : null}
     </View>
   );
 }
@@ -99,8 +206,9 @@ export function ChannelScreen({
   channelId,
   channelName,
   onBack,
+  canModerate = false,
 }: Props) {
-  const {status, errorMessage, messages, send} = useChannel(
+  const {status, errorMessage, messages, send, edit, remove} = useChannel(
     serverUrl,
     serverId,
     channelId,
@@ -111,7 +219,16 @@ export function ChannelScreen({
   const selfDid =
     identityState.status === 'ready' ? identityState.identity.did : null;
   const [draft, setDraft] = useState('');
+  const [replyTo, setReplyTo] = useState<ChannelMessage | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editDraft, setEditDraft] = useState('');
+  const [pendingDelete, setPendingDelete] = useState<ChannelMessage | null>(
+    null,
+  );
   const scrollRef = useRef<ScrollView | null>(null);
+
+  const messagesById = useRef<Map<string, ChannelMessage>>(new Map());
+  messagesById.current = new Map(messages.map(m => [m.id, m]));
 
   useEffect(() => {
     requestAnimationFrame(() => {
@@ -122,8 +239,28 @@ export function ChannelScreen({
   function handleSend() {
     const trimmed = draft.trim();
     if (!trimmed) return;
-    send(trimmed);
+    send(trimmed, replyTo ? replyTo.id : null);
     setDraft('');
+    setReplyTo(null);
+  }
+
+  function handleStartEdit(message: ChannelMessage) {
+    setEditingId(message.id);
+    setEditDraft(message.body ?? '');
+  }
+
+  function handleSubmitEdit() {
+    if (!editingId) return;
+    const trimmed = editDraft.trim();
+    if (trimmed) edit(editingId, trimmed);
+    setEditingId(null);
+    setEditDraft('');
+  }
+
+  function handleConfirmDelete() {
+    if (!pendingDelete) return;
+    remove(pendingDelete.id);
+    setPendingDelete(null);
   }
 
   const statusClass =
@@ -189,9 +326,79 @@ export function ChannelScreen({
             message={message}
             selfDid={selfDid}
             selfDisplayName={effectiveDisplayName}
+            replyTo={
+              message.reply_to_message_id
+                ? messagesById.current.get(message.reply_to_message_id) ?? null
+                : null
+            }
+            canModerate={canModerate}
+            isEditing={editingId === message.id}
+            editDraft={editDraft}
+            onChangeEditDraft={setEditDraft}
+            onStartEdit={() => handleStartEdit(message)}
+            onCancelEdit={() => setEditingId(null)}
+            onSubmitEdit={handleSubmitEdit}
+            onReply={() => setReplyTo(message)}
+            onDelete={() => setPendingDelete(message)}
           />
         ))}
       </ScrollView>
+
+      {pendingDelete ? (
+        <View
+          testID="delete-confirm"
+          className="px-6 py-3 border-t border-danger bg-danger/10 flex-row items-center justify-between">
+          <Text className="text-xs text-danger flex-1">
+            Delete this message? This cannot be undone.
+          </Text>
+          <View className="flex-row" style={{gap: 8}}>
+            <Pressable
+              testID="delete-confirm-cancel"
+              accessibilityRole="button"
+              accessibilityLabel="cancel delete"
+              onPress={() => setPendingDelete(null)}
+              style={pointerCursor}
+              className="px-3 py-1 rounded-pill bg-surface-2">
+              <Text className="text-xs font-semibold text-text-secondary">
+                Cancel
+              </Text>
+            </Pressable>
+            <Pressable
+              testID="delete-confirm-delete"
+              accessibilityRole="button"
+              accessibilityLabel="confirm delete"
+              onPress={handleConfirmDelete}
+              style={pointerCursor}
+              className="px-3 py-1 rounded-pill bg-danger">
+              <Text className="text-xs font-semibold text-white">Delete</Text>
+            </Pressable>
+          </View>
+        </View>
+      ) : null}
+
+      {replyTo ? (
+        <View
+          testID="reply-card"
+          className="px-6 py-2 border-t border-border-soft bg-surface flex-row items-center justify-between">
+          <View className="flex-1 pl-3 border-l-2 border-primary" style={{marginRight: 8}}>
+            <Text className="text-xs text-text-secondary" style={{fontFamily: monospace}}>
+              Replying to {displayAuthor(replyTo.sender_did)}
+            </Text>
+            <Text className="text-xs text-text-tertiary" numberOfLines={1}>
+              {replyTo.body === null ? '[deleted]' : replyTo.body}
+            </Text>
+          </View>
+          <Pressable
+            testID="reply-card-cancel"
+            accessibilityRole="button"
+            accessibilityLabel="cancel reply"
+            onPress={() => setReplyTo(null)}
+            style={pointerCursor}
+            className="w-6 h-6 rounded-full bg-surface-2 items-center justify-center">
+            <Text className="text-text-secondary text-xs">×</Text>
+          </Pressable>
+        </View>
+      ) : null}
 
       <View className="px-4 py-3 border-t border-border-soft bg-bg flex-row items-center" style={{gap: 8}}>
         <TextInput

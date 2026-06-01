@@ -28,6 +28,41 @@ export const PERMISSION_BITS = {
 
 export type PermissionName = keyof typeof PERMISSION_BITS;
 
+const ALL_BITS = Object.values(PERMISSION_BITS).reduce((a, b) => a | b, 0);
+
+const MEMBER_BITS =
+  PERMISSION_BITS.read_messages |
+  PERMISSION_BITS.send_messages |
+  PERMISSION_BITS.add_reactions;
+
+const ADMIN_BITS =
+  MEMBER_BITS |
+  PERMISSION_BITS.manage_messages |
+  PERMISSION_BITS.manage_channels |
+  PERMISSION_BITS.manage_roles |
+  PERMISSION_BITS.kick_members |
+  PERMISSION_BITS.ban_members |
+  PERMISSION_BITS.create_invite;
+
+/**
+ * Coarse client-side estimate of an identity's effective bits from its
+ * stored server role label. The server's `effective_bits/3` resolver is
+ * authoritative; this only decides which controls to surface so users who
+ * can't act don't see dead affordances.
+ */
+export function bitsForRole(role: string): number {
+  switch (role.toLowerCase()) {
+    case 'owner':
+      return ALL_BITS;
+    case 'admin':
+      return ADMIN_BITS;
+    case 'guest':
+      return PERMISSION_BITS.read_messages;
+    default:
+      return MEMBER_BITS;
+  }
+}
+
 /** Whether `effectiveBits` carries the named permission bit. */
 export function hasPermission(
   effectiveBits: number,

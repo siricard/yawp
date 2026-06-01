@@ -88,8 +88,11 @@ jest.mock('../screens/DidScreen', () => ({
 jest.mock('../screens/VectorTestScreen', () => ({
   VectorTestScreen: () => null,
 }));
-jest.mock('../screens/ChannelScreen', () => ({
-  ChannelScreen: () => null,
+jest.mock('../screens/ServerScreen', () => ({
+  ServerScreen: () => null,
+}));
+jest.mock('../screens/DmListScreen', () => ({
+  DmListScreen: () => null,
 }));
 jest.mock('../screens/AddServerScreen', () => ({
   AddServerScreen: () => null,

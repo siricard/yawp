@@ -12,8 +12,9 @@ import {
   type WorkspaceServer,
 } from './identity-context';
 import {AddServerScreen} from './screens/AddServerScreen';
-import {ChannelScreen} from './screens/ChannelScreen';
+import {DmListScreen} from './screens/DmListScreen';
 import {HomeScreen} from './screens/HomeScreen';
+import {ServerScreen} from './screens/ServerScreen';
 import {LockedScreen} from './screens/LockedScreen';
 import {OnboardingFlow} from './screens/OnboardingFlow';
 import {PassphraseSettingsScreen} from './screens/PassphraseSettingsScreen';
@@ -45,11 +46,13 @@ type Screen =
   | {kind: 'vector'}
   | {kind: 'add-server'}
   | {kind: 'passphrase-settings'}
+  | {kind: 'dm'}
   | {
       kind: 'channel';
       serverUrl: string;
       serverId: string;
       serverLabel: string;
+      serverRole: string;
       channelId: string;
       channelName: string;
     };
@@ -97,6 +100,7 @@ function AppShell() {
         serverUrl: server.url,
         serverId: general.serverId,
         serverLabel: server.label,
+        serverRole: server.role,
         channelId: general.id,
         channelName: general.name,
       });
@@ -163,14 +167,18 @@ function AppShell() {
         <PassphraseSettingsScreen onBack={() => setScreen({kind: 'home'})} />
       );
       break;
+    case 'dm':
+      body = <DmListScreen onBack={() => setScreen({kind: 'home'})} />;
+      break;
     case 'channel':
       body = (
-        <ChannelScreen
+        <ServerScreen
           serverUrl={screen.serverUrl}
           serverId={screen.serverId}
           serverLabel={screen.serverLabel}
-          channelId={screen.channelId}
-          channelName={screen.channelName}
+          role={screen.serverRole}
+          initialChannelId={screen.channelId}
+          initialChannelName={screen.channelName}
           onBack={() => setScreen({kind: 'home'})}
         />
       );
@@ -187,6 +195,11 @@ function AppShell() {
         <WorkspaceBar
           onAddServer={() => setScreen({kind: 'add-server'})}
           onSelectServer={handleSelectServer}
+          onSelectDm={() => setScreen({kind: 'dm'})}
+          dmActive={screen.kind === 'dm'}
+          activeServerUrl={
+            screen.kind === 'channel' ? screen.serverUrl : null
+          }
           bindingUrl={bindingUrl}
         />
         <View style={{flex: 1}}>{body}</View>
