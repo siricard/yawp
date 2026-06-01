@@ -1,4 +1,5 @@
 import React from 'react';
+import {TextInput} from 'react-native';
 import ReactTestRenderer from 'react-test-renderer';
 
 import {
@@ -19,6 +20,7 @@ import {
   Subsection,
   Tile,
   Toast,
+  tokens,
 } from '../ui';
 
 function findByTestId(
@@ -143,6 +145,83 @@ describe('Input', () => {
       .findAllByProps({testID: 'ta'})
       .find(n => n.props.multiline !== undefined);
     expect(m?.props.multiline).toBe(true);
+  });
+
+  const textInputNode = (
+    tree: ReactTestRenderer.ReactTestInstance,
+    testID: string,
+  ) =>
+    tree
+      .findAllByProps({testID})
+      .find(n => typeof n.props.onFocus === 'function')!;
+
+  const inputWrapperStyle = (
+    tree: ReactTestRenderer.ReactTestInstance,
+    testID: string,
+  ) => {
+    const input = tree.findAllByProps({testID}).find(n => n.type === TextInput);
+    return flattenStyle(input!.parent!.props.style);
+  };
+
+  test('removes the native browser focus outline', async () => {
+    const root = await render(
+      <Input testID="in-out" value="" onChangeText={() => {}} />,
+    );
+    const input = root.root
+      .findAllByProps({testID: 'in-out'})
+      .find(n => n.type === TextInput);
+    expect(flattenStyle(input!.props.style).outlineStyle).toBe('none');
+  });
+
+  test('applies the chartreuse focus ring when focused', async () => {
+    const root = await render(
+      <Input testID="in-focus" value="" onChangeText={() => {}} />,
+    );
+    expect(inputWrapperStyle(root.root, 'in-focus').boxShadow).toBeUndefined();
+    await ReactTestRenderer.act(async () => {
+      textInputNode(root.root, 'in-focus').props.onFocus({});
+    });
+    const focusedStyle = inputWrapperStyle(root.root, 'in-focus');
+    expect(focusedStyle.boxShadow).toBe(tokens.misc.focusRing);
+    expect(focusedStyle.borderColor).toBe(tokens.color.primary);
+    await ReactTestRenderer.act(async () => {
+      textInputNode(root.root, 'in-focus').props.onBlur({});
+    });
+    expect(inputWrapperStyle(root.root, 'in-focus').boxShadow).toBeUndefined();
+  });
+
+  test('error state keeps the danger border and is not overridden by focus', async () => {
+    const root = await render(
+      <Input testID="in-err" error value="" onChangeText={() => {}} />,
+    );
+    await ReactTestRenderer.act(async () => {
+      textInputNode(root.root, 'in-err').props.onFocus({});
+    });
+    const errStyle = inputWrapperStyle(root.root, 'in-err');
+    expect(errStyle.boxShadow).toBeUndefined();
+    expect(errStyle.borderColor).toBeUndefined();
+  });
+
+  test('composes forwarded onFocus / onBlur handlers', async () => {
+    const onFocus = jest.fn();
+    const onBlur = jest.fn();
+    const root = await render(
+      <Input
+        testID="in-cb"
+        value=""
+        onChangeText={() => {}}
+        onFocus={onFocus}
+        onBlur={onBlur}
+      />,
+    );
+    await ReactTestRenderer.act(async () => {
+      textInputNode(root.root, 'in-cb').props.onFocus({});
+    });
+    expect(onFocus).toHaveBeenCalledTimes(1);
+    await ReactTestRenderer.act(async () => {
+      textInputNode(root.root, 'in-cb').props.onBlur({});
+    });
+    expect(onBlur).toHaveBeenCalledTimes(1);
   });
 });
 
