@@ -29,6 +29,8 @@ type Props = {
   onToggleEdit?: () => void;
   onDeleteChannel?: (channel: TreeChannel) => void;
   onReorderChannels?: (categoryId: string | null, orderedIds: string[]) => void;
+  onRecategorizeChannel?: (channelId: string, categoryId: string | null) => void;
+  onReorderCategories?: (orderedIds: string[]) => void;
   onAddChannel?: (categoryId: string | null) => void;
   onAddCategory?: () => void;
 };
@@ -39,6 +41,54 @@ function Divider() {
       style={{width: 1, height: 22, marginHorizontal: 4}}
       className="bg-border-soft"
     />
+  );
+}
+
+function CategoryLabel({
+  category,
+  editMode,
+  onDragStart,
+  onDrop,
+  onDragEnd,
+  dragging,
+}: {
+  category: {id: string; name: string};
+  editMode: boolean;
+  onDragStart?: () => void;
+  onDrop?: () => void;
+  onDragEnd?: () => void;
+  dragging?: boolean;
+}) {
+  const dragProps =
+    Platform.OS === 'web' && editMode
+      ? ({
+          draggable: true,
+          onDragStart,
+          onDragOver: (e: {preventDefault?: () => void}) => e.preventDefault?.(),
+          onDrop,
+          onDragEnd,
+        } as Record<string, unknown>)
+      : {};
+  return (
+    <Text
+      testID={`category-label-${category.id}`}
+      {...dragProps}
+      className={[
+        'text-text-tertiary uppercase',
+        dragging ? 'opacity-40' : '',
+      ].join(' ')}
+      style={[
+        {
+          fontFamily: monospace,
+          fontSize: 10,
+          fontWeight: '600',
+          letterSpacing: 1,
+          paddingHorizontal: 4,
+        },
+        editMode ? pointerCursor : null,
+      ]}>
+      {category.name}
+    </Text>
   );
 }
 
@@ -134,14 +184,18 @@ export function TabRow({
   onToggleEdit,
   onDeleteChannel,
   onReorderChannels,
+  onRecategorizeChannel,
+  onReorderCategories,
   onAddChannel,
   onAddCategory,
 }: Props) {
   const [dragId, setDragId] = useState<string | null>(null);
-  const dragRef = useRef<string | null>(null);
+  const dragRef = useRef<{kind: 'channel' | 'category'; id: string} | null>(
+    null,
+  );
 
-  function startDrag(id: string) {
-    dragRef.current = id;
+  function startDrag(kind: 'channel' | 'category', id: string) {
+    dragRef.current = {kind, id};
     setDragId(id);
   }
 
@@ -156,12 +210,12 @@ export function TabRow({
     targetId: string,
   ) {
     const source = dragRef.current;
-    if (!source || source === targetId) {
+    if (!source || source.kind !== 'channel' || source.id === targetId) {
       endDrag();
       return;
     }
     const ids = channels.map(c => c.id);
-    const from = ids.indexOf(source);
+    const from = ids.indexOf(source.id);
     const to = ids.indexOf(targetId);
     if (from === -1 || to === -1) {
       endDrag();
@@ -169,6 +223,35 @@ export function TabRow({
     }
     ids.splice(to, 0, ids.splice(from, 1)[0]);
     onReorderChannels?.(categoryId, ids);
+    endDrag();
+  }
+
+  function handleCategoryDrop(targetCategoryId: string) {
+    const source = dragRef.current;
+    if (!source) {
+      endDrag();
+      return;
+    }
+    if (source.kind === 'channel') {
+      onRecategorizeChannel?.(source.id, targetCategoryId);
+      endDrag();
+      return;
+    }
+    if (source.id === targetCategoryId) {
+      endDrag();
+      return;
+    }
+    const ids = groups
+      .map(g => g.category?.id)
+      .filter((id): id is string => typeof id === 'string');
+    const from = ids.indexOf(source.id);
+    const to = ids.indexOf(targetCategoryId);
+    if (from === -1 || to === -1) {
+      endDrag();
+      return;
+    }
+    ids.splice(to, 0, ids.splice(from, 1)[0]);
+    onReorderCategories?.(ids);
     endDrag();
   }
 
@@ -229,12 +312,14 @@ export function TabRow({
             key={group.category ? group.category.id : `uncategorized-${gi}`}
             style={{flexDirection: 'row', alignItems: 'center', gap: 4}}>
             {group.category ? (
-              <Text
-                testID={`category-label-${group.category.id}`}
-                className="text-text-tertiary uppercase"
-                style={{fontFamily: monospace, fontSize: 10, fontWeight: '600', letterSpacing: 1, paddingHorizontal: 4}}>
-                {group.category.name}
-              </Text>
+              <CategoryLabel
+                category={group.category}
+                editMode={editMode}
+                onDragStart={() => startDrag('category', group.category!.id)}
+                onDrop={() => handleCategoryDrop(group.category!.id)}
+                onDragEnd={endDrag}
+                dragging={dragId === group.category.id}
+              />
             ) : null}
             {group.channels.map(channel => (
               <ChannelTab
@@ -246,7 +331,7 @@ export function TabRow({
                 onDelete={
                   onDeleteChannel ? () => onDeleteChannel(channel) : undefined
                 }
-                onDragStart={() => startDrag(channel.id)}
+                onDragStart={() => startDrag('channel', channel.id)}
                 onDrop={() =>
                   handleDrop(
                     group.category ? group.category.id : null,

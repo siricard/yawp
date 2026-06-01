@@ -112,6 +112,49 @@ describe('TabRow', () => {
     expect(onReorderChannels).toHaveBeenCalledWith('cat-a', ['ch-3', 'ch-2']);
   });
 
+  test('dragging a channel onto a category recategorizes it', () => {
+    const onRecategorizeChannel = jest.fn();
+    const root = render({
+      editAvailable: true,
+      editMode: true,
+      onRecategorizeChannel,
+    });
+    const ch1 = root.root.findByProps({testID: 'channel-tab-ch-1'});
+    const cat = root.root.findByProps({testID: 'category-label-cat-a'});
+    ReactTestRenderer.act(() => {
+      ch1.props.onDragStart();
+      cat.props.onDrop();
+    });
+    expect(onRecategorizeChannel).toHaveBeenCalledWith('ch-1', 'cat-a');
+  });
+
+  test('dragging a category onto another reorders categories', () => {
+    const onReorderCategories = jest.fn();
+    const twoCategoryGroups: CategoryGroup[] = [
+      {
+        category: {id: 'cat-a', name: 'Information', position: 0},
+        channels: [{id: 'ch-2', name: 'design', categoryId: 'cat-a', position: 0}],
+      },
+      {
+        category: {id: 'cat-b', name: 'Projects', position: 1},
+        channels: [{id: 'ch-4', name: 'roadmap', categoryId: 'cat-b', position: 0}],
+      },
+    ];
+    const root = render({
+      groups: twoCategoryGroups,
+      editAvailable: true,
+      editMode: true,
+      onReorderCategories,
+    });
+    const catB = root.root.findByProps({testID: 'category-label-cat-b'});
+    const catA = root.root.findByProps({testID: 'category-label-cat-a'});
+    ReactTestRenderer.act(() => {
+      catB.props.onDragStart();
+      catA.props.onDrop();
+    });
+    expect(onReorderCategories).toHaveBeenCalledWith(['cat-b', 'cat-a']);
+  });
+
   test('non-edit mode hides delete shortcuts', () => {
     const root = render({
       editAvailable: true,

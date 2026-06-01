@@ -1,8 +1,10 @@
 import {
   createCategory,
   createChannel,
+  destroyChannel,
   listCategoriesForServer,
   listTextChannels,
+  recategorizeChannel,
   reorderCategories,
   reorderChannels,
 } from '../ash_generated';
@@ -159,6 +161,32 @@ export async function reorderServerCategories(
 ): Promise<{ok: boolean}> {
   const result = await reorderCategories({
     input: {serverId, orderedIds},
+    customFetch: scopedFetch(serverUrl),
+  });
+  return {ok: result.success};
+}
+
+export async function recategorizeServerChannel(
+  serverUrl: string,
+  channelId: string,
+  categoryId: string | null,
+  position?: number,
+): Promise<{ok: boolean}> {
+  const result = await recategorizeChannel({
+    identity: channelId,
+    input: {categoryId, ...(position !== undefined ? {position} : {})},
+    fields: ['id'],
+    customFetch: scopedFetch(serverUrl),
+  });
+  return {ok: result.success};
+}
+
+export async function destroyServerChannel(
+  serverUrl: string,
+  channelId: string,
+): Promise<{ok: boolean}> {
+  const result = await destroyChannel({
+    identity: channelId,
     customFetch: scopedFetch(serverUrl),
   });
   return {ok: result.success};

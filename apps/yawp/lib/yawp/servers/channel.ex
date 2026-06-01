@@ -29,11 +29,18 @@ defmodule Yawp.Servers.Channel do
   end
 
   actions do
-    defaults [:read, :destroy]
+    defaults [:read]
 
     create :create do
       primary? true
       accept [:server_id, :category_id, :name, :type, :position, :visibility, :join_policy]
+
+      change Yawp.Servers.Changes.RequireManageChannels
+    end
+
+    destroy :destroy do
+      primary? true
+      require_atomic? false
 
       change Yawp.Servers.Changes.RequireManageChannels
     end

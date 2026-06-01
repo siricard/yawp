@@ -893,6 +893,66 @@ export async function validateCreateChannel(
 }
 
 
+export type DestroyChannelResult = | { success: true; data: {}; }
+| { success: false; errors: AshRpcError[]; }
+
+;
+
+/**
+ * Delete a Channel
+ *
+ * @ashActionType :destroy
+ */
+export async function destroyChannel(
+  config: {
+  tenant?: string;
+  identity: UUID;
+  headers?: Record<string, string>;
+  fetchOptions?: RequestInit;
+  customFetch?: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
+}
+): Promise<DestroyChannelResult> {
+  const payload = {
+    action: "destroy_channel",
+    ...(config.tenant !== undefined && { tenant: config.tenant }),
+    identity: config.identity
+  };
+
+  return executeActionRpcRequest<DestroyChannelResult>(
+    payload,
+    config
+  );
+}
+
+
+/**
+ * Validate: Delete a Channel
+ *
+ * @ashActionType :destroy
+ * @validation true
+ */
+export async function validateDestroyChannel(
+  config: {
+  tenant?: string;
+  identity: UUID | string;
+  headers?: Record<string, string>;
+  fetchOptions?: RequestInit;
+  customFetch?: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
+}
+): Promise<ValidationResult> {
+  const payload = {
+    action: "destroy_channel",
+    ...(config.tenant !== undefined && { tenant: config.tenant }),
+    identity: config.identity
+  };
+
+  return executeValidationRpcRequest<ValidationResult>(
+    payload,
+    config
+  );
+}
+
+
 export type ListTextChannelsFields = UnifiedFieldSelection<ServerChannelResourceSchema>[];
 export type InferListTextChannelsResult<
   Fields extends ListTextChannelsFields,

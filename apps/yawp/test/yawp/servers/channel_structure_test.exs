@@ -224,6 +224,21 @@ defmodule Yawp.Servers.ChannelStructureTest do
     end
   end
 
+  describe "destroy_channel/1" do
+    test "removes the channel" do
+      %{server: server} = seed_server()
+
+      {:ok, channel} =
+        Servers.create_channel(%{server_id: server.id, name: "general", type: :text})
+
+      :ok = Servers.destroy_channel(channel)
+
+      assert Yawp.Servers.Channel
+             |> Ash.read!(authorize?: false)
+             |> Enum.all?(&(&1.id != channel.id))
+    end
+  end
+
   describe "manage_channels gating" do
     test "an actor without manage_channels cannot create a channel" do
       %{server: server, member_role: member_role} = seed_server()
@@ -291,6 +306,34 @@ defmodule Yawp.Servers.ChannelStructureTest do
                  %{category_id: category.id},
                  actor: member
                )
+    end
+
+    test "an actor without manage_channels cannot destroy a channel" do
+      %{server: server, member_role: member_role} = seed_server()
+      member = member_of(server, member_role)
+
+      {:ok, channel} =
+        Servers.create_channel(%{server_id: server.id, name: "general", type: :text})
+
+      assert {:error, _err} = Servers.destroy_channel(channel, actor: member)
+
+      assert Yawp.Servers.Channel
+             |> Ash.read!(authorize?: false)
+             |> Enum.any?(&(&1.id == channel.id))
+    end
+
+    test "an admin actor can destroy a channel" do
+      %{server: server, admin_role: admin_role} = seed_server()
+      admin = member_of(server, admin_role)
+
+      {:ok, channel} =
+        Servers.create_channel(%{server_id: server.id, name: "general", type: :text})
+
+      :ok = Servers.destroy_channel(channel, actor: admin)
+
+      assert Yawp.Servers.Channel
+             |> Ash.read!(authorize?: false)
+             |> Enum.all?(&(&1.id != channel.id))
     end
 
     test "an admin actor can recategorize a channel" do

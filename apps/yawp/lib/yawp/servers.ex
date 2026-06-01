@@ -18,6 +18,7 @@ defmodule Yawp.Servers do
       rpc_action :create_channel, :create
       rpc_action :recategorize_channel, :recategorize
       rpc_action :reorder_channels, :reorder
+      rpc_action :destroy_channel, :destroy
     end
 
     resource Yawp.Servers.Category do
@@ -65,6 +66,7 @@ defmodule Yawp.Servers do
       define :create_channel, action: :create
       define :recategorize_channel, action: :recategorize
       define :reorder_channels, action: :reorder
+      define :destroy_channel, action: :destroy
     end
 
     resource Yawp.Servers.Category do
