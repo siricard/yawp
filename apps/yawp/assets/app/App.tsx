@@ -1,6 +1,7 @@
 
 import React, {useEffect, useState} from 'react';
 import {Platform, StatusBar, View} from 'react-native';
+import {SafeAreaProvider, SafeAreaView} from 'react-native-safe-area-context';
 
 import {submitBindDevice} from './bind';
 import {discoverGeneralChannel} from './chat/discover';
@@ -54,9 +55,11 @@ type Screen =
 
 export default function App() {
   return (
-    <IdentityProvider>
-      <AppShell />
-    </IdentityProvider>
+    <SafeAreaProvider>
+      <IdentityProvider>
+        <AppShell />
+      </IdentityProvider>
+    </SafeAreaProvider>
   );
 }
 
@@ -102,19 +105,25 @@ function AppShell() {
 
   if (identityState.status === 'onboarding') {
     return (
-      <View className="flex-1 bg-bg" nativeID="app-root">
+      <SafeAreaView
+        edges={['top', 'bottom']}
+        className="flex-1 bg-bg"
+        nativeID="app-root">
         {Platform.OS !== 'web' ? <StatusBar barStyle="light-content" /> : null}
         <OnboardingFlow onDone={() => setScreen({kind: 'home'})} />
-      </View>
+      </SafeAreaView>
     );
   }
 
   if (identityState.status === 'locked') {
     return (
-      <View className="flex-1 bg-bg" nativeID="app-root">
+      <SafeAreaView
+        edges={['top', 'bottom']}
+        className="flex-1 bg-bg"
+        nativeID="app-root">
         {Platform.OS !== 'web' ? <StatusBar barStyle="light-content" /> : null}
         <LockedScreen />
-      </View>
+      </SafeAreaView>
     );
   }
 
@@ -166,7 +175,10 @@ function AppShell() {
   }
 
   return (
-    <View className="flex-1 bg-bg" nativeID="app-root">
+    <SafeAreaView
+      edges={['top', 'bottom']}
+      className="flex-1 bg-bg"
+      nativeID="app-root">
       {Platform.OS !== 'web' ? <StatusBar barStyle="light-content" /> : null}
       <View style={{flex: 1, flexDirection: 'column'}}>
         <WorkspaceBar
@@ -176,6 +188,6 @@ function AppShell() {
         />
         <View style={{flex: 1}}>{body}</View>
       </View>
-    </View>
+    </SafeAreaView>
   );
 }
