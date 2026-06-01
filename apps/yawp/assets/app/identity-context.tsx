@@ -53,10 +53,6 @@ export type WorkspaceServer = {
   did: string;
   role: string;
   label: string;
-  /**
-   * Per-server unread total. Wired by a later milestone; the workspace
-   * bar consumes it when present and renders an unread/mention dot.
-   */
   unreadCount?: number;
 };
 
