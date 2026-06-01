@@ -135,7 +135,7 @@ defmodule Yawp.Servers.Permissions do
   defp owner?(_, _), do: false
 
   defp resolve(membership, channel) do
-    baseline = baseline_bits(membership.role_ids)
+    baseline = baseline_bits(membership.role_ids, membership.server_id)
 
     case channel do
       nil -> baseline
@@ -143,11 +143,11 @@ defmodule Yawp.Servers.Permissions do
     end
   end
 
-  defp baseline_bits([]), do: 0
+  defp baseline_bits([], _server_id), do: 0
 
-  defp baseline_bits(role_ids) when is_list(role_ids) do
+  defp baseline_bits(role_ids, server_id) when is_list(role_ids) do
     Yawp.Servers.Role
-    |> Ash.Query.filter(id in ^role_ids)
+    |> Ash.Query.filter(id in ^role_ids and server_id == ^server_id)
     |> Ash.read!(authorize?: false)
     |> Enum.reduce(0, fn role, acc -> acc ||| role.permission_bits end)
   end

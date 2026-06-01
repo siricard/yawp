@@ -301,6 +301,21 @@ defmodule Yawp.Servers.PermissionsTest do
       assert Permissions.has?(effective, :send_messages)
     end
 
+    test "a role id belonging to another server grants zero bits" do
+      %{server: server, channel: channel} = seed_server()
+      other = seed_server()
+      identity = make_identity()
+
+      Ash.Seed.seed!(Yawp.Servers.Membership, %{
+        identity_id: identity.id,
+        server_id: server.id,
+        role_ids: [other.admin_role.id]
+      })
+
+      assert Permissions.effective_bits(identity, server, nil) == 0
+      assert Permissions.effective_bits(identity, server, channel) == 0
+    end
+
     test "overrides on a different channel do not leak into this channel" do
       %{server: server, member_role: member_role, channel: channel} = seed_server()
 
