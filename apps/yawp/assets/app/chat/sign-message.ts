@@ -26,10 +26,6 @@ export type DeleteEnvelope = {
   ts: number;
 };
 
-/**
- * Returns the canonical-JSON bytes that get signed. Exported so tests
- * (and the Elixir verifier) can compare byte-for-byte.
- */
 export function buildSendCanonical(envelope: SendEnvelope): Uint8Array {
   return new TextEncoder().encode(canonicalJson(envelope));
 }
@@ -42,10 +38,6 @@ export function buildDeleteCanonical(envelope: DeleteEnvelope): Uint8Array {
   return new TextEncoder().encode(canonicalJson(envelope));
 }
 
-/**
- * Sign the canonical-JSON of a send envelope and return the signature as
- * a base64url string (unpadded).
- */
 export function signSend(envelope: SendEnvelope, signer: Signer): string {
   return bytesToBase64Url(signer(buildSendCanonical(envelope)));
 }
