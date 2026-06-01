@@ -26,6 +26,7 @@ export type IdentityBundleV1 = {
      * word-pair default (derived from masterPk) is shown.
      */
     displayNameOverride?: string;
+    servers?: Array<{url: string; did: string; role: string; label: string}>;
     /**
      * ISO 8601 timestamp captured the first time the device
      * successfully bound to a server. Drives the 7-day second-anchor
@@ -110,6 +111,19 @@ export function isIdentityBundleV1(value: unknown): value is IdentityBundleV1 {
       typeof meta.secondAnchorNudgeDismissed !== 'boolean'
     ) {
       return false;
+    }
+    if ('servers' in meta && meta.servers !== undefined) {
+      if (!Array.isArray(meta.servers)) return false;
+      const ok = meta.servers.every(
+        s =>
+          s &&
+          typeof s === 'object' &&
+          typeof (s as Record<string, unknown>).url === 'string' &&
+          typeof (s as Record<string, unknown>).did === 'string' &&
+          typeof (s as Record<string, unknown>).role === 'string' &&
+          typeof (s as Record<string, unknown>).label === 'string',
+      );
+      if (!ok) return false;
     }
   }
   return true;

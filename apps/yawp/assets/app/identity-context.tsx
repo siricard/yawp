@@ -1,6 +1,5 @@
 
 import React, {createContext, useCallback, useContext, useEffect, useRef, useState} from 'react';
-import {Platform} from 'react-native';
 
 import {entropyToMnemonic, mnemonicToSeed, validateMnemonic} from './identity/bip39';
 import {b64UrlToBytes, bytesToB64Url, type IdentityBundleV1} from './identity/bundle';
@@ -95,8 +94,6 @@ export type OnboardingStep =
 export type RestoreResult =
   | {ok: true}
   | {ok: false; reason: 'wrong_word_count' | 'unknown_word' | 'bad_checksum'};
-
-const WORKSPACES_KEY = 'mook.workspaces';
 
 /**
  * outcome of an unlock attempt against a sealed envelope.
@@ -248,32 +245,24 @@ const EMPTY_METADATA: NonNullable<IdentityBundleV1['metadata']> = Object.freeze(
   {},
 ) as NonNullable<IdentityBundleV1['metadata']>;
 
-function loadServers(): WorkspaceServer[] {
-  if (Platform.OS !== 'web') return [];
-  try {
-    const raw = window.localStorage.getItem(WORKSPACES_KEY);
-    if (!raw) return [];
-    const parsed = JSON.parse(raw);
-    if (!Array.isArray(parsed)) return [];
-    return parsed.filter(
-      (s): s is WorkspaceServer =>
-        s &&
-        typeof s.url === 'string' &&
-        typeof s.did === 'string' &&
-        typeof s.role === 'string' &&
-        typeof s.label === 'string',
-    );
-  } catch {
-    return [];
-  }
+function serversFromBundle(bundle: IdentityBundleV1): WorkspaceServer[] {
+  return bundle.metadata?.servers ?? [];
 }
 
-function persistServers(servers: WorkspaceServer[]): void {
-  if (Platform.OS !== 'web') return;
-  try {
-    window.localStorage.setItem(WORKSPACES_KEY, JSON.stringify(servers));
-  } catch {
-  }
+type PersistedServer = {url: string; did: string; role: string; label: string};
+
+function persistableServers(servers: WorkspaceServer[]): PersistedServer[] {
+  return servers.map(({url, did, role, label}) => ({url, did, role, label}));
+}
+
+function buildMetadata(opts: {
+  displayName: string | null;
+  servers: WorkspaceServer[];
+}): IdentityBundleV1['metadata'] | undefined {
+  const meta: NonNullable<IdentityBundleV1['metadata']> = {};
+  if (opts.displayName) meta.displayNameOverride = opts.displayName;
+  if (opts.servers.length > 0) meta.servers = persistableServers(opts.servers);
+  return Object.keys(meta).length > 0 ? meta : undefined;
 }
 
 function constantTimeEqual(a: Uint8Array, b: Uint8Array): boolean {
@@ -369,7 +358,8 @@ export function IdentityProvider({children}: {children: React.ReactNode}) {
     identity: null,
     error: null,
   });
-  const [servers, setServers] = useState<WorkspaceServer[]>(() => loadServers());
+  const [servers, setServers] = useState<WorkspaceServer[]>([]);
+  const serversRef = useRef<WorkspaceServer[]>([]);
   const [displayName, setDisplayNameState] = useState<string | null>(null);
   const draftRef = useRef<DraftIdentity | null>(null);
   const draftSealedRef = useRef<boolean>(false);
@@ -385,6 +375,24 @@ export function IdentityProvider({children}: {children: React.ReactNode}) {
   const applyState = useCallback((next: State) => {
     stateRef.current = next;
     setState(next);
+  }, []);
+  const setServersState = useCallback((next: WorkspaceServer[]) => {
+    serversRef.current = next;
+    setServers(next);
+  }, []);
+  const mutateBundleMetadataRef = useRef<Ctx['mutateBundleMetadata'] | null>(
+    null,
+  );
+  const persistServers = useCallback((next: WorkspaceServer[]) => {
+    if (stateRef.current.status !== 'ready') return;
+    const desired = persistableServers(next);
+    void mutateBundleMetadataRef.current?.(prev => {
+      if (desired.length === 0) {
+        const {servers: _omit, ...rest} = prev;
+        return rest;
+      }
+      return {...prev, servers: desired};
+    });
   }, []);
 
   useEffect(() => {
@@ -407,6 +415,7 @@ export function IdentityProvider({children}: {children: React.ReactNode}) {
           setDisplayNameState(
             entry.bundle.metadata?.displayNameOverride ?? null,
           );
+          setServersState(serversFromBundle(entry.bundle));
           applyState({
             status: 'ready',
             identity: buildIdentityFromBundle(entry.bundle),
@@ -441,27 +450,29 @@ export function IdentityProvider({children}: {children: React.ReactNode}) {
     };
   }, []);
 
-  const addServer = useCallback((server: WorkspaceServer) => {
-    setServers(prev => {
-      const without = prev.filter(s => s.url !== server.url);
+  const addServer = useCallback(
+    (server: WorkspaceServer) => {
+      const without = serversRef.current.filter(s => s.url !== server.url);
       const next = [...without, server];
+      setServersState(next);
       persistServers(next);
-      return next;
-    });
-  }, []);
+    },
+    [setServersState, persistServers],
+  );
 
-  const reorderServers = useCallback((orderedUrls: string[]) => {
-    setServers(prev => {
+  const reorderServers = useCallback(
+    (orderedUrls: string[]) => {
       const rank = new Map(orderedUrls.map((url, i) => [url, i]));
-      const next = [...prev].sort((a, b) => {
+      const next = [...serversRef.current].sort((a, b) => {
         const ra = rank.has(a.url) ? rank.get(a.url)! : Number.MAX_SAFE_INTEGER;
         const rb = rank.has(b.url) ? rank.get(b.url)! : Number.MAX_SAFE_INTEGER;
         return ra - rb;
       });
+      setServersState(next);
       persistServers(next);
-      return next;
-    });
-  }, []);
+    },
+    [setServersState, persistServers],
+  );
 
   /**
    * single entry point for identity-scoped metadata
@@ -516,6 +527,7 @@ export function IdentityProvider({children}: {children: React.ReactNode}) {
     },
     [applyState],
   );
+  mutateBundleMetadataRef.current = mutateBundleMetadata;
 
   const setDisplayNameOverride = useCallback(
     async (name: string | null): Promise<void> => {
@@ -557,6 +569,10 @@ export function IdentityProvider({children}: {children: React.ReactNode}) {
         chosenName !== null && chosenName.trim().length > 0
           ? chosenName.trim()
           : null;
+      const metadata = buildMetadata({
+        displayName: trimmedName,
+        servers: serversRef.current,
+      });
       const bundle: IdentityBundleV1 = {
         version: 1,
         master: {sk: bytesToB64Url(draft.masterSk)},
@@ -567,7 +583,7 @@ export function IdentityProvider({children}: {children: React.ReactNode}) {
           signature: bytesToB64Url(draft.deviceDelegationSignature),
           issuedAt: draft.deviceIssuedAt,
         },
-        ...(trimmedName ? {metadata: {displayNameOverride: trimmedName}} : {}),
+        ...(metadata ? {metadata} : {}),
       };
       try {
         if (passphrase && passphrase.length > 0) {
@@ -633,6 +649,10 @@ export function IdentityProvider({children}: {children: React.ReactNode}) {
         deviceDelegationSignature: device.signature,
         deviceIssuedAt: device.issuedAt,
       };
+      const metadata = buildMetadata({
+        displayName: null,
+        servers: serversRef.current,
+      });
       const bundle: IdentityBundleV1 = {
         version: 1,
         master: {sk: bytesToB64Url(draft.masterSk)},
@@ -643,6 +663,7 @@ export function IdentityProvider({children}: {children: React.ReactNode}) {
           signature: bytesToB64Url(draft.deviceDelegationSignature),
           issuedAt: draft.deviceIssuedAt,
         },
+        ...(metadata ? {metadata} : {}),
       };
       await saveIdentity(bundle);
       draftRef.current = draft;
@@ -667,6 +688,10 @@ export function IdentityProvider({children}: {children: React.ReactNode}) {
     const draft = draftRef.current;
     if (!draft) return;
     const cached = draftSealRef.current;
+    const metadata = buildMetadata({
+      displayName,
+      servers: serversRef.current,
+    });
     const unlockedBundle: IdentityBundleV1 = {
       version: 1,
       master: {sk: bytesToB64Url(draft.masterSk)},
@@ -677,7 +702,7 @@ export function IdentityProvider({children}: {children: React.ReactNode}) {
         signature: bytesToB64Url(draft.deviceDelegationSignature),
         issuedAt: draft.deviceIssuedAt,
       },
-      ...(displayName ? {metadata: {displayNameOverride: displayName}} : {}),
+      ...(metadata ? {metadata} : {}),
     };
     applyState({
       status: 'ready',
@@ -698,6 +723,7 @@ export function IdentityProvider({children}: {children: React.ReactNode}) {
       try {
         const {bundle, sealKey, salt} = unsealEnvelope(envelope, passphrase);
         setDisplayNameState(bundle.metadata?.displayNameOverride ?? null);
+        setServersState(serversFromBundle(bundle));
         applyState({
           status: 'ready',
           identity: buildIdentityFromBundle(bundle),
@@ -720,7 +746,7 @@ export function IdentityProvider({children}: {children: React.ReactNode}) {
         return {ok: false, reason: 'unknown'};
       }
     },
-    [applyState],
+    [applyState, setServersState],
   );
 
   const changePassphrase = useCallback(

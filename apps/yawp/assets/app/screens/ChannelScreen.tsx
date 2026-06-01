@@ -1,6 +1,7 @@
 
 import React, {useEffect, useRef, useState} from 'react';
 import {
+  FlatList,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -36,12 +37,6 @@ const monospace = Platform.select({
   default: 'monospace',
 });
 
-/**
- * Build the display form of a message author DID.
- *
- * Wire ships the bare base58 form; the client prefixes `did:yawp:` and truncates long
- * values for the row label.
- */
 export function displayAuthor(authorDid: string): string {
   const full = `did:yawp:${authorDid}`;
   return full.length <= 18 ? full : `${full.slice(0, 12)}…${full.slice(-4)}`;
@@ -345,7 +340,7 @@ export function ChannelScreen({
     null,
   );
   const [showMembers, setShowMembers] = useState(false);
-  const scrollRef = useRef<ScrollView | null>(null);
+  const listRef = useRef<FlatList<ChannelMessage> | null>(null);
 
   const members = Array.from(new Set(messages.map(m => m.sender_did)));
 
@@ -354,7 +349,7 @@ export function ChannelScreen({
 
   useEffect(() => {
     requestAnimationFrame(() => {
-      scrollRef.current?.scrollToEnd({animated: true});
+      listRef.current?.scrollToEnd({animated: true});
     });
   }, [messages.length]);
 
@@ -444,16 +439,22 @@ export function ChannelScreen({
         </View>
       ) : null}
 
-      <ScrollView
+      <FlatList
         testID="channel-message-list"
-        ref={ref => {
-          scrollRef.current = ref;
-        }}
+        ref={listRef}
         className="flex-1"
-        contentContainerStyle={{paddingVertical: 12}}>
-        {messages.map(message => (
+        data={messages}
+        keyExtractor={message => message.id}
+        contentContainerStyle={{paddingVertical: 12}}
+        initialNumToRender={20}
+        maxToRenderPerBatch={20}
+        windowSize={11}
+        removeClippedSubviews={Platform.OS !== 'web'}
+        onContentSizeChange={() =>
+          listRef.current?.scrollToEnd({animated: false})
+        }
+        renderItem={({item: message}) => (
           <MessageRow
-            key={message.id}
             message={message}
             selfDid={selfDid}
             selfDisplayName={effectiveDisplayName}
@@ -472,8 +473,8 @@ export function ChannelScreen({
             onReply={() => setReplyTo(message)}
             onDelete={() => setPendingDelete(message)}
           />
-        ))}
-      </ScrollView>
+        )}
+      />
 
       {pendingDelete ? (
         <View

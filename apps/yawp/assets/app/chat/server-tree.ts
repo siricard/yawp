@@ -86,11 +86,6 @@ export async function fetchServerTree(
   return {categories, channels};
 }
 
-/**
- * Groups channels under their category, ordered by category position then
- * channel position. Channels with no category form a leading uncategorized
- * group (`category: null`).
- */
 export function groupChannelsByCategory(tree: ServerTree): CategoryGroup[] {
   const byPosition = (a: {position: number}, b: {position: number}) =>
     a.position - b.position;

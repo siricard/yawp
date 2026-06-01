@@ -19,27 +19,14 @@ import {WorkspacesDrawer} from './WorkspacesDrawer';
 
 export const WORKSPACE_BAR_HEIGHT = 59;
 
-/**
- * Below this viewport width the full multi-server strip collapses behind a
- * single workspace toggle (v16 "Mobile compromise"). Branch on WIDTH, never
- * Platform.OS — a narrow native window gets the drawer, a wide one the strip.
- */
 export const WORKSPACE_BAR_NARROW_BREAKPOINT = 640;
 
 type Props = {
   onAddServer: () => void;
   onSelectServer?: (server: WorkspaceServer) => void;
-  /**
-   * URL of the tile whose lazy bind RPC is currently in
-   * flight, if any. The matching tile renders a muted/pulsing overlay
-   * so the user has feedback while we mint a fresh session.
-   */
   bindingUrl?: string | null;
-  /** Whether the dedicated DM (`@`) tile is the active surface. */
   dmActive?: boolean;
-  /** Open the dedicated DM surface. */
   onSelectDm?: () => void;
-  /** URL of the currently-open server, to render the active ring. */
   activeServerUrl?: string | null;
 };
 
