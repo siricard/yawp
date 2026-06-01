@@ -43,7 +43,6 @@ export function ServerScreen({
 
   const effectiveBits = bitsForRole(role);
   const editMode = useEditMode(effectiveBits);
-  const canModerate = role.toLowerCase() === 'owner' || role.toLowerCase() === 'admin';
 
   const refresh = useCallback(async () => {
     const next = await fetchServerTree(serverUrl, serverId);
@@ -115,7 +114,7 @@ export function ServerScreen({
           serverLabel={serverLabel}
           channelId={activeChannel.id}
           channelName={activeChannel.name}
-          canModerate={canModerate}
+          effectiveBits={effectiveBits}
           onBack={onBack}
         />
       </View>

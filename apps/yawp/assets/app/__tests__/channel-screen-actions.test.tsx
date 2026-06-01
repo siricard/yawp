@@ -47,11 +47,12 @@ jest.mock('../identity-context', () => ({
   useDisplayName: () => ({effectiveDisplayName: 'Me'}),
 }));
 
+import {PERMISSION_BITS} from '../chat/edit-mode';
 import {ChannelScreen} from '../screens/ChannelScreen';
 
 const roots: ReactTestRenderer.ReactTestRenderer[] = [];
 
-function render(canModerate = false) {
+function render(effectiveBits = 0) {
   let root: ReactTestRenderer.ReactTestRenderer | null = null;
   ReactTestRenderer.act(() => {
     root = ReactTestRenderer.create(
@@ -61,7 +62,7 @@ function render(canModerate = false) {
         serverLabel="localhost:4000"
         channelId="chan-1"
         channelName="general"
-        canModerate={canModerate}
+        effectiveBits={effectiveBits}
         onBack={() => {}}
       />,
     );
@@ -137,9 +138,9 @@ describe('ChannelScreen message actions', () => {
     expect(mockRemove).toHaveBeenCalledWith('m-1');
   });
 
-  test('a non-self message hides edit but a moderator can delete', () => {
+  test('a non-self message hides edit but a manage_messages holder can delete', () => {
     mockMessages = [msg({id: 'm-2', sender_did: 'zOther'})];
-    const root = render(true);
+    const root = render(PERMISSION_BITS.manage_messages);
     expect(
       root.root.findAllByProps({testID: 'message-edit-m-2'}).length,
     ).toBe(0);
@@ -148,9 +149,9 @@ describe('ChannelScreen message actions', () => {
     ).toBeGreaterThan(0);
   });
 
-  test('a non-moderator cannot delete others messages', () => {
+  test('a member without manage_messages cannot delete others messages', () => {
     mockMessages = [msg({id: 'm-3', sender_did: 'zOther'})];
-    const root = render(false);
+    const root = render(PERMISSION_BITS.read_messages | PERMISSION_BITS.send_messages);
     expect(
       root.root.findAllByProps({testID: 'message-delete-m-3'}).length,
     ).toBe(0);

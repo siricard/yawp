@@ -12,6 +12,7 @@ import {
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 
 import {useChannel, type ChannelMessage} from '../chat/channel-store';
+import {hasPermission} from '../chat/edit-mode';
 import {MessageBody} from '../chat/MessageBody';
 import {useDisplayName, useIdentityState} from '../identity-context';
 import {banServerMember, kickServerMember} from '../server-moderation';
@@ -25,8 +26,13 @@ type Props = {
   channelId: string;
   channelName: string;
   onBack: () => void;
-  /** When true, the current identity may delete others' messages. */
-  canModerate?: boolean;
+  /**
+   * The current identity's effective permission bits for this channel.
+   * Each destructive affordance is gated on its own bit so a user only
+   * sees the controls they can actually use; the server enforces the
+   * same gates independently.
+   */
+  effectiveBits?: number;
 };
 
 const monospace = Platform.select({
@@ -63,7 +69,7 @@ function MessageRow({
   selfDid,
   selfDisplayName,
   replyTo,
-  canModerate,
+  canManageMessages,
   isEditing,
   editDraft,
   onChangeEditDraft,
@@ -77,7 +83,7 @@ function MessageRow({
   selfDid: string | null;
   selfDisplayName: string | null;
   replyTo: ChannelMessage | null;
-  canModerate: boolean;
+  canManageMessages: boolean;
   isEditing: boolean;
   editDraft: string;
   onChangeEditDraft: (text: string) => void;
@@ -92,7 +98,7 @@ function MessageRow({
     isSelf && selfDisplayName ? selfDisplayName : displayAuthor(message.sender_did);
   const deleted = message.body === null;
   const canEdit = isSelf && !deleted;
-  const canDelete = (isSelf || canModerate) && !deleted;
+  const canDelete = (isSelf || canManageMessages) && !deleted;
   return (
     <View testID={`channel-message-${message.id}`} className="px-6 py-2 group">
       {replyTo ? (
@@ -205,14 +211,16 @@ function MemberSheet({
   serverId,
   members,
   selfDid,
-  canModerate,
+  canKick,
+  canBan,
   onClose,
 }: {
   serverUrl: string;
   serverId: string;
   members: string[];
   selfDid: string | null;
-  canModerate: boolean;
+  canKick: boolean;
+  canBan: boolean;
   onClose: () => void;
 }) {
   const [pending, setPending] = useState<string | null>(null);
@@ -277,28 +285,32 @@ function MemberSheet({
               </Text>
               {removedLabel ? (
                 <Text className="text-xs text-text-tertiary">{removedLabel}</Text>
-              ) : canModerate && !isSelf ? (
+              ) : !isSelf && (canKick || canBan) ? (
                 <View className="flex-row" style={{gap: 6}}>
-                  <Pressable
-                    testID={`member-kick-${did}`}
-                    accessibilityRole="button"
-                    accessibilityLabel="kick member"
-                    disabled={pending !== null}
-                    onPress={() => act('kick', did)}
-                    style={pointerCursor}
-                    className="px-2 py-1 rounded-pill bg-surface-2">
-                    <Text className="text-xs text-text-secondary">Kick</Text>
-                  </Pressable>
-                  <Pressable
-                    testID={`member-ban-${did}`}
-                    accessibilityRole="button"
-                    accessibilityLabel="ban member"
-                    disabled={pending !== null}
-                    onPress={() => act('ban', did)}
-                    style={pointerCursor}
-                    className="px-2 py-1 rounded-pill bg-danger">
-                    <Text className="text-xs text-white">Ban</Text>
-                  </Pressable>
+                  {canKick ? (
+                    <Pressable
+                      testID={`member-kick-${did}`}
+                      accessibilityRole="button"
+                      accessibilityLabel="kick member"
+                      disabled={pending !== null}
+                      onPress={() => act('kick', did)}
+                      style={pointerCursor}
+                      className="px-2 py-1 rounded-pill bg-surface-2">
+                      <Text className="text-xs text-text-secondary">Kick</Text>
+                    </Pressable>
+                  ) : null}
+                  {canBan ? (
+                    <Pressable
+                      testID={`member-ban-${did}`}
+                      accessibilityRole="button"
+                      accessibilityLabel="ban member"
+                      disabled={pending !== null}
+                      onPress={() => act('ban', did)}
+                      style={pointerCursor}
+                      className="px-2 py-1 rounded-pill bg-danger">
+                      <Text className="text-xs text-white">Ban</Text>
+                    </Pressable>
+                  ) : null}
                 </View>
               ) : null}
             </View>
@@ -316,13 +328,16 @@ export function ChannelScreen({
   channelId,
   channelName,
   onBack,
-  canModerate = false,
+  effectiveBits = 0,
 }: Props) {
   const {status, errorMessage, messages, send, edit, remove} = useChannel(
     serverUrl,
     serverId,
     channelId,
   );
+  const canManageMessages = hasPermission(effectiveBits, 'manage_messages');
+  const canKick = hasPermission(effectiveBits, 'kick_members');
+  const canBan = hasPermission(effectiveBits, 'ban_members');
   const insets = useSafeAreaInsets();
   const identityState = useIdentityState();
   const {effectiveDisplayName} = useDisplayName();
@@ -453,7 +468,7 @@ export function ChannelScreen({
                 ? messagesById.current.get(message.reply_to_message_id) ?? null
                 : null
             }
-            canModerate={canModerate}
+            canManageMessages={canManageMessages}
             isEditing={editingId === message.id}
             editDraft={editDraft}
             onChangeEditDraft={setEditDraft}
@@ -557,7 +572,8 @@ export function ChannelScreen({
           serverId={serverId}
           members={members}
           selfDid={selfDid}
-          canModerate={canModerate}
+          canKick={canKick}
+          canBan={canBan}
           onClose={() => setShowMembers(false)}
         />
       ) : null}
