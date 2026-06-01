@@ -1,6 +1,6 @@
 defmodule Yawp.Servers.Category do
   @moduledoc """
-  A named grouping of channels within a server (ADR 018).
+  A named grouping of channels within a server.
 
   Categories are pure UI organization — they carry no permissions in v1.
   Each channel belongs to at most one category, and the sidebar sorts

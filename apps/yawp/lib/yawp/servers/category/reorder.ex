@@ -4,7 +4,7 @@ defmodule Yawp.Servers.Category.Reorder do
   `Yawp.Servers.Category`. Assigns positions `0..n-1` to the categories
   named in `ordered_ids`, in order, within the given server.
 
-  Gated by `manage_channels` (ADR 017, ADR 018) for non-nil actors.
+  Gated by `manage_channels`.
   """
   use Ash.Resource.Actions.Implementation
 

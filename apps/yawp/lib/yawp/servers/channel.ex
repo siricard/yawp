@@ -1,6 +1,6 @@
 defmodule Yawp.Servers.Channel do
   @moduledoc """
-  A channel (room) on a server (ADR 018).
+  A channel (room) on a server.
 
   Carries the server FK, an optional category FK, the channel `name`,
   its `type` (`:text` | `:voice`), the sidebar `position`, the
