@@ -22,12 +22,16 @@ defmodule Yawp.Servers.RedeemRoomInviteRpcTest do
 
     {:ok, channel} =
       Servers.Channel
-      |> Ash.Changeset.for_create(:create, %{
-        server_id: server.id,
-        name: "secret-rpc",
-        type: :text,
-        visibility: :private
-      })
+      |> Ash.Changeset.for_create(
+        :create,
+        %{
+          server_id: server.id,
+          name: "secret-rpc",
+          type: :text,
+          visibility: :private
+        },
+        authorize?: false
+      )
       |> Ash.create(authorize?: false)
 
     owner = seed_identity!()

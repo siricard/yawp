@@ -44,7 +44,10 @@ defmodule Yawp.Servers.PermissionsTest do
       })
 
     {:ok, channel} =
-      Servers.create_channel(%{server_id: server.id, name: "general", type: :text})
+      Servers.create_channel(
+        %{server_id: server.id, name: "general", type: :text},
+        authorize?: false
+      )
 
     %{
       server: server,
@@ -320,7 +323,10 @@ defmodule Yawp.Servers.PermissionsTest do
       %{server: server, member_role: member_role, channel: channel} = seed_server()
 
       {:ok, other_channel} =
-        Servers.create_channel(%{server_id: server.id, name: "other", type: :text})
+        Servers.create_channel(
+          %{server_id: server.id, name: "other", type: :text},
+          authorize?: false
+        )
 
       identity = make_identity()
       {:ok, _m} = Servers.assign_role(identity.id, server.id, [member_role.id])

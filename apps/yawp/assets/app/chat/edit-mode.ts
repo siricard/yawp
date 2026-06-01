@@ -73,7 +73,7 @@ export function hasPermission(
 
 /**
  * Edit mode is available only to users who can rearrange the sidebar —
- * i.e. those holding `manage_channels` (admins and above per ADR 017).
+ * i.e. those holding `manage_channels` (admins and above).
  */
 export function canEnterEditMode(effectiveBits: number): boolean {
   return hasPermission(effectiveBits, 'manage_channels');

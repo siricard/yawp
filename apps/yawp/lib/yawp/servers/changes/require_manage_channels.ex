@@ -1,12 +1,14 @@
 defmodule Yawp.Servers.Changes.RequireManageChannels do
   @moduledoc """
   Gates a channel/category mutation on the `manage_channels` permission
-  bit (ADR 017, ADR 018).
+  bit.
 
-  A `nil` actor is a trusted internal call (boot seeder, tests, the
-  redeem orchestration) and passes through. When an actor is present it
-  MUST be a `Yawp.Identity.Identity` holding `manage_channels` on the
-  target server, resolved via `Yawp.Servers.Permissions.effective_bits/3`.
+  A present actor MUST be a `Yawp.Identity.Identity` holding
+  `manage_channels` on the target server, resolved via
+  `Yawp.Servers.Permissions.effective_bits/3`. A `nil` actor is rejected
+  with `not_authenticated` on any authorized call — only an explicit
+  authorization bypass (the boot seeder and trusted server-side callers
+  that pass `authorize?: false`) skips the gate.
 
   The target server is read from the changeset's `server_id` attribute,
   a `server_id` argument, or the underlying record being updated.
@@ -18,20 +20,23 @@ defmodule Yawp.Servers.Changes.RequireManageChannels do
 
   @impl true
   def change(changeset, _opts, context) do
-    case context_actor(context) do
-      nil ->
+    cond do
+      bypass?(context) ->
         changeset
 
-      %Yawp.Identity.Identity{} = actor ->
-        gate(changeset, actor)
+      match?(%Yawp.Identity.Identity{}, context_actor(context)) ->
+        gate(changeset, context_actor(context))
 
-      _ ->
+      true ->
         Ash.Changeset.add_error(
           changeset,
           RpcError.exception(type: "not_authenticated", message: "not_authenticated")
         )
     end
   end
+
+  defp bypass?(%{authorize?: false}), do: true
+  defp bypass?(_), do: false
 
   defp gate(changeset, actor) do
     with {:ok, server} <- resolve_server(changeset),

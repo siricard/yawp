@@ -35,6 +35,7 @@ defmodule Yawp.Servers.Channel do
       primary? true
       accept [:server_id, :category_id, :name, :type, :position, :visibility, :join_policy]
 
+      change Yawp.Servers.Changes.EnforceChannelCategorySameServer
       change Yawp.Servers.Changes.RequireManageChannels
     end
 
@@ -50,6 +51,7 @@ defmodule Yawp.Servers.Channel do
       accept [:category_id, :position]
       require_atomic? false
 
+      change Yawp.Servers.Changes.EnforceChannelCategorySameServer
       change Yawp.Servers.Changes.RequireManageChannels
     end
 

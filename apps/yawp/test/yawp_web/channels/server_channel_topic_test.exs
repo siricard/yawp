@@ -11,7 +11,10 @@ defmodule YawpWeb.ServerChannelTopicTest do
     {:ok, server} = Servers.create_server("Yawp")
 
     {:ok, channel} =
-      Servers.create_channel(%{server_id: server.id, name: "general", type: :text})
+      Servers.create_channel(
+        %{server_id: server.id, name: "general", type: :text},
+        authorize?: false
+      )
 
     %{server: server, channel: channel}
   end

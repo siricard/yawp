@@ -11,8 +11,10 @@ defmodule Yawp.Servers.ChannelStructureTest do
     Ash.Seed.seed!(Yawp.Identity.Identity, %{did: did, master_public_key: pk})
   end
 
-  defp seed_server do
-    {:ok, server} = Servers.create_server("Yawp")
+  defp seed_server, do: seed_server_named("Yawp")
+
+  defp seed_server_named(name) do
+    {:ok, server} = Servers.create_server(name)
 
     {:ok, admin_role} =
       Servers.create_role(%{
@@ -46,7 +48,7 @@ defmodule Yawp.Servers.ChannelStructureTest do
       %{server: server} = seed_server()
 
       {:ok, category} =
-        Servers.create_category(%{server_id: server.id, name: "Text Channels"})
+        Servers.create_category(%{server_id: server.id, name: "Text Channels"}, authorize?: false)
 
       assert category.server_id == server.id
       assert category.name == "Text Channels"
@@ -58,50 +60,68 @@ defmodule Yawp.Servers.ChannelStructureTest do
       %{server: server} = seed_server()
 
       {:ok, category} =
-        Servers.create_category(%{server_id: server.id, name: "Off Topic", position: 3})
+        Servers.create_category(
+          %{server_id: server.id, name: "Off Topic", position: 3},
+          authorize?: false
+        )
 
       assert category.position == 3
     end
 
     test "create_category/1 allows a child whose parent is top-level (depth 1)" do
       %{server: server} = seed_server()
-      {:ok, parent} = Servers.create_category(%{server_id: server.id, name: "Parent"})
+
+      {:ok, parent} =
+        Servers.create_category(%{server_id: server.id, name: "Parent"}, authorize?: false)
 
       {:ok, child} =
-        Servers.create_category(%{
-          server_id: server.id,
-          name: "Child",
-          parent_id: parent.id
-        })
+        Servers.create_category(
+          %{
+            server_id: server.id,
+            name: "Child",
+            parent_id: parent.id
+          },
+          authorize?: false
+        )
 
       assert child.parent_id == parent.id
     end
 
     test "create_category/1 rejects nesting deeper than one level" do
       %{server: server} = seed_server()
-      {:ok, parent} = Servers.create_category(%{server_id: server.id, name: "Parent"})
+
+      {:ok, parent} =
+        Servers.create_category(%{server_id: server.id, name: "Parent"}, authorize?: false)
 
       {:ok, child} =
-        Servers.create_category(%{
-          server_id: server.id,
-          name: "Child",
-          parent_id: parent.id
-        })
+        Servers.create_category(
+          %{
+            server_id: server.id,
+            name: "Child",
+            parent_id: parent.id
+          },
+          authorize?: false
+        )
 
       assert {:error, _err} =
-               Servers.create_category(%{
-                 server_id: server.id,
-                 name: "Grandchild",
-                 parent_id: child.id
-               })
+               Servers.create_category(
+                 %{
+                   server_id: server.id,
+                   name: "Grandchild",
+                   parent_id: child.id
+                 },
+                 authorize?: false
+               )
     end
 
     test "unique_server_id_name identity rejects duplicate category names" do
       %{server: server} = seed_server()
-      {:ok, _c} = Servers.create_category(%{server_id: server.id, name: "Dupe"})
+
+      {:ok, _c} =
+        Servers.create_category(%{server_id: server.id, name: "Dupe"}, authorize?: false)
 
       assert {:error, _err} =
-               Servers.create_category(%{server_id: server.id, name: "Dupe"})
+               Servers.create_category(%{server_id: server.id, name: "Dupe"}, authorize?: false)
     end
   end
 
@@ -110,7 +130,10 @@ defmodule Yawp.Servers.ChannelStructureTest do
       %{server: server} = seed_server()
 
       {:ok, channel} =
-        Servers.create_channel(%{server_id: server.id, name: "general", type: :text})
+        Servers.create_channel(
+          %{server_id: server.id, name: "general", type: :text},
+          authorize?: false
+        )
 
       assert channel.position == 0
       assert channel.visibility == :server_public
@@ -120,18 +143,23 @@ defmodule Yawp.Servers.ChannelStructureTest do
 
     test "create_channel/1 accepts a category, position, visibility and join_policy" do
       %{server: server} = seed_server()
-      {:ok, category} = Servers.create_category(%{server_id: server.id, name: "Text"})
+
+      {:ok, category} =
+        Servers.create_category(%{server_id: server.id, name: "Text"}, authorize?: false)
 
       {:ok, channel} =
-        Servers.create_channel(%{
-          server_id: server.id,
-          category_id: category.id,
-          name: "general",
-          type: :text,
-          position: 2,
-          visibility: :private,
-          join_policy: :open
-        })
+        Servers.create_channel(
+          %{
+            server_id: server.id,
+            category_id: category.id,
+            name: "general",
+            type: :text,
+            position: 2,
+            visibility: :private,
+            join_policy: :open
+          },
+          authorize?: false
+        )
 
       assert channel.category_id == category.id
       assert channel.position == 2
@@ -143,25 +171,35 @@ defmodule Yawp.Servers.ChannelStructureTest do
       %{server: server} = seed_server()
 
       assert {:error, _err} =
-               Servers.create_channel(%{
-                 server_id: server.id,
-                 name: "x",
-                 type: :text,
-                 visibility: :nope
-               })
+               Servers.create_channel(
+                 %{
+                   server_id: server.id,
+                   name: "x",
+                   type: :text,
+                   visibility: :nope
+                 },
+                 authorize?: false
+               )
     end
   end
 
   describe "recategorize_channel/2" do
     test "moves a channel into a category and sets its position" do
       %{server: server} = seed_server()
-      {:ok, category} = Servers.create_category(%{server_id: server.id, name: "Text"})
+
+      {:ok, category} =
+        Servers.create_category(%{server_id: server.id, name: "Text"}, authorize?: false)
 
       {:ok, channel} =
-        Servers.create_channel(%{server_id: server.id, name: "general", type: :text})
+        Servers.create_channel(
+          %{server_id: server.id, name: "general", type: :text},
+          authorize?: false
+        )
 
       {:ok, moved} =
-        Servers.recategorize_channel(channel, %{category_id: category.id, position: 5})
+        Servers.recategorize_channel(channel, %{category_id: category.id, position: 5},
+          authorize?: false
+        )
 
       assert moved.category_id == category.id
       assert moved.position == 5
@@ -169,17 +207,22 @@ defmodule Yawp.Servers.ChannelStructureTest do
 
     test "moves a channel out of any category when category_id is nil" do
       %{server: server} = seed_server()
-      {:ok, category} = Servers.create_category(%{server_id: server.id, name: "Text"})
+
+      {:ok, category} =
+        Servers.create_category(%{server_id: server.id, name: "Text"}, authorize?: false)
 
       {:ok, channel} =
-        Servers.create_channel(%{
-          server_id: server.id,
-          category_id: category.id,
-          name: "general",
-          type: :text
-        })
+        Servers.create_channel(
+          %{
+            server_id: server.id,
+            category_id: category.id,
+            name: "general",
+            type: :text
+          },
+          authorize?: false
+        )
 
-      {:ok, moved} = Servers.recategorize_channel(channel, %{category_id: nil})
+      {:ok, moved} = Servers.recategorize_channel(channel, %{category_id: nil}, authorize?: false)
       assert moved.category_id == nil
     end
   end
@@ -187,12 +230,20 @@ defmodule Yawp.Servers.ChannelStructureTest do
   describe "reorder_channels/1" do
     test "assigns positions in the supplied order" do
       %{server: server} = seed_server()
-      {:ok, a} = Servers.create_channel(%{server_id: server.id, name: "a", type: :text})
-      {:ok, b} = Servers.create_channel(%{server_id: server.id, name: "b", type: :text})
-      {:ok, c} = Servers.create_channel(%{server_id: server.id, name: "c", type: :text})
+
+      {:ok, a} =
+        Servers.create_channel(%{server_id: server.id, name: "a", type: :text}, authorize?: false)
+
+      {:ok, b} =
+        Servers.create_channel(%{server_id: server.id, name: "b", type: :text}, authorize?: false)
+
+      {:ok, c} =
+        Servers.create_channel(%{server_id: server.id, name: "c", type: :text}, authorize?: false)
 
       {:ok, _} =
-        Servers.reorder_channels(%{server_id: server.id, ordered_ids: [c.id, a.id, b.id]})
+        Servers.reorder_channels(%{server_id: server.id, ordered_ids: [c.id, a.id, b.id]},
+          authorize?: false
+        )
 
       positions =
         Yawp.Servers.Channel
@@ -208,11 +259,17 @@ defmodule Yawp.Servers.ChannelStructureTest do
   describe "reorder_categories/1" do
     test "assigns positions in the supplied order" do
       %{server: server} = seed_server()
-      {:ok, a} = Servers.create_category(%{server_id: server.id, name: "a"})
-      {:ok, b} = Servers.create_category(%{server_id: server.id, name: "b"})
+
+      {:ok, a} =
+        Servers.create_category(%{server_id: server.id, name: "a"}, authorize?: false)
+
+      {:ok, b} =
+        Servers.create_category(%{server_id: server.id, name: "b"}, authorize?: false)
 
       {:ok, _} =
-        Servers.reorder_categories(%{server_id: server.id, ordered_ids: [b.id, a.id]})
+        Servers.reorder_categories(%{server_id: server.id, ordered_ids: [b.id, a.id]},
+          authorize?: false
+        )
 
       positions =
         Yawp.Servers.Category
@@ -229,13 +286,81 @@ defmodule Yawp.Servers.ChannelStructureTest do
       %{server: server} = seed_server()
 
       {:ok, channel} =
-        Servers.create_channel(%{server_id: server.id, name: "general", type: :text})
+        Servers.create_channel(
+          %{server_id: server.id, name: "general", type: :text},
+          authorize?: false
+        )
 
-      :ok = Servers.destroy_channel(channel)
+      :ok = Servers.destroy_channel(channel, authorize?: false)
 
       assert Yawp.Servers.Channel
              |> Ash.read!(authorize?: false)
              |> Enum.all?(&(&1.id != channel.id))
+    end
+  end
+
+  describe "same-server foreign-key validation" do
+    test "create_channel/1 rejects a category from another server" do
+      %{server: server} = seed_server()
+      %{server: other_server} = seed_server_named("Other")
+
+      {:ok, foreign_category} =
+        Servers.create_category(
+          %{server_id: other_server.id, name: "Foreign"},
+          authorize?: false
+        )
+
+      assert {:error, _err} =
+               Servers.create_channel(
+                 %{
+                   server_id: server.id,
+                   name: "general",
+                   type: :text,
+                   category_id: foreign_category.id
+                 },
+                 authorize?: false
+               )
+    end
+
+    test "recategorize_channel/2 rejects a category from another server" do
+      %{server: server} = seed_server()
+      %{server: other_server} = seed_server_named("Other")
+
+      {:ok, foreign_category} =
+        Servers.create_category(
+          %{server_id: other_server.id, name: "Foreign"},
+          authorize?: false
+        )
+
+      {:ok, channel} =
+        Servers.create_channel(
+          %{server_id: server.id, name: "general", type: :text},
+          authorize?: false
+        )
+
+      assert {:error, _err} =
+               Servers.recategorize_channel(
+                 channel,
+                 %{category_id: foreign_category.id},
+                 authorize?: false
+               )
+    end
+
+    test "create_category/1 rejects a parent from another server" do
+      %{server: server} = seed_server()
+      %{server: other_server} = seed_server_named("Other")
+
+      {:ok, foreign_parent} =
+        Servers.create_category(
+          %{server_id: other_server.id, name: "Foreign"},
+          authorize?: false
+        )
+
+      assert {:error, _err} =
+               Servers.create_category(
+                 %{server_id: server.id, name: "Child", parent_id: foreign_parent.id},
+                 authorize?: false
+               )
     end
   end
 
@@ -283,7 +408,9 @@ defmodule Yawp.Servers.ChannelStructureTest do
     test "an actor without manage_channels cannot reorder channels" do
       %{server: server, member_role: member_role} = seed_server()
       member = member_of(server, member_role)
-      {:ok, a} = Servers.create_channel(%{server_id: server.id, name: "a", type: :text})
+
+      {:ok, a} =
+        Servers.create_channel(%{server_id: server.id, name: "a", type: :text}, authorize?: false)
 
       assert {:error, _err} =
                Servers.reorder_channels(
@@ -295,10 +422,15 @@ defmodule Yawp.Servers.ChannelStructureTest do
     test "an actor without manage_channels cannot recategorize a channel" do
       %{server: server, member_role: member_role} = seed_server()
       member = member_of(server, member_role)
-      {:ok, category} = Servers.create_category(%{server_id: server.id, name: "Text"})
+
+      {:ok, category} =
+        Servers.create_category(%{server_id: server.id, name: "Text"}, authorize?: false)
 
       {:ok, channel} =
-        Servers.create_channel(%{server_id: server.id, name: "general", type: :text})
+        Servers.create_channel(
+          %{server_id: server.id, name: "general", type: :text},
+          authorize?: false
+        )
 
       assert {:error, _err} =
                Servers.recategorize_channel(
@@ -313,7 +445,10 @@ defmodule Yawp.Servers.ChannelStructureTest do
       member = member_of(server, member_role)
 
       {:ok, channel} =
-        Servers.create_channel(%{server_id: server.id, name: "general", type: :text})
+        Servers.create_channel(
+          %{server_id: server.id, name: "general", type: :text},
+          authorize?: false
+        )
 
       assert {:error, _err} = Servers.destroy_channel(channel, actor: member)
 
@@ -327,7 +462,10 @@ defmodule Yawp.Servers.ChannelStructureTest do
       admin = member_of(server, admin_role)
 
       {:ok, channel} =
-        Servers.create_channel(%{server_id: server.id, name: "general", type: :text})
+        Servers.create_channel(
+          %{server_id: server.id, name: "general", type: :text},
+          authorize?: false
+        )
 
       :ok = Servers.destroy_channel(channel, actor: admin)
 
@@ -339,10 +477,15 @@ defmodule Yawp.Servers.ChannelStructureTest do
     test "an admin actor can recategorize a channel" do
       %{server: server, admin_role: admin_role} = seed_server()
       admin = member_of(server, admin_role)
-      {:ok, category} = Servers.create_category(%{server_id: server.id, name: "Text"})
+
+      {:ok, category} =
+        Servers.create_category(%{server_id: server.id, name: "Text"}, authorize?: false)
 
       {:ok, channel} =
-        Servers.create_channel(%{server_id: server.id, name: "general", type: :text})
+        Servers.create_channel(
+          %{server_id: server.id, name: "general", type: :text},
+          authorize?: false
+        )
 
       {:ok, moved} =
         Servers.recategorize_channel(

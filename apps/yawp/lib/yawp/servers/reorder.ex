@@ -2,8 +2,12 @@ defmodule Yawp.Servers.Reorder do
   @moduledoc """
   Shared positioning logic for the channel and category `:reorder`
   generic actions. Verifies the actor holds `manage_channels` on the
-  server (a `nil` actor is a trusted internal call), then writes
-  positions `0..n-1` to the rows named in `ordered_ids`, in order.
+  server, then writes positions `0..n-1` to the rows named in
+  `ordered_ids`, in order.
+
+  A `nil` actor is rejected with `not_authenticated` on any authorized
+  call — only an explicit authorization bypass (`authorize?: false`,
+  used by trusted server-side callers and tests) skips the gate.
   """
 
   alias Yawp.RpcError
@@ -11,14 +15,24 @@ defmodule Yawp.Servers.Reorder do
 
   @spec run(module(), map(), map()) :: {:ok, non_neg_integer()} | {:error, term()}
   def run(resource, %{server_id: server_id, ordered_ids: ordered_ids}, context) do
-    with :ok <- authorize(server_id, context_actor(context)) do
+    with :ok <- authorize(server_id, context) do
       reposition(resource, server_id, ordered_ids)
     end
   end
 
-  defp authorize(_server_id, nil), do: :ok
+  defp authorize(_server_id, %{authorize?: false}), do: :ok
 
-  defp authorize(server_id, %Yawp.Identity.Identity{} = actor) do
+  defp authorize(server_id, context) do
+    case context_actor(context) do
+      %Yawp.Identity.Identity{} = actor ->
+        gate(server_id, actor)
+
+      _ ->
+        {:error, RpcError.exception(type: "not_authenticated", message: "not_authenticated")}
+    end
+  end
+
+  defp gate(server_id, actor) do
     case Ash.get(Yawp.Servers.Server, server_id, authorize?: false) do
       {:ok, server} ->
         if Permissions.has?(Permissions.effective_bits(actor, server, nil), :manage_channels) do
@@ -31,9 +45,6 @@ defmodule Yawp.Servers.Reorder do
         {:error, RpcError.exception(type: "missing_permission", message: "manage_channels")}
     end
   end
-
-  defp authorize(_server_id, _actor),
-    do: {:error, RpcError.exception(type: "not_authenticated", message: "not_authenticated")}
 
   defp reposition(resource, server_id, ordered_ids) do
     {:ok, {count, notifications}} =

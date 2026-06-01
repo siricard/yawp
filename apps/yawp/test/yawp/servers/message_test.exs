@@ -9,10 +9,16 @@ defmodule Yawp.Servers.MessageTest do
     {:ok, server} = Servers.create_server("Yawp")
 
     {:ok, channel_a} =
-      Servers.create_channel(%{server_id: server.id, name: "general", type: :text})
+      Servers.create_channel(
+        %{server_id: server.id, name: "general", type: :text},
+        authorize?: false
+      )
 
     {:ok, channel_b} =
-      Servers.create_channel(%{server_id: server.id, name: "random", type: :text})
+      Servers.create_channel(
+        %{server_id: server.id, name: "random", type: :text},
+        authorize?: false
+      )
 
     sender = seed_identity()
 

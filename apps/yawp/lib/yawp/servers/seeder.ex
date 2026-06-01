@@ -91,7 +91,7 @@ defmodule Yawp.Servers.Seeder do
               name: name,
               type: type
             },
-            notify_opts
+            Keyword.put(notify_opts, :authorize?, false)
           )
 
         Logger.info("Yawp.Servers.Seeder: created #{type} channel #{name}")

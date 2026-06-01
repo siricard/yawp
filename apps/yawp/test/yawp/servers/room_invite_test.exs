@@ -28,12 +28,16 @@ defmodule Yawp.Servers.RoomInviteTest do
 
     {:ok, channel} =
       Servers.Channel
-      |> Ash.Changeset.for_create(:create, %{
-        server_id: server.id,
-        name: "secret",
-        type: :text,
-        visibility: :private
-      })
+      |> Ash.Changeset.for_create(
+        :create,
+        %{
+          server_id: server.id,
+          name: "secret",
+          type: :text,
+          visibility: :private
+        },
+        authorize?: false
+      )
       |> Ash.create(authorize?: false)
 
     %{server: server, channel: channel}
