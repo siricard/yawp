@@ -16,6 +16,7 @@ defmodule Yawp.Application do
        )},
       {Phoenix.PubSub, name: Yawp.PubSub},
       Yawp.Federation.KeyDocCache,
+      Yawp.Federation.DeliveryNonceCache,
       YawpWeb.Presence,
       Yawp.Vault,
       Yawp.Admin.SetupToken,
