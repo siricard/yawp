@@ -112,4 +112,53 @@ describe('WorkspaceBar responsive collapse', () => {
       .map(n => n.props.children);
     expect(labels).toContain('B');
   });
+
+  function hasDot(root: ReactTestRenderer.ReactTestRenderer): boolean {
+    return root.root.findAllByProps({testID: 'workspace-unread-dot'}).length > 0;
+  }
+
+  test('a non-active server unread renders a dot on the collapsed toggle', () => {
+    mockServers = [
+      mk('http://alpha', {unreadCount: 2}),
+      mk('http://bravo'),
+    ];
+    const root = render({activeServerUrl: 'http://bravo'});
+    expect(hasDot(root)).toBe(true);
+  });
+
+  test('unread on the active server alone does not dot the toggle', () => {
+    mockServers = [
+      mk('http://alpha', {unreadCount: 2}),
+      mk('http://bravo'),
+    ];
+    const root = render({activeServerUrl: 'http://alpha'});
+    expect(hasDot(root)).toBe(false);
+  });
+
+  test('a mention on a non-active server renders a mention-styled toggle dot', () => {
+    mockServers = [
+      mk('http://alpha', {unreadCount: -1}),
+      mk('http://bravo'),
+    ];
+    const root = render({activeServerUrl: 'http://bravo'});
+    const dot = root.root.findByProps({testID: 'workspace-unread-dot'});
+    expect(dot.props.accessibilityLabel).toBe('mention');
+  });
+
+  test('drawer rows surface per-server unread dots', () => {
+    mockServers = [
+      mk('http://alpha', {unreadCount: 3}),
+      mk('http://bravo'),
+    ];
+    const root = render({activeServerUrl: 'http://bravo'});
+    ReactTestRenderer.act(() => {
+      root.root.findByProps({testID: 'workspace-toggle'}).props.onPress();
+    });
+    expect(
+      has(root, 'workspaces-drawer-unread-http://alpha'),
+    ).toBe(true);
+    expect(
+      has(root, 'workspaces-drawer-unread-http://bravo'),
+    ).toBe(false);
+  });
 });

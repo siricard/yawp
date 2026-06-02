@@ -8,6 +8,7 @@ defmodule YawpWeb.ChannelStructureRpcAuthzTest do
   """
   use YawpWeb.ConnCase, async: false
 
+  alias Yawp.Identity
   alias Yawp.Servers
 
   require Ash.Query
@@ -22,6 +23,25 @@ defmodule YawpWeb.ChannelStructureRpcAuthzTest do
       |> Ash.read_one(authorize?: false)
 
     %{conn: conn, server: server, channel: channel}
+  end
+
+  defp seed_identity!() do
+    {pk, _sk} = :crypto.generate_key(:eddsa, :ed25519)
+    did = "did:yawp:" <> Identity.did_from_pubkey(pk)
+    Ash.Seed.seed!(Yawp.Identity.Identity, %{did: did, master_public_key: pk})
+  end
+
+  defp owner!(server) do
+    owner = seed_identity!()
+    {:ok, _} = Servers.set_server_owner(server, owner.did)
+    {:ok, role} = Servers.get_system_role_for_server("Owner", server.id)
+    {:ok, _} = Servers.assign_role(owner.id, server.id, [role.id])
+    owner
+  end
+
+  defp bearer(identity) do
+    {:ok, %{session_token: session}} = Identity.issue_pair(identity.id, Ecto.UUID.generate())
+    session.token
   end
 
   defp rpc(conn, action, input) do
@@ -140,5 +160,49 @@ defmodule YawpWeb.ChannelStructureRpcAuthzTest do
     assert Servers.Channel
            |> Ash.read!(authorize?: false)
            |> Enum.any?(&(&1.id == channel.id))
+  end
+
+  test "an owner reorder_channels over the wire persists the new positions", %{
+    conn: conn,
+    server: server,
+    channel: seeded
+  } do
+    owner = owner!(server)
+
+    {:ok, second} =
+      Servers.create_channel(
+        %{server_id: server.id, name: "second", type: :text},
+        authorize?: false
+      )
+
+    {:ok, third} =
+      Servers.create_channel(
+        %{server_id: server.id, name: "third", type: :text},
+        authorize?: false
+      )
+
+    payload =
+      conn
+      |> put_req_header("content-type", "application/json")
+      |> put_req_header("authorization", "Bearer #{bearer(owner)}")
+      |> post(~p"/rpc/run", %{
+        "action" => "reorder_channels",
+        "input" => %{
+          "serverId" => server.id,
+          "orderedIds" => [third.id, seeded.id, second.id]
+        }
+      })
+      |> json_response(200)
+
+    assert payload["success"] == true
+
+    positions =
+      Servers.Channel
+      |> Ash.read!(authorize?: false)
+      |> Map.new(&{&1.id, &1.position})
+
+    assert positions[third.id] == 0
+    assert positions[seeded.id] == 1
+    assert positions[second.id] == 2
   end
 end

@@ -24,6 +24,22 @@ function initials(label: string): string {
   return cleaned.charAt(0).toUpperCase() || '?';
 }
 
+function DrawerUnreadDot({url, count}: {url: string; count: number}) {
+  const mention = count < 0;
+  return (
+    <View
+      testID={`workspaces-drawer-unread-${url}`}
+      accessibilityLabel={mention ? 'mention' : 'unread'}
+      pointerEvents="none"
+      style={{position: 'absolute', top: -2, right: -2}}
+      className={[
+        'w-2.5 h-2.5 rounded-full border-2 border-surface',
+        mention ? 'bg-danger' : 'bg-primary',
+      ].join(' ')}
+    />
+  );
+}
+
 export function WorkspacesDrawer({
   visible,
   onClose,
@@ -99,6 +115,7 @@ export function WorkspacesDrawer({
 
           {servers.map(server => {
             const isActive = activeServerUrl === server.url && !dmActive;
+            const unread = isActive ? 0 : server.unreadCount ?? 0;
             return (
               <Pressable
                 key={server.url}
@@ -117,6 +134,9 @@ export function WorkspacesDrawer({
                   <Text className="text-sm font-bold text-text">
                     {initials(server.label)}
                   </Text>
+                  {unread !== 0 ? (
+                    <DrawerUnreadDot url={server.url} count={unread} />
+                  ) : null}
                 </View>
                 <Text className="text-sm font-bold text-text" numberOfLines={1}>
                   {server.label}

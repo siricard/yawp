@@ -3,6 +3,7 @@ import {Platform, Pressable, ScrollView, Text, View} from 'react-native';
 
 import {Badge} from '../ui/Badge';
 import {pointerCursor} from '../ui/cursor';
+import {Draggable} from '../ui/Draggable';
 import type {CategoryGroup, TreeChannel} from './server-tree';
 
 const monospace = Platform.select({
@@ -59,36 +60,32 @@ function CategoryLabel({
   onDragEnd?: () => void;
   dragging?: boolean;
 }) {
-  const dragProps =
-    Platform.OS === 'web' && editMode
-      ? ({
-          draggable: true,
-          onDragStart,
-          onDragOver: (e: {preventDefault?: () => void}) => e.preventDefault?.(),
-          onDrop,
-          onDragEnd,
-        } as Record<string, unknown>)
-      : {};
   return (
-    <Text
-      testID={`category-label-${category.id}`}
-      {...dragProps}
-      className={[
-        'text-text-tertiary uppercase',
-        dragging ? 'opacity-40' : '',
-      ].join(' ')}
-      style={[
-        {
-          fontFamily: monospace,
-          fontSize: 10,
-          fontWeight: '600',
-          letterSpacing: 1,
-          paddingHorizontal: 4,
-        },
-        editMode ? pointerCursor : null,
-      ]}>
-      {category.name}
-    </Text>
+    <Draggable
+      testID={`category-drag-${category.id}`}
+      enabled={editMode}
+      onDragStart={onDragStart}
+      onDrop={onDrop}
+      onDragEnd={onDragEnd}>
+      <Text
+        testID={`category-label-${category.id}`}
+        className={[
+          'text-text-tertiary uppercase',
+          dragging ? 'opacity-40' : '',
+        ].join(' ')}
+        style={[
+          {
+            fontFamily: monospace,
+            fontSize: 10,
+            fontWeight: '600',
+            letterSpacing: 1,
+            paddingHorizontal: 4,
+          },
+          editMode ? pointerCursor : null,
+        ]}>
+        {category.name}
+      </Text>
+    </Draggable>
   );
 }
 
@@ -114,62 +111,58 @@ function ChannelTab({
   dragging?: boolean;
 }) {
   const unread = channel.unreadCount ?? 0;
-  const dragProps =
-    Platform.OS === 'web' && editMode
-      ? ({
-          draggable: true,
-          onDragStart,
-          onDragOver: (e: {preventDefault?: () => void}) => e.preventDefault?.(),
-          onDrop,
-          onDragEnd,
-        } as Record<string, unknown>)
-      : {};
   return (
-    <Pressable
-      testID={`channel-tab-${channel.id}`}
-      accessibilityRole="button"
-      accessibilityLabel={`channel ${channel.name}`}
-      onPress={onSelect}
-      {...dragProps}
-      style={[{paddingVertical: 6, paddingHorizontal: 12}, pointerCursor]}
-      className={[
-        'rounded-pill flex-row items-center',
-        active ? 'bg-surface-2 border border-border-soft' : '',
-        dragging ? 'opacity-40' : '',
-      ].join(' ')}>
-      <Text
-        className={active ? 'text-text-secondary' : 'text-text-tertiary'}
-        style={{fontFamily: monospace, fontWeight: '700', marginRight: 4}}>
-        #
-      </Text>
-      <Text
+    <Draggable
+      testID={`channel-drag-${channel.id}`}
+      enabled={editMode}
+      onDragStart={onDragStart}
+      onDrop={onDrop}
+      onDragEnd={onDragEnd}>
+      <Pressable
+        testID={`channel-tab-${channel.id}`}
+        accessibilityRole="button"
+        accessibilityLabel={`channel ${channel.name}`}
+        onPress={onSelect}
+        style={[{paddingVertical: 6, paddingHorizontal: 12}, pointerCursor]}
         className={[
-          'text-xs font-semibold',
-          active ? 'text-text' : 'text-text-secondary',
+          'rounded-pill flex-row items-center',
+          active ? 'bg-surface-2 border border-border-soft' : '',
+          dragging ? 'opacity-40' : '',
         ].join(' ')}>
-        {channel.name}
-      </Text>
-      {unread > 0 ? (
-        <View style={{marginLeft: 6}}>
-          <Badge
-            testID={`channel-tab-badge-${channel.id}`}
-            count={unread}
-            tone="primary"
-          />
-        </View>
-      ) : null}
-      {editMode && onDelete ? (
-        <Pressable
-          testID={`channel-tab-delete-${channel.id}`}
-          accessibilityRole="button"
-          accessibilityLabel={`delete channel ${channel.name}`}
-          onPress={onDelete}
-          style={[{marginLeft: 6}, pointerCursor]}
-          className="w-4 h-4 rounded-full bg-danger/20 items-center justify-center">
-          <Text className="text-danger text-xs">×</Text>
-        </Pressable>
-      ) : null}
-    </Pressable>
+        <Text
+          className={active ? 'text-text-secondary' : 'text-text-tertiary'}
+          style={{fontFamily: monospace, fontWeight: '700', marginRight: 4}}>
+          #
+        </Text>
+        <Text
+          className={[
+            'text-xs font-semibold',
+            active ? 'text-text' : 'text-text-secondary',
+          ].join(' ')}>
+          {channel.name}
+        </Text>
+        {unread > 0 ? (
+          <View style={{marginLeft: 6}}>
+            <Badge
+              testID={`channel-tab-badge-${channel.id}`}
+              count={unread}
+              tone="primary"
+            />
+          </View>
+        ) : null}
+        {editMode && onDelete ? (
+          <Pressable
+            testID={`channel-tab-delete-${channel.id}`}
+            accessibilityRole="button"
+            accessibilityLabel={`delete channel ${channel.name}`}
+            onPress={onDelete}
+            style={[{marginLeft: 6}, pointerCursor]}
+            className="w-4 h-4 rounded-full bg-danger/20 items-center justify-center">
+            <Text className="text-danger text-xs">×</Text>
+          </Pressable>
+        ) : null}
+      </Pressable>
+    </Draggable>
   );
 }
 

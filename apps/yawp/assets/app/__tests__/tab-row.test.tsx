@@ -2,10 +2,37 @@ import React from 'react';
 import {Platform} from 'react-native';
 import ReactTestRenderer from 'react-test-renderer';
 
-import {TabRow} from '../chat/TabRow';
 import type {CategoryGroup} from '../chat/server-tree';
 
 (Platform as {OS: string}).OS = 'web';
+
+jest.mock('../ui/Draggable', () => {
+  const ReactModule = require('react');
+  return {
+    Draggable: ({
+      children,
+      testID,
+      onDragStart,
+      onDrop,
+      onDragEnd,
+      enabled,
+    }: {
+      children: React.ReactNode;
+      testID?: string;
+      onDragStart?: () => void;
+      onDrop?: () => void;
+      onDragEnd?: () => void;
+      enabled?: boolean;
+    }) =>
+      ReactModule.createElement(
+        'draggable-mock',
+        {testID, onDragStart, onDrop, onDragEnd, enabled},
+        children,
+      ),
+  };
+});
+
+import {TabRow} from '../chat/TabRow';
 
 const GROUPS: CategoryGroup[] = [
   {
@@ -112,8 +139,8 @@ describe('TabRow', () => {
       editMode: true,
       onReorderChannels,
     });
-    const ch2 = root.root.findByProps({testID: 'channel-tab-ch-2'});
-    const ch3 = root.root.findByProps({testID: 'channel-tab-ch-3'});
+    const ch2 = root.root.findByProps({testID: 'channel-drag-ch-2'});
+    const ch3 = root.root.findByProps({testID: 'channel-drag-ch-3'});
     ReactTestRenderer.act(() => {
       ch2.props.onDragStart();
       ch3.props.onDrop();
@@ -128,8 +155,8 @@ describe('TabRow', () => {
       editMode: true,
       onRecategorizeChannel,
     });
-    const ch1 = root.root.findByProps({testID: 'channel-tab-ch-1'});
-    const cat = root.root.findByProps({testID: 'category-label-cat-a'});
+    const ch1 = root.root.findByProps({testID: 'channel-drag-ch-1'});
+    const cat = root.root.findByProps({testID: 'category-drag-cat-a'});
     ReactTestRenderer.act(() => {
       ch1.props.onDragStart();
       cat.props.onDrop();
@@ -155,8 +182,8 @@ describe('TabRow', () => {
       editMode: true,
       onReorderCategories,
     });
-    const catB = root.root.findByProps({testID: 'category-label-cat-b'});
-    const catA = root.root.findByProps({testID: 'category-label-cat-a'});
+    const catB = root.root.findByProps({testID: 'category-drag-cat-b'});
+    const catA = root.root.findByProps({testID: 'category-drag-cat-a'});
     ReactTestRenderer.act(() => {
       catB.props.onDragStart();
       catA.props.onDrop();

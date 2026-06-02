@@ -15,6 +15,7 @@ import {
   type WorkspaceServer,
 } from '../identity-context';
 import {pointerCursor} from '../ui/cursor';
+import {Draggable} from '../ui/Draggable';
 import {WorkspacesDrawer} from './WorkspacesDrawer';
 
 export const WORKSPACE_BAR_HEIGHT = 59;
@@ -34,6 +35,20 @@ function initials(label: string): string {
   const cleaned = label.replace(/^https?:\/\//, '');
   const first = cleaned.charAt(0).toUpperCase();
   return first || '?';
+}
+
+function aggregateUnread(
+  servers: WorkspaceServer[],
+  activeServerUrl: string | null,
+): number {
+  let total = 0;
+  for (const server of servers) {
+    if (server.url === activeServerUrl) continue;
+    const unread = server.unreadCount ?? 0;
+    if (unread < 0) return -1;
+    total += unread;
+  }
+  return total;
 }
 
 function UnreadDot({count}: {count: number}) {
@@ -79,6 +94,8 @@ export function WorkspaceBar({
       ? initials(activeServer.label)
       : selfInitial;
 
+  const backgroundUnread = aggregateUnread(servers, activeServerUrl);
+
   if (narrow) {
     return (
       <>
@@ -111,6 +128,7 @@ export function WorkspaceBar({
               ].join(' ')}>
               {toggleLabel}
             </Text>
+            {backgroundUnread !== 0 ? <UnreadDot count={backgroundUnread} /> : null}
           </Pressable>
         </View>
         <WorkspacesDrawer
@@ -180,46 +198,42 @@ export function WorkspaceBar({
           const isBinding = bindingUrl === server.url;
           const isActive = activeServerUrl === server.url && !dmActive;
           const unread = server.unreadCount ?? 0;
-          const dragProps = isWeb
-            ? ({
-                draggable: !isBinding,
-                onDragStart: () => startDrag(server.url),
-                onDragOver: (e: {preventDefault?: () => void}) =>
-                  e.preventDefault?.(),
-                onDrop: () => handleDrop(server.url),
-                onDragEnd: endDrag,
-              } as Record<string, unknown>)
-            : {};
           return (
-            <Pressable
+            <Draggable
               key={server.url}
-              testID={`workspace-tile-${server.url}`}
-              accessibilityRole="button"
-              accessibilityLabel={`server ${server.label}`}
-              onPress={() => onSelectServer?.(server)}
-              disabled={isBinding}
-              {...dragProps}
-              style={[{width: 38, height: 38}, isBinding ? undefined : pointerCursor]}
-              className={[
-                'rounded-xl bg-surface-2 items-center justify-center active:bg-surface-3',
-                isActive ? 'border-2 border-primary' : '',
-                isBinding ? 'opacity-60 animate-pulse' : '',
-                dragUrl === server.url ? 'opacity-40' : '',
-              ].join(' ')}>
-              <Text className="text-sm font-bold text-text">
-                {initials(server.label)}
-              </Text>
-              {unread !== 0 && !isBinding ? <UnreadDot count={unread} /> : null}
-              {isBinding ? (
-                <View
-                  testID={`workspace-tile-binding-${server.url}`}
-                  accessibilityLabel={`binding ${server.label}`}
-                  pointerEvents="none"
-                  style={{position: 'absolute', right: 4, bottom: 4}}
-                  className="w-2 h-2 rounded-full bg-success"
-                />
-              ) : null}
-            </Pressable>
+              testID={`workspace-tile-drag-${server.url}`}
+              enabled={isWeb && !isBinding}
+              onDragStart={() => startDrag(server.url)}
+              onDrop={() => handleDrop(server.url)}
+              onDragEnd={endDrag}>
+              <Pressable
+                testID={`workspace-tile-${server.url}`}
+                accessibilityRole="button"
+                accessibilityLabel={`server ${server.label}`}
+                onPress={() => onSelectServer?.(server)}
+                disabled={isBinding}
+                style={[{width: 38, height: 38}, isBinding ? undefined : pointerCursor]}
+                className={[
+                  'rounded-xl bg-surface-2 items-center justify-center active:bg-surface-3',
+                  isActive ? 'border-2 border-primary' : '',
+                  isBinding ? 'opacity-60 animate-pulse' : '',
+                  dragUrl === server.url ? 'opacity-40' : '',
+                ].join(' ')}>
+                <Text className="text-sm font-bold text-text">
+                  {initials(server.label)}
+                </Text>
+                {unread !== 0 && !isBinding ? <UnreadDot count={unread} /> : null}
+                {isBinding ? (
+                  <View
+                    testID={`workspace-tile-binding-${server.url}`}
+                    accessibilityLabel={`binding ${server.label}`}
+                    pointerEvents="none"
+                    style={{position: 'absolute', right: 4, bottom: 4}}
+                    className="w-2 h-2 rounded-full bg-success"
+                  />
+                ) : null}
+              </Pressable>
+            </Draggable>
           );
         })}
 

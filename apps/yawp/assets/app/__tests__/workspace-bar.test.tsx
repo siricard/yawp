@@ -18,6 +18,32 @@ jest.mock('../identity-context', () => ({
   useDisplayName: () => ({effectiveDisplayName: 'Brave Otter'}),
 }));
 
+jest.mock('../ui/Draggable', () => {
+  const ReactModule = require('react');
+  return {
+    Draggable: ({
+      children,
+      testID,
+      onDragStart,
+      onDrop,
+      onDragEnd,
+      enabled,
+    }: {
+      children: React.ReactNode;
+      testID?: string;
+      onDragStart?: () => void;
+      onDrop?: () => void;
+      onDragEnd?: () => void;
+      enabled?: boolean;
+    }) =>
+      ReactModule.createElement(
+        'draggable-mock',
+        {testID, onDragStart, onDrop, onDragEnd, enabled},
+        children,
+      ),
+  };
+});
+
 import {WorkspaceBar} from '../screens/WorkspaceBar';
 
 function mk(url: string, extra: Partial<WorkspaceServer> = {}): WorkspaceServer {
@@ -87,8 +113,8 @@ describe('WorkspaceBar', () => {
 
   test('dragging one tile onto another calls reorderServers with the new order', () => {
     const root = render();
-    const tileA = root.root.findByProps({testID: 'workspace-tile-http://a'});
-    const tileB = root.root.findByProps({testID: 'workspace-tile-http://b'});
+    const tileA = root.root.findByProps({testID: 'workspace-tile-drag-http://a'});
+    const tileB = root.root.findByProps({testID: 'workspace-tile-drag-http://b'});
     ReactTestRenderer.act(() => {
       tileA.props.onDragStart();
       tileB.props.onDrop();
