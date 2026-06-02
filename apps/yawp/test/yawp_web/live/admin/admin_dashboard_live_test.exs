@@ -116,6 +116,7 @@ defmodule YawpWeb.AdminDashboardLiveTest do
       assert has_element?(view, "#claim-token-value", token.token)
       assert has_element?(view, "#claim-token-replace-btn")
       assert has_element?(view, "#claim-token-revoke-btn")
+      assert_push_event(view, "reveal-token", %{id: "claim-token-value"})
       refute has_element?(view, "#claim-token-generate-btn")
     end
 
@@ -243,6 +244,7 @@ defmodule YawpWeb.AdminDashboardLiveTest do
 
       assert has_element?(view, "#server-invite-token-#{invite.id}", invite.token)
       assert has_element?(view, "#server-invite-revoke-btn-#{invite.id}")
+      assert_push_event(view, "reveal-token", %{id: "server-invite-token-" <> _})
     end
 
     test "multi-use mint button mints a multi_use invite with the entered uses_remaining",

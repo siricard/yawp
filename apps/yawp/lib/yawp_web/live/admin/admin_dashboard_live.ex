@@ -73,7 +73,9 @@ defmodule YawpWeb.AdminDashboardLive do
     socket = stream_insert(socket, :audit_log, generate_entry, at: 0)
 
     {:noreply,
-     put_flash(socket, :info, "Claim token generated. Copy it now — it will not be shown again.")}
+     socket
+     |> put_flash(:info, "Claim token generated. Copy it now — it will not be shown again.")
+     |> push_event("reveal-token", %{id: "claim-token-value"})}
   end
 
   def handle_event("acknowledge_per_server_defaults", _params, socket) do
@@ -121,7 +123,8 @@ defmodule YawpWeb.AdminDashboardLive do
              |> put_flash(
                :info,
                "Server invite minted. Copy the token — it will not be shown again."
-             )}
+             )
+             |> push_event("reveal-token", %{id: "server-invite-token-#{invite.id}"})}
 
           {:error, _error} ->
             {:noreply, put_flash(socket, :error, "Could not mint server invite.")}
@@ -174,8 +177,23 @@ defmodule YawpWeb.AdminDashboardLive do
     <Layouts.app flash={@flash}>
       <header
         id="admin-header-strip"
+        phx-hook=".RevealToken"
         class="flex items-center justify-between gap-4 bg-surface text-text rounded-lg px-4 py-3 mb-4 shadow-card"
       >
+        <script :type={Phoenix.LiveView.ColocatedHook} name=".RevealToken">
+          export default {
+            mounted() {
+              this.handleEvent("reveal-token", ({id}) => {
+                requestAnimationFrame(() => {
+                  const el = document.getElementById(id)
+                  if (el) {
+                    el.scrollIntoView({behavior: "smooth", block: "center"})
+                  }
+                })
+              })
+            }
+          }
+        </script>
         <div>
           <h1 class="font-display text-2xl font-bold text-text">Operator console</h1>
           <p class="text-sm text-text-secondary font-mono">
