@@ -16,6 +16,8 @@ defmodule Yawp.Servers.ServerInviteTest do
   """
   use Yawp.DataCase, async: false
 
+  require Ash.Query
+
   alias Yawp.Identity
   alias Yawp.Servers
   alias Yawp.Servers.ServerInvite
@@ -45,6 +47,25 @@ defmodule Yawp.Servers.ServerInviteTest do
         "did" => did,
         "pk" => pk_b64
       })
+
+    sig = :crypto.sign(:eddsa, :none, canonical, [sk, :ed25519])
+
+    %{
+      token: token,
+      did: did,
+      pk: pk_b64,
+      sender_signature: Base.url_encode64(sig, padding: false),
+      _pk_bytes: pk,
+      _sk_bytes: sk
+    }
+  end
+
+  defp build_redeem_args_for(token, pk, sk) do
+    did = "did:yawp:" <> Identity.did_from_pubkey(pk)
+    pk_b64 = Base.url_encode64(pk, padding: false)
+
+    canonical =
+      Yawp.CanonicalJson.encode(%{"token" => token, "did" => did, "pk" => pk_b64})
 
     sig = :crypto.sign(:eddsa, :none, canonical, [sk, :ed25519])
 
@@ -202,6 +223,48 @@ defmodule Yawp.Servers.ServerInviteTest do
 
       assert {:error, error} = do_redeem(build_redeem_args(invite.token))
       assert error_type(error) == "invite_token_exhausted"
+    end
+  end
+
+  describe "redeem after a kick" do
+    test "clears the kicked flag and restores an authorized membership",
+         %{server: server, owner: owner} do
+      {:ok, invite} =
+        Servers.mint_server_invite(%{server_id: server.id}, actor: owner)
+
+      args = build_redeem_args(invite.token)
+      assert {:ok, _} = do_redeem(args)
+
+      identity = Yawp.Identity.get_identity_by_did!(args.did)
+
+      membership =
+        Yawp.Servers.Membership
+        |> Ash.Query.filter(identity_id == ^identity.id and server_id == ^server.id)
+        |> Ash.read_one!(authorize?: false)
+
+      {:ok, kicked} =
+        membership
+        |> Ash.Changeset.for_update(:set_moderation, %{kicked: true})
+        |> Ash.update(authorize?: false)
+
+      assert kicked.kicked == true
+
+      {:ok, refreshed_invite} =
+        Servers.mint_server_invite(%{server_id: server.id}, actor: owner)
+
+      rejoin_args = build_redeem_args_for(refreshed_invite.token, args._pk_bytes, args._sk_bytes)
+      assert {:ok, %{server_id: rejoined_server_id}} = do_redeem(rejoin_args)
+      assert rejoined_server_id == server.id
+
+      reread =
+        Yawp.Servers.Membership
+        |> Ash.Query.filter(identity_id == ^identity.id and server_id == ^server.id)
+        |> Ash.read_one!(authorize?: false)
+
+      assert reread.kicked == false
+
+      bits = Yawp.Servers.Permissions.effective_bits(identity, server, nil)
+      assert Yawp.Servers.Permissions.has?(bits, :read_messages)
     end
   end
 

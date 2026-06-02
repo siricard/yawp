@@ -17,6 +17,20 @@ jest.mock('../chat/server-tree', () => {
   };
 });
 
+jest.mock('../chat/server-unread', () => ({
+  useServerUnread: () => ({unreadByChannel: {}, total: 0}),
+}));
+
+jest.mock('../identity-context', () => ({
+  useWorkspaceServers: () => ({
+    servers: [],
+    addServer: jest.fn(),
+    removeServer: jest.fn(),
+    setServerUnread: jest.fn(),
+    reorderServers: jest.fn(),
+  }),
+}));
+
 jest.mock('../screens/ChannelScreen', () => {
   const ReactLib = require('react');
   const {Text} = require('react-native');

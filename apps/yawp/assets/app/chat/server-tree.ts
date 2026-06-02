@@ -8,6 +8,40 @@ import {
   reorderCategories,
   reorderChannels,
 } from '../ash_generated';
+import {getValidSessionToken} from '../session';
+
+export type MutationResult = {ok: boolean; error?: string; message?: string};
+
+const SLUG_MESSAGES: Record<string, string> = {
+  not_authenticated: 'You must be signed in on this server.',
+  missing_permission: "You don't have permission to manage channels.",
+  no_session: 'No active session on this anchor. Re-add the server.',
+  rotation_failed: 'Your session expired. Re-add the server.',
+  network_error: 'Could not reach the server. Check your connection.',
+  internal_error: 'The server hit an internal error. Try again later.',
+};
+
+function humanize(slug: string, fallback: string): string {
+  return SLUG_MESSAGES[slug] ?? fallback;
+}
+
+type AuthHeadersResult =
+  | {ok: true; headers: Record<string, string>}
+  | {ok: false; error: string; message: string};
+
+async function authHeaders(serverUrl: string): Promise<AuthHeadersResult> {
+  const session = await getValidSessionToken({serverUrl});
+  if (!session.ok) {
+    return {ok: false, error: session.reason, message: humanize(session.reason, 'No session.')};
+  }
+  return {ok: true, headers: {Authorization: `Bearer ${session.sessionToken}`}};
+}
+
+function failure(errors: {type?: string; message?: string}[]): MutationResult {
+  const first = errors[0];
+  const slug = first?.type ?? 'internal_error';
+  return {ok: false, error: slug, message: humanize(slug, first?.message ?? 'Server error.')};
+}
 
 export type TreeChannel = {
   id: string;
@@ -114,13 +148,16 @@ export async function createServerCategory(
   serverUrl: string,
   serverId: string,
   name: string,
-): Promise<{ok: boolean}> {
+): Promise<MutationResult> {
+  const auth = await authHeaders(serverUrl);
+  if (auth.ok !== true) return auth;
   const result = await createCategory({
     input: {serverId, name},
     fields: ['id'],
+    headers: auth.headers,
     customFetch: scopedFetch(serverUrl),
   });
-  return {ok: result.success};
+  return result.success ? {ok: true} : failure(result.errors);
 }
 
 export async function createServerChannel(
@@ -128,37 +165,46 @@ export async function createServerChannel(
   serverId: string,
   name: string,
   categoryId: string | null,
-): Promise<{ok: boolean}> {
+): Promise<MutationResult> {
+  const auth = await authHeaders(serverUrl);
+  if (auth.ok !== true) return auth;
   const result = await createChannel({
     input: {serverId, name, type: 'text', categoryId},
     fields: ['id'],
+    headers: auth.headers,
     customFetch: scopedFetch(serverUrl),
   });
-  return {ok: result.success};
+  return result.success ? {ok: true} : failure(result.errors);
 }
 
 export async function reorderServerChannels(
   serverUrl: string,
   serverId: string,
   orderedIds: string[],
-): Promise<{ok: boolean}> {
+): Promise<MutationResult> {
+  const auth = await authHeaders(serverUrl);
+  if (auth.ok !== true) return auth;
   const result = await reorderChannels({
     input: {serverId, orderedIds},
+    headers: auth.headers,
     customFetch: scopedFetch(serverUrl),
   });
-  return {ok: result.success};
+  return result.success ? {ok: true} : failure(result.errors);
 }
 
 export async function reorderServerCategories(
   serverUrl: string,
   serverId: string,
   orderedIds: string[],
-): Promise<{ok: boolean}> {
+): Promise<MutationResult> {
+  const auth = await authHeaders(serverUrl);
+  if (auth.ok !== true) return auth;
   const result = await reorderCategories({
     input: {serverId, orderedIds},
+    headers: auth.headers,
     customFetch: scopedFetch(serverUrl),
   });
-  return {ok: result.success};
+  return result.success ? {ok: true} : failure(result.errors);
 }
 
 export async function recategorizeServerChannel(
@@ -166,23 +212,29 @@ export async function recategorizeServerChannel(
   channelId: string,
   categoryId: string | null,
   position?: number,
-): Promise<{ok: boolean}> {
+): Promise<MutationResult> {
+  const auth = await authHeaders(serverUrl);
+  if (auth.ok !== true) return auth;
   const result = await recategorizeChannel({
     identity: channelId,
     input: {categoryId, ...(position !== undefined ? {position} : {})},
     fields: ['id'],
+    headers: auth.headers,
     customFetch: scopedFetch(serverUrl),
   });
-  return {ok: result.success};
+  return result.success ? {ok: true} : failure(result.errors);
 }
 
 export async function destroyServerChannel(
   serverUrl: string,
   channelId: string,
-): Promise<{ok: boolean}> {
+): Promise<MutationResult> {
+  const auth = await authHeaders(serverUrl);
+  if (auth.ok !== true) return auth;
   const result = await destroyChannel({
     identity: channelId,
+    headers: auth.headers,
     customFetch: scopedFetch(serverUrl),
   });
-  return {ok: result.success};
+  return result.success ? {ok: true} : failure(result.errors);
 }

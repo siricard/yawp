@@ -159,6 +159,32 @@ describe('ChannelScreen message actions', () => {
     ).toBe(0);
   });
 
+  test('an edited message renders the (edited) marker', () => {
+    mockMessages = [msg({id: 'm-9', body: 'changed', edited: true})];
+    const root = render();
+    const markers = root.root
+      .findAllByType(require('react-native').Text)
+      .filter(n => {
+        const c = n.props.children;
+        const flat = Array.isArray(c) ? c.join('') : c;
+        return typeof flat === 'string' && flat.includes('(edited)');
+      });
+    expect(markers.length).toBeGreaterThan(0);
+  });
+
+  test('a non-edited message does not render the (edited) marker', () => {
+    mockMessages = [msg({id: 'm-10', body: 'pristine'})];
+    const root = render();
+    const markers = root.root
+      .findAllByType(require('react-native').Text)
+      .filter(n => {
+        const c = n.props.children;
+        const flat = Array.isArray(c) ? c.join('') : c;
+        return typeof flat === 'string' && flat.includes('(edited)');
+      });
+    expect(markers.length).toBe(0);
+  });
+
   test('a reply renders a quote card above the message', () => {
     mockMessages = [
       msg({id: 'parent', body: 'original', server_serial: 1}),

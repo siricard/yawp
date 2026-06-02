@@ -8,6 +8,7 @@ import {discoverGeneralChannel} from './chat/discover';
 import {
   IdentityProvider,
   useIdentityState,
+  useWorkspaceServers,
   type Identity,
   type WorkspaceServer,
 } from './identity-context';
@@ -68,9 +69,17 @@ export default function App() {
 
 function AppShell() {
   const identityState = useIdentityState();
+  const {removeServer} = useWorkspaceServers();
   const [screen, setScreen] = useState<Screen>({kind: 'home'});
   const [bindingUrl, setBindingUrl] = useState<string | null>(null);
   const [bindError, setBindError] = useState<string | null>(null);
+
+  function handleRemovedFromServer(serverUrl: string, reason: string) {
+    if (reason === 'banned') {
+      removeServer(serverUrl);
+    }
+    setScreen({kind: 'home'});
+  }
 
   useEffect(() => {
     if (Platform.OS !== 'web') return;
@@ -178,6 +187,7 @@ function AppShell() {
           initialChannelName={screen.channelName}
           onBack={() => setScreen({kind: 'home'})}
           onOpenDmList={() => setScreen({kind: 'dm'})}
+          onRemoved={reason => handleRemovedFromServer(screen.serverUrl, reason)}
         />
       );
       break;

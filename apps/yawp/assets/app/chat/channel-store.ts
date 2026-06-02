@@ -23,6 +23,7 @@ export type ChannelMessage = {
   signature: string;
   server_serial: number;
   server_inserted_at: string;
+  edited?: boolean;
 };
 
 type MessageEdited = {
@@ -36,11 +37,17 @@ type MessageDeleted = {
   reason: string;
 };
 
-export type UseChannelStatus = 'connecting' | 'joined' | 'error';
+export type UseChannelStatus = 'connecting' | 'joined' | 'error' | 'removed';
+
+type MemberRemoved = {
+  did: string;
+  reason: string;
+};
 
 export type UseChannelResult = {
   status: UseChannelStatus;
   errorMessage: string | null;
+  removedReason: string | null;
   messages: ChannelMessage[];
   effectiveBits: number;
   send: (body: string, replyToMessageId?: string | null) => void;
@@ -60,6 +67,7 @@ export function useChannel(
   const identity = useIdentity();
   const [status, setStatus] = useState<UseChannelStatus>('connecting');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [removedReason, setRemovedReason] = useState<string | null>(null);
   const [messages, setMessages] = useState<ChannelMessage[]>([]);
   const [effectiveBits, setEffectiveBits] = useState(0);
   const channelRef = useRef<Channel | null>(null);
@@ -106,7 +114,9 @@ export function useChannel(
         if (cancelled) return;
         setMessages(prev =>
           prev.map(m =>
-            m.id === edit.message_id ? {...m, body: edit.body} : m,
+            m.id === edit.message_id
+              ? {...m, body: edit.body, edited: true}
+              : m,
           ),
         );
       });
@@ -118,6 +128,12 @@ export function useChannel(
             m.id === del.message_id ? {...m, body: null} : m,
           ),
         );
+      });
+
+      localChannel.on('removed', (payload: MemberRemoved) => {
+        if (cancelled) return;
+        setStatus('removed');
+        setRemovedReason(payload?.reason ?? 'removed');
       });
 
       localChannel
@@ -226,5 +242,14 @@ export function useChannel(
     });
   }
 
-  return {status, errorMessage, messages, effectiveBits, send, edit, remove};
+  return {
+    status,
+    errorMessage,
+    removedReason,
+    messages,
+    effectiveBits,
+    send,
+    edit,
+    remove,
+  };
 }

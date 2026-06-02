@@ -154,6 +154,8 @@ type Ctx = {
   state: State;
   servers: WorkspaceServer[];
   addServer: (server: WorkspaceServer) => void;
+  removeServer: (url: string) => void;
+  setServerUnread: (url: string, count: number) => void;
   /**
    * Persist a new ordering of the workspace bar. `orderedUrls` is the full
    * set of server URLs in their new order; any server not present is kept
@@ -454,6 +456,29 @@ export function IdentityProvider({children}: {children: React.ReactNode}) {
       persistServers(next);
     },
     [setServersState, persistServers],
+  );
+
+  const removeServer = useCallback(
+    (url: string) => {
+      const next = serversRef.current.filter(s => s.url !== url);
+      if (next.length === serversRef.current.length) return;
+      setServersState(next);
+      persistServers(next);
+    },
+    [setServersState, persistServers],
+  );
+
+  const setServerUnread = useCallback(
+    (url: string, count: number) => {
+      const current = serversRef.current;
+      const target = current.find(s => s.url === url);
+      if (!target || (target.unreadCount ?? 0) === count) return;
+      const next = current.map(s =>
+        s.url === url ? {...s, unreadCount: count} : s,
+      );
+      setServersState(next);
+    },
+    [setServersState],
   );
 
   const reorderServers = useCallback(
@@ -805,6 +830,8 @@ export function IdentityProvider({children}: {children: React.ReactNode}) {
         state,
         servers,
         addServer,
+        removeServer,
+        setServerUnread,
         reorderServers,
         displayName,
         setDisplayNameOverride,
@@ -847,6 +874,8 @@ export function useIdentityState(): State {
 export function useWorkspaceServers(): {
   servers: WorkspaceServer[];
   addServer: (server: WorkspaceServer) => void;
+  removeServer: (url: string) => void;
+  setServerUnread: (url: string, count: number) => void;
   reorderServers: (orderedUrls: string[]) => void;
 } {
   const ctx = useContext(IdentityContext);
@@ -856,6 +885,8 @@ export function useWorkspaceServers(): {
   return {
     servers: ctx.servers,
     addServer: ctx.addServer,
+    removeServer: ctx.removeServer,
+    setServerUnread: ctx.setServerUnread,
     reorderServers: ctx.reorderServers,
   };
 }

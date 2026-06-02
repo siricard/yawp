@@ -28,14 +28,17 @@ defmodule YawpWeb.ServerChannelTopic do
 
   use Phoenix.Channel
 
+  require Ash.Query
+
   alias Yawp.Identity.Identity, as: IdentityResource
   alias Yawp.Servers
   alias Yawp.Servers.Permissions
   alias YawpWeb.Presence
 
   @impl true
-  def join("server:" <> rest, _params, socket) do
+  def join("server:" <> rest, params, socket) do
     identity = socket.assigns[:current_identity]
+    watch? = Map.get(params, "mode") == "watch"
 
     with {:ok, server_id, channel_id} <- parse_topic(rest),
          %IdentityResource{} <- identity,
@@ -43,13 +46,15 @@ defmodule YawpWeb.ServerChannelTopic do
          {:ok, channel} <- fetch_channel(channel_id, server_id),
          bits <- Permissions.effective_bits(identity, server, channel),
          true <- Permissions.has?(bits, :read_messages) do
-      send(self(), :after_join)
+      unless watch?, do: send(self(), :after_join)
+      Phoenix.PubSub.subscribe(Yawp.PubSub, "server:#{server.id}:moderation")
 
       {:ok, %{effective_bits: bits},
        socket
        |> assign(:server, server)
        |> assign(:channel, channel)
-       |> assign(:effective_bits, bits)}
+       |> assign(:effective_bits, bits)
+       |> assign(:watch?, watch?)}
     else
       :bad_topic -> {:error, %{reason: "bad_topic"}}
       _ -> {:error, %{reason: "unauthorized"}}
@@ -61,7 +66,11 @@ defmodule YawpWeb.ServerChannelTopic do
     channel = socket.assigns.channel
 
     {:ok, messages} = Servers.list_channel_messages(channel.id, authorize?: false)
-    push(socket, "history", %{messages: Enum.map(messages, &serialize_message/1)})
+    latest_edits = latest_edits_for(messages)
+
+    push(socket, "history", %{
+      messages: Enum.map(messages, &serialize_message(&1, latest_edits))
+    })
 
     {:ok, _} =
       Presence.track(socket, bare_did(socket.assigns.current_identity.did), %{
@@ -69,6 +78,15 @@ defmodule YawpWeb.ServerChannelTopic do
       })
 
     push(socket, "presence_state", Presence.list(socket))
+    {:noreply, socket}
+  end
+
+  @impl true
+  def handle_info({:member_removed, %{did: did, reason: reason}}, socket) do
+    if bare_did(did) == bare_did(socket.assigns.current_identity.did) do
+      push(socket, "removed", %{reason: reason, did: bare_did(did)})
+    end
+
     {:noreply, socket}
   end
 
@@ -244,20 +262,35 @@ defmodule YawpWeb.ServerChannelTopic do
 
   defp valid_delete_payload?(_), do: false
 
-  defp serialize_message(%Servers.Message{} = m) do
+  defp serialize_message(%Servers.Message{} = m, latest_edits \\ %{}) do
+    edit = Map.get(latest_edits, m.id)
+
     %{
       id: m.id,
       channel_id: m.channel_id,
       sender_did: bare_did(m.sender_did),
-      body: m.body,
+      body: if(edit, do: edit.body, else: m.body),
       reply_to_message_id: m.reply_to_message_id,
       mentions: m.mentions,
       attachments: m.attachments,
       signed_by: m.signed_by,
       signature: Base.url_encode64(m.sender_signature, padding: false),
       server_serial: m.server_serial,
-      server_inserted_at: DateTime.to_iso8601(m.server_inserted_at)
+      server_inserted_at: DateTime.to_iso8601(m.server_inserted_at),
+      edited: edit != nil
     }
+  end
+
+  defp latest_edits_for([]), do: %{}
+
+  defp latest_edits_for(messages) do
+    message_ids = Enum.map(messages, & &1.id)
+
+    Servers.MessageEdit
+    |> Ash.Query.filter(message_id in ^message_ids)
+    |> Ash.Query.sort(edit_serial: :asc)
+    |> Ash.read!(authorize?: false)
+    |> Enum.reduce(%{}, fn edit, acc -> Map.put(acc, edit.message_id, edit) end)
   end
 
   defp serialize_edit(%Servers.MessageEdit{} = e) do

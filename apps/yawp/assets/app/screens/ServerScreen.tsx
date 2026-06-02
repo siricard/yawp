@@ -2,7 +2,9 @@ import React, {useCallback, useEffect, useState} from 'react';
 import {Pressable, Text, View} from 'react-native';
 
 import {useEditMode} from '../chat/edit-mode';
+import {useServerUnread} from '../chat/server-unread';
 import {TabRow} from '../chat/TabRow';
+import {useWorkspaceServers} from '../identity-context';
 import {pointerCursor} from '../ui/cursor';
 import {
   createServerCategory,
@@ -26,6 +28,7 @@ type Props = {
   initialChannelName: string;
   onBack: () => void;
   onOpenDmList?: () => void;
+  onRemoved?: (reason: string) => void;
 };
 
 const EMPTY_TREE: ServerTree = {categories: [], channels: []};
@@ -38,9 +41,11 @@ export function ServerScreen({
   initialChannelName,
   onBack,
   onOpenDmList,
+  onRemoved,
 }: Props) {
   const [tree, setTree] = useState<ServerTree>(EMPTY_TREE);
   const [pendingDelete, setPendingDelete] = useState<TreeChannel | null>(null);
+  const [manageError, setManageError] = useState<string | null>(null);
   const [effectiveBits, setEffectiveBits] = useState(0);
   const [activeChannel, setActiveChannel] = useState<{
     id: string;
@@ -48,6 +53,7 @@ export function ServerScreen({
   }>({id: initialChannelId, name: initialChannelName});
 
   const editMode = useEditMode(effectiveBits);
+  const {setServerUnread} = useWorkspaceServers();
 
   const refresh = useCallback(async () => {
     const next = await fetchServerTree(serverUrl, serverId);
@@ -58,7 +64,28 @@ export function ServerScreen({
     refresh();
   }, [refresh]);
 
-  const groups = groupChannelsByCategory(tree);
+  const channelIds = tree.channels.map(c => c.id);
+  const {unreadByChannel, total} = useServerUnread({
+    serverUrl,
+    serverId,
+    channelIds,
+    activeChannelId: activeChannel.id || null,
+  });
+
+  useEffect(() => {
+    setServerUnread(serverUrl, total);
+  }, [setServerUnread, serverUrl, total]);
+
+  const treeWithUnread: ServerTree = {
+    categories: tree.categories,
+    channels: tree.channels.map(c => ({
+      ...c,
+      unreadCount:
+        c.id === activeChannel.id ? 0 : unreadByChannel[c.id] ?? 0,
+    })),
+  };
+
+  const groups = groupChannelsByCategory(treeWithUnread);
 
   function handleSelectChannel(channel: TreeChannel) {
     setActiveChannel({id: channel.id, name: channel.name});
@@ -83,13 +110,23 @@ export function ServerScreen({
 
   async function handleAddChannel(categoryId: string | null) {
     const name = `channel-${tree.channels.length + 1}`;
-    await createServerChannel(serverUrl, serverId, name, categoryId);
+    setManageError(null);
+    const result = await createServerChannel(serverUrl, serverId, name, categoryId);
+    if (!result.ok) {
+      setManageError(result.message ?? 'Could not create the channel.');
+      return;
+    }
     refresh();
   }
 
   async function handleAddCategory() {
     const name = `folder-${tree.categories.length + 1}`;
-    await createServerCategory(serverUrl, serverId, name);
+    setManageError(null);
+    const result = await createServerCategory(serverUrl, serverId, name);
+    if (!result.ok) {
+      setManageError(result.message ?? 'Could not create the category.');
+      return;
+    }
     refresh();
   }
 
@@ -137,7 +174,11 @@ export function ServerScreen({
         next ? {id: next.id, name: next.name} : {id: '', name: ''},
       );
     }
-    await destroyServerChannel(serverUrl, target.id);
+    setManageError(null);
+    const result = await destroyServerChannel(serverUrl, target.id);
+    if (!result.ok) {
+      setManageError(result.message ?? 'Could not delete the channel.');
+    }
     refresh();
   }
 
@@ -158,6 +199,22 @@ export function ServerScreen({
         onAddCategory={handleAddCategory}
         onDeleteChannel={handleDeleteChannel}
       />
+      {manageError ? (
+        <View
+          testID="server-manage-error"
+          className="px-6 py-2 bg-danger/20 border-b border-danger flex-row items-center justify-between">
+          <Text className="text-xs text-danger flex-1">{manageError}</Text>
+          <Pressable
+            testID="server-manage-error-dismiss"
+            accessibilityRole="button"
+            accessibilityLabel="dismiss error"
+            onPress={() => setManageError(null)}
+            style={pointerCursor}
+            className="ml-3 w-6 h-6 rounded-full bg-surface-2 items-center justify-center">
+            <Text className="text-text-secondary text-xs">×</Text>
+          </Pressable>
+        </View>
+      ) : null}
       {pendingDelete ? (
         <View
           testID="channel-delete-confirm"
@@ -200,6 +257,7 @@ export function ServerScreen({
             channelName={activeChannel.name}
             onEffectiveBits={setEffectiveBits}
             onBack={onBack}
+            onRemoved={onRemoved}
           />
         ) : (
           <View

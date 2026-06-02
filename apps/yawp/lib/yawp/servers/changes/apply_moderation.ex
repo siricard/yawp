@@ -66,10 +66,35 @@ defmodule Yawp.Servers.Changes.ApplyModeration do
 
   defp maybe_revoke(record, :kicked) do
     Yawp.Identity.revoke_all_for_identity(record.identity_id)
+    broadcast_removal(record, "kicked")
     :ok
   end
 
-  defp maybe_revoke(_record, _flag), do: :ok
+  defp maybe_revoke(record, :banned) do
+    broadcast_removal(record, "banned")
+    :ok
+  end
+
+  defp broadcast_removal(record, reason) do
+    did = identity_did(record.identity_id)
+
+    if did do
+      Phoenix.PubSub.broadcast(
+        Yawp.PubSub,
+        "server:#{record.server_id}:moderation",
+        {:member_removed, %{did: did, reason: reason}}
+      )
+    end
+
+    :ok
+  end
+
+  defp identity_did(identity_id) do
+    case Ash.get(Yawp.Identity.Identity, identity_id, authorize?: false) do
+      {:ok, %{did: did}} -> did
+      _ -> nil
+    end
+  end
 
   defp fetch_membership(identity_id, server_id) do
     Yawp.Servers.Membership

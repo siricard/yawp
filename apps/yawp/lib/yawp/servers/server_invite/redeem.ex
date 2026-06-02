@@ -133,6 +133,7 @@ defmodule Yawp.Servers.ServerInvite.Redeem do
              Servers.assign_role(identity.id, server.id, [member_role.id],
                return_notifications?: true
              ),
+           {:ok, n3b} <- clear_kicked(identity.id, server.id),
            {:ok, _audit, n4} <-
              Admin.create_audit_entry(
                %{
@@ -148,7 +149,7 @@ defmodule Yawp.Servers.ServerInvite.Redeem do
                authorize?: false,
                return_notifications?: true
              ) do
-        {%{server_id: server.id, role: "Member"}, n1 ++ n2 ++ n3 ++ n4}
+        {%{server_id: server.id, role: "Member"}, n1 ++ n2 ++ n3 ++ n3b ++ n4}
       else
         {:error, %RpcError{} = err} -> Yawp.Repo.rollback(err)
         {:error, :stale} -> Yawp.Repo.rollback(reclassify_stale(invite.id))
@@ -250,6 +251,30 @@ defmodule Yawp.Servers.ServerInvite.Redeem do
     case Servers.get_system_role_for_server("Member", server_id) do
       {:ok, %Servers.Role{} = role} -> {:ok, role}
       _ -> {:error, rpc("internal_error")}
+    end
+  end
+
+  defp clear_kicked(identity_id, server_id) do
+    membership =
+      Servers.Membership
+      |> Ash.Query.filter(identity_id == ^identity_id and server_id == ^server_id)
+      |> Ash.Query.limit(1)
+      |> Ash.read!(authorize?: false)
+      |> List.first()
+
+    case membership do
+      %Servers.Membership{kicked: true} = m ->
+        m
+        |> Ash.Changeset.for_update(:set_moderation, %{kicked: false})
+        |> Ash.update(authorize?: false, return_notifications?: true)
+        |> case do
+          {:ok, _cleared, n} -> {:ok, n}
+          {:ok, _cleared} -> {:ok, []}
+          {:error, _} = err -> err
+        end
+
+      _ ->
+        {:ok, []}
     end
   end
 

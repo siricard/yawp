@@ -20,10 +20,12 @@ const MENTION_CLASS: Record<MentionKind, string> = {
 export function MessageBody({
   body,
   deleted = false,
+  edited = false,
   testID,
 }: {
   body: string | null;
   deleted?: boolean;
+  edited?: boolean;
   testID?: string;
 }) {
   if (deleted || body === null) {
@@ -64,6 +66,12 @@ export function MessageBody({
           </Text>
         );
       })}
+      {edited ? (
+        <Text testID={testID ? `${testID}-edited` : undefined} className="text-xs text-text-tertiary">
+          {' '}
+          (edited)
+        </Text>
+      ) : null}
     </Text>
   );
 }

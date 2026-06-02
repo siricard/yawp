@@ -28,6 +28,7 @@ type Props = {
   channelName: string;
   onBack: () => void;
   onEffectiveBits?: (bits: number) => void;
+  onRemoved?: (reason: string) => void;
 };
 
 const monospace = Platform.select({
@@ -153,7 +154,11 @@ function MessageRow({
           </View>
         </View>
       ) : (
-        <MessageBody body={message.body} deleted={deleted} />
+        <MessageBody
+          body={message.body}
+          deleted={deleted}
+          edited={message.edited === true}
+        />
       )}
 
       {!isEditing && !deleted ? (
@@ -318,12 +323,26 @@ export function ChannelScreen({
   channelName,
   onBack,
   onEffectiveBits,
+  onRemoved,
 }: Props) {
-  const {status, errorMessage, messages, effectiveBits, send, edit, remove} =
-    useChannel(serverUrl, serverId, channelId);
+  const {
+    status,
+    errorMessage,
+    removedReason,
+    messages,
+    effectiveBits,
+    send,
+    edit,
+    remove,
+  } = useChannel(serverUrl, serverId, channelId);
   useEffect(() => {
     onEffectiveBits?.(effectiveBits);
   }, [effectiveBits, onEffectiveBits]);
+  useEffect(() => {
+    if (status === 'removed') {
+      onRemoved?.(removedReason ?? 'removed');
+    }
+  }, [status, removedReason, onRemoved]);
   const canManageMessages = hasPermission(effectiveBits, 'manage_messages');
   const canKick = hasPermission(effectiveBits, 'kick_members');
   const canBan = hasPermission(effectiveBits, 'ban_members');
@@ -386,6 +405,32 @@ export function ChannelScreen({
       : status === 'error'
         ? 'text-xs text-danger'
         : 'text-xs text-text-tertiary';
+
+  if (status === 'removed') {
+    return (
+      <View
+        testID="channel-removed"
+        className="flex-1 bg-bg items-center justify-center px-8">
+        <Text className="text-lg font-bold text-text text-center mb-2">
+          You were removed from this server
+        </Text>
+        <Text className="text-sm text-text-secondary text-center mb-6">
+          {removedReason === 'banned'
+            ? 'A moderator banned you. You can no longer access this server.'
+            : 'A moderator removed you. Ask for a new invite to rejoin.'}
+        </Text>
+        <Pressable
+          testID="channel-removed-back"
+          accessibilityRole="button"
+          accessibilityLabel="back to home"
+          onPress={onBack}
+          style={pointerCursor}
+          className="px-5 py-2 rounded-pill bg-primary">
+          <Text className="text-on-primary font-semibold">Back to home</Text>
+        </Pressable>
+      </View>
+    );
+  }
 
   return (
     <KeyboardAvoidingView

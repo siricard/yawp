@@ -67,7 +67,7 @@ defmodule YawpWeb.ServerChannelTopicTest do
 
   defp topic(server, channel), do: "server:#{server.id}:channel:#{channel.id}"
 
-  defp join_channel(actor, server, channel) do
+  defp join_channel(actor, server, channel, params \\ %{}) do
     YawpWeb.UserSocket
     |> Phoenix.ChannelTest.socket(
       "identity_socket:#{actor.identity.id}-#{System.unique_integer([:positive])}",
@@ -75,7 +75,7 @@ defmodule YawpWeb.ServerChannelTopicTest do
         current_identity: actor.identity
       }
     )
-    |> subscribe_and_join(YawpWeb.ServerChannelTopic, topic(server, channel))
+    |> subscribe_and_join(YawpWeb.ServerChannelTopic, topic(server, channel), params)
   end
 
   defp sign(map, device_sk) do
@@ -160,6 +160,43 @@ defmodule YawpWeb.ServerChannelTopicTest do
 
       assert {:ok, reply, _socket} = join_channel(actor, ctx.server, ctx.channel)
       assert Permissions.has?(reply.effective_bits, :manage_messages)
+    end
+
+    test "watch mode authorizes read_messages but skips history and presence", ctx do
+      actor = seed_identity()
+      seed_membership(actor, ctx.server, [:read_messages, :send_messages])
+
+      assert {:ok, _reply, _socket} =
+               join_channel(actor, ctx.server, ctx.channel, %{"mode" => "watch"})
+
+      refute_push "history", _
+      refute_push "presence_state", _
+    end
+
+    test "watch mode still receives new_message broadcasts", ctx do
+      watcher = seed_identity()
+      seed_membership(watcher, ctx.server, [:read_messages, :send_messages])
+
+      {:ok, _reply, _watch_socket} =
+        join_channel(watcher, ctx.server, ctx.channel, %{"mode" => "watch"})
+
+      sender = seed_identity()
+      seed_membership(sender, ctx.server, [:read_messages, :send_messages])
+      {:ok, _, sender_socket} = join_channel(sender, ctx.server, ctx.channel)
+      assert_push "history", _
+      assert_push "presence_state", _
+
+      ref = push(sender_socket, "send_message", send_payload(ctx.channel, sender, "ping"))
+      assert_reply ref, :ok, _
+      assert_push "new_message", %{body: "ping"}
+    end
+
+    test "watch mode is still rejected without read_messages", ctx do
+      actor = seed_identity()
+      seed_membership(actor, ctx.server, [:send_messages])
+
+      assert {:error, %{reason: "unauthorized"}} =
+               join_channel(actor, ctx.server, ctx.channel, %{"mode" => "watch"})
     end
 
     test "identity without read_messages is rejected", ctx do
@@ -292,6 +329,40 @@ defmodule YawpWeb.ServerChannelTopicTest do
       refute_broadcast "message_edited", _
     end
 
+    test "rejoining after an edit serves the edited body and an edited flag in history", ctx do
+      ts = System.system_time(:millisecond)
+      envelope = %{"message_id" => ctx.message_id, "body" => "v2", "ts" => ts}
+
+      ref =
+        push(ctx.socket, "edit_message", %{
+          "message_id" => ctx.message_id,
+          "body" => "v2",
+          "signed_by" => ctx.actor.device_id,
+          "signature" => sign(envelope, ctx.actor.device_sk),
+          "ts" => ts
+        })
+
+      assert_reply ref, :ok, %{edit_serial: 1}
+
+      {:ok, _, _socket} = join_channel(ctx.actor, ctx.server, ctx.channel)
+      mid = ctx.message_id
+      assert_push "history", %{messages: [message]}
+      assert message.id == mid
+      assert message.body == "v2"
+      assert message.edited == true
+      assert_push "presence_state", _
+    end
+
+    test "an unedited message reports edited false in history", ctx do
+      {:ok, _, _socket} = join_channel(ctx.actor, ctx.server, ctx.channel)
+      mid = ctx.message_id
+      assert_push "history", %{messages: [message]}
+      assert message.id == mid
+      assert message.body == "v1"
+      assert message.edited == false
+      assert_push "presence_state", _
+    end
+
     test "author cannot edit their message from a different channel topic", ctx do
       {:ok, other_channel} =
         Servers.create_channel(
@@ -320,6 +391,60 @@ defmodule YawpWeb.ServerChannelTopicTest do
 
       {:ok, [message]} = Servers.list_channel_messages(ctx.channel.id)
       assert message.body == "v1"
+    end
+  end
+
+  describe "kick invalidation" do
+    test "a kicked member's joined socket is pushed a removed event", ctx do
+      owner = seed_identity()
+
+      {:ok, _} =
+        ctx.server
+        |> Ash.Changeset.for_update(:set_owner, %{owner_did: owner.did})
+        |> Ash.update(authorize?: false)
+
+      seed_membership(owner, ctx.server, [])
+
+      victim = seed_identity()
+      seed_membership(victim, ctx.server, [:read_messages, :send_messages])
+      {:ok, _, _socket} = join_channel(victim, ctx.server, ctx.channel)
+      assert_push "history", _
+      assert_push "presence_state", _
+
+      {:ok, _kick} =
+        Servers.kick_member(%{server_id: ctx.server.id, identity_id: victim.identity.id},
+          actor: owner.identity
+        )
+
+      victim_did = String.replace_prefix(victim.did, "did:yawp:", "")
+      assert_push "removed", %{reason: "kicked", did: ^victim_did}
+    end
+
+    test "a kick of another member does not push removed to a different member's socket", ctx do
+      owner = seed_identity()
+
+      {:ok, _} =
+        ctx.server
+        |> Ash.Changeset.for_update(:set_owner, %{owner_did: owner.did})
+        |> Ash.update(authorize?: false)
+
+      seed_membership(owner, ctx.server, [])
+
+      bystander = seed_identity()
+      seed_membership(bystander, ctx.server, [:read_messages, :send_messages])
+      {:ok, _, _socket} = join_channel(bystander, ctx.server, ctx.channel)
+      assert_push "history", _
+      assert_push "presence_state", _
+
+      victim = seed_identity()
+      seed_membership(victim, ctx.server, [:read_messages, :send_messages])
+
+      {:ok, _kick} =
+        Servers.kick_member(%{server_id: ctx.server.id, identity_id: victim.identity.id},
+          actor: owner.identity
+        )
+
+      refute_push "removed", _
     end
   end
 
