@@ -3,6 +3,10 @@ config :yawp, Oban, testing: :manual
 config :yawp, token_signing_secret: "********************************"
 config :yawp, dev_routes: true
 config :yawp, ensure_server_key_on_boot: false
+
+config :yawp, Yawp.Federation.KeyDocFetcher,
+  req_options: [plug: {Req.Test, Yawp.Federation.KeyDocFetcher}]
+
 config :yawp, announce_setup_token_on_boot: false
 config :yawp, run_servers_seeder_on_boot: false
 config :bcrypt_elixir, log_rounds: 1

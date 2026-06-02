@@ -15,6 +15,7 @@ defmodule Yawp.Application do
          Application.fetch_env!(:yawp, Oban)
        )},
       {Phoenix.PubSub, name: Yawp.PubSub},
+      Yawp.Federation.KeyDocCache,
       YawpWeb.Presence,
       Yawp.Vault,
       Yawp.Admin.SetupToken,
