@@ -68,6 +68,7 @@ defmodule YawpWeb.Router do
   scope "/federation", YawpWeb do
     pipe_through :federation
 
+    get "/ppe/:did", FederationController, :ppe_fetch
     post "/ppe/push", FederationController, :ppe_push
     post "/blob/push", FederationController, :blob_push
     post "/inbox/push", FederationController, :inbox_push

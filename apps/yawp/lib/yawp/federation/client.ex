@@ -43,6 +43,26 @@ defmodule Yawp.Federation.Client do
     post(peer_host, "/federation/pull", request)
   end
 
+  @spec fetch_ppe!(String.t(), String.t()) :: {:ok, map()} | {:error, term()}
+  def fetch_ppe!(peer_host, did) when is_binary(peer_host) and is_binary(did) do
+    url = "#{scheme(peer_host)}://#{peer_host}/federation/ppe/#{URI.encode_www_form(did)}"
+
+    options =
+      [url: url, receive_timeout: @default_timeout, retry: false] ++ req_options()
+
+    case Req.get(options) do
+      {:ok, %Req.Response{status: status, body: %{"ppe" => ppe}}}
+      when status in 200..299 and is_map(ppe) ->
+        {:ok, ppe}
+
+      {:ok, %Req.Response{status: status, body: resp}} ->
+        {:error, {:http_error, status, resp}}
+
+      {:error, reason} ->
+        {:error, reason}
+    end
+  end
+
   defp post(peer_host, path, inner) do
     body = Wrapper.encode_body(inner, sender_anchor_id: this_anchor_id())
     url = "#{scheme(peer_host)}://#{peer_host}#{path}"

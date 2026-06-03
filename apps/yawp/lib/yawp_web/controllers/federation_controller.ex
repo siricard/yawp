@@ -68,6 +68,16 @@ defmodule YawpWeb.FederationController do
     end)
   end
 
+  def ppe_fetch(conn, %{"did" => did}) when is_binary(did) do
+    case Identity.get_ppe_by_did(did) do
+      {:ok, %Identity.Ppe{envelope: envelope}} when is_map(envelope) ->
+        ok(conn, %{"ppe" => envelope})
+
+      _ ->
+        error(conn, 404, "unknown_ppe")
+    end
+  end
+
   def pull(conn, params) do
     with_inner(conn, params, fn inner, _anchor ->
       with %{"recipient_did" => did} when is_binary(did) <- inner,

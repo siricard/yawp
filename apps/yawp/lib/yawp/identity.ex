@@ -73,15 +73,21 @@ defmodule Yawp.Identity do
   """
   @spec apply_ppe_if_newer(map()) :: {:ok, :applied | :stale} | {:error, term()}
   def apply_ppe_if_newer(envelope) when is_map(envelope) do
-    did = Map.fetch!(envelope, "did")
-    incoming_version = Map.get(envelope, "profile_version", 0)
+    case Yawp.Identity.Ppe.validate(envelope) do
+      :ok ->
+        did = Map.fetch!(envelope, "did")
+        incoming_version = Map.fetch!(envelope, "profile_version")
 
-    case get_ppe_by_did(did) do
-      {:ok, %Yawp.Identity.Ppe{profile_version: current}} when current >= incoming_version ->
-        {:ok, :stale}
+        case get_ppe_by_did(did) do
+          {:ok, %Yawp.Identity.Ppe{profile_version: current}} when current >= incoming_version ->
+            {:ok, :stale}
 
-      {:ok, _} ->
-        do_upsert_ppe(did, incoming_version, envelope)
+          {:ok, _} ->
+            do_upsert_ppe(did, incoming_version, envelope)
+        end
+
+      {:error, reason} ->
+        {:error, reason}
     end
   end
 

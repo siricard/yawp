@@ -79,12 +79,21 @@ defmodule Yawp.Federation.TwoAnchorTest do
 
   defp peer(port), do: "localhost:#{port}"
 
+  defp fresh_pubkey do
+    {pub, _priv} = :crypto.generate_key(:eddsa, :ed25519)
+    Base.url_encode64(pub, padding: false)
+  end
+
   test "PPE update round-trips from anchor A to anchor B over real sockets" do
     did = "did:yawp:two-anchor-ppe"
+
+    encoded_pk = fresh_pubkey()
 
     ppe = %{
       "did" => did,
       "profile_version" => 4,
+      "public_key" => encoded_pk,
+      "anchors" => [@sender_anchor],
       "display_name" => "Alice",
       "bio" => "hello from A"
     }
@@ -138,7 +147,16 @@ defmodule Yawp.Federation.TwoAnchorTest do
   test "a replayed wrapper is rejected by the receiving anchor" do
     did = "did:yawp:two-anchor-replay"
 
-    inner = %{"did" => did, "profile_version" => 1, "display_name" => "Once"}
+    encoded_pk = fresh_pubkey()
+
+    inner = %{
+      "did" => did,
+      "profile_version" => 1,
+      "public_key" => encoded_pk,
+      "anchors" => [@sender_anchor],
+      "display_name" => "Once"
+    }
+
     body = Yawp.Federation.Wrapper.encode_body(inner, sender_anchor_id: @sender_anchor)
     url = "http://#{peer(@anchor_b_port)}/federation/ppe/push"
 

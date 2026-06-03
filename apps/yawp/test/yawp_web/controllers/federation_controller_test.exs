@@ -61,11 +61,20 @@ defmodule YawpWeb.FederationControllerTest do
 
   defp tamper(<<first, rest::binary>>), do: <<bxor(first, 1), rest::binary>>
 
+  defp fresh_pubkey do
+    {pub, _priv} = :crypto.generate_key(:eddsa, :ed25519)
+    Base.url_encode64(pub, padding: false)
+  end
+
   defp ppe_envelope(did, version, attrs \\ %{}) do
+    encoded_pk = fresh_pubkey()
+
     Map.merge(
       %{
         "did" => did,
         "profile_version" => version,
+        "public_key" => encoded_pk,
+        "anchors" => ["anchor-a.example"],
         "display_name" => "Alice"
       },
       attrs
@@ -133,6 +142,26 @@ defmodule YawpWeb.FederationControllerTest do
         |> post("/federation/ppe/push", body)
 
       assert json_response(second, 409) == %{"error" => "replay"}
+    end
+  end
+
+  describe "GET /federation/ppe/:did" do
+    test "returns the cached envelope for a known DID", %{conn: conn} do
+      did = "did:yawp:ppe-get"
+
+      build_conn()
+      |> post_federation("/federation/ppe/push", ppe_envelope(did, 4))
+
+      conn = get(conn, "/federation/ppe/#{URI.encode_www_form(did)}")
+
+      assert %{"ppe" => envelope} = json_response(conn, 200)
+      assert envelope["did"] == did
+      assert envelope["profile_version"] == 4
+    end
+
+    test "returns 404 for an unknown DID", %{conn: conn} do
+      conn = get(conn, "/federation/ppe/#{URI.encode_www_form("did:yawp:ghost")}")
+      assert json_response(conn, 404) == %{"error" => "unknown_ppe"}
     end
   end
 
