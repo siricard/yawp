@@ -1,0 +1,140 @@
+defmodule YawpWeb.UserChannel do
+  @moduledoc """
+  Always-on Phoenix channel a client keeps open against the user's anchor.
+
+  Topic: `user:<bare base58 DID>`. Only the identity that owns the DID
+  may join — the socket's `current_identity` must match the topic.
+
+  On join the connecting device is tracked in `YawpWeb.Presence` under
+  the bare DID so a presence roster reflects every connected device, and
+  the channel subscribes to the inbox fan-out for that DID.
+
+  Outbound:
+
+    * `inbox` — a DM/notification envelope appended to this user's inbox
+      at the anchor (pushed live; the client also pulls on reconnect).
+    * `delivery_ack` / `read_marker` — relayed to the user's other
+      connected devices.
+
+  Inbound (signature verification of the inner envelope happens at the
+  resource layer; here we validate shape and fan out):
+
+    * `delivery_ack` — a per-recipient acknowledgement that an envelope
+      reached a device.
+    * `read_marker` — a conversation read cursor advance.
+  """
+
+  use Phoenix.Channel
+
+  alias Yawp.Identity.Identity, as: IdentityResource
+  alias YawpWeb.Presence
+
+  @impl true
+  def join("user:" <> bare_did, _params, socket) do
+    identity = socket.assigns[:current_identity]
+
+    with %IdentityResource{} = identity <- identity,
+         true <- byte_size(bare_did) > 0,
+         true <- bare(identity.did) == bare_did do
+      send(self(), :after_join)
+
+      Phoenix.PubSub.subscribe(Yawp.PubSub, inbox_topic(bare_did))
+
+      {:ok, assign(socket, :did, bare_did)}
+    else
+      _ -> {:error, %{reason: "unauthorized"}}
+    end
+  end
+
+  @impl true
+  def handle_info(:after_join, socket) do
+    {:ok, _} =
+      Presence.track(socket, socket.assigns.did, %{
+        online_at: System.system_time(:second)
+      })
+
+    push(socket, "presence_state", Presence.list(socket))
+    {:noreply, socket}
+  end
+
+  @impl true
+  def handle_info({:inbox, entry}, socket) do
+    push(socket, "inbox", %{
+      envelope_id: entry.envelope_id,
+      conversation_id: entry.conversation_id,
+      kind: entry.kind,
+      inbox_serial: entry.inbox_serial,
+      envelope: entry.envelope
+    })
+
+    {:noreply, socket}
+  end
+
+  @impl true
+  def handle_in("delivery_ack", payload, socket) do
+    if valid_delivery_ack?(payload) do
+      broadcast!(socket, "delivery_ack", %{
+        envelope_id: Map.fetch!(payload, "envelope_id"),
+        conversation_id: Map.get(payload, "conversation_id"),
+        signed_by: Map.fetch!(payload, "signed_by"),
+        signature: Map.fetch!(payload, "signature"),
+        ts: Map.fetch!(payload, "ts")
+      })
+
+      {:reply, :ok, socket}
+    else
+      {:reply, {:error, %{reason: "invalid_payload"}}, socket}
+    end
+  end
+
+  @impl true
+  def handle_in("read_marker", payload, socket) do
+    if valid_read_marker?(payload) do
+      broadcast!(socket, "read_marker", %{
+        conversation_id: Map.fetch!(payload, "conversation_id"),
+        up_to_serial: Map.fetch!(payload, "up_to_serial"),
+        signed_by: Map.fetch!(payload, "signed_by"),
+        signature: Map.fetch!(payload, "signature"),
+        ts: Map.fetch!(payload, "ts")
+      })
+
+      {:reply, :ok, socket}
+    else
+      {:reply, {:error, %{reason: "invalid_payload"}}, socket}
+    end
+  end
+
+  @doc """
+  PubSub topic on which inbox appends for `bare_did` are fanned out to
+  every connected device's `user:` channel.
+  """
+  @spec inbox_topic(String.t()) :: String.t()
+  def inbox_topic(bare_did), do: "user_inbox:#{bare_did}"
+
+  defp valid_delivery_ack?(%{
+         "envelope_id" => env,
+         "signed_by" => sb,
+         "signature" => sig,
+         "ts" => ts
+       }) do
+    is_binary(env) and is_binary(sb) and is_binary(sig) and is_integer(ts)
+  end
+
+  defp valid_delivery_ack?(_), do: false
+
+  defp valid_read_marker?(%{
+         "conversation_id" => conv,
+         "up_to_serial" => serial,
+         "signed_by" => sb,
+         "signature" => sig,
+         "ts" => ts
+       }) do
+    is_binary(conv) and is_integer(serial) and is_binary(sb) and is_binary(sig) and
+      is_integer(ts)
+  end
+
+  defp valid_read_marker?(_), do: false
+
+  defp bare("did:yawp:" <> base58), do: base58
+  defp bare(other) when is_binary(other), do: other
+end

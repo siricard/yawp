@@ -50,6 +50,10 @@ jest.mock('../identity-context', () => ({
   }),
 }));
 
+jest.mock('../chat/anchor-connection', () => ({
+  AnchorConnectionProvider: ({children}: {children: unknown}) => children,
+  useAnchorStatus: () => ({status: 'connected', degraded: false}),
+}));
 jest.mock('../bind', () => ({submitBindDevice: jest.fn()}));
 jest.mock('../session', () => ({getValidSessionToken: jest.fn()}));
 jest.mock('../chat/discover', () => ({discoverGeneralChannel: jest.fn()}));

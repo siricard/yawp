@@ -4,6 +4,7 @@ import {Platform, StatusBar, View} from 'react-native';
 import {SafeAreaProvider, SafeAreaView} from 'react-native-safe-area-context';
 
 import {submitBindDevice} from './bind';
+import {AnchorConnectionProvider} from './chat/anchor-connection';
 import {discoverGeneralChannel} from './chat/discover';
 import {
   IdentityProvider,
@@ -18,6 +19,7 @@ import {DmListScreen} from './screens/DmListScreen';
 import {HomeScreen} from './screens/HomeScreen';
 import {ServerScreen} from './screens/ServerScreen';
 import {LockedScreen} from './screens/LockedScreen';
+import {DegradedModeBanner} from './screens/DegradedModeBanner';
 import {OnboardingFlow} from './screens/OnboardingFlow';
 import {PassphraseSettingsScreen} from './screens/PassphraseSettingsScreen';
 import {VectorTestScreen} from './screens/VectorTestScreen';
@@ -71,7 +73,8 @@ export default function App() {
 
 function AppShell() {
   const identityState = useIdentityState();
-  const {removeServer} = useWorkspaceServers();
+  const {servers, removeServer} = useWorkspaceServers();
+  const primaryAnchorUrl = servers.length > 0 ? servers[0].url : null;
   const [screen, setScreen] = useState<Screen>({kind: 'home'});
   const [bindingUrl, setBindingUrl] = useState<string | null>(null);
   const [bindError, setBindError] = useState<string | null>(null);
@@ -205,24 +208,27 @@ function AppShell() {
   }
 
   return (
-    <SafeAreaView
-      edges={['top', 'bottom']}
-      className="flex-1 bg-bg"
-      nativeID="app-root">
-      {Platform.OS !== 'web' ? <StatusBar barStyle="light-content" /> : null}
-      <View style={{flex: 1, flexDirection: 'column'}}>
-        <WorkspaceBar
-          onAddServer={() => setScreen({kind: 'add-server'})}
-          onSelectServer={handleSelectServer}
-          onSelectDm={() => setScreen({kind: 'dm'})}
-          dmActive={screen.kind === 'dm'}
-          activeServerUrl={
-            screen.kind === 'channel' ? screen.serverUrl : null
-          }
-          bindingUrl={bindingUrl}
-        />
-        <View style={{flex: 1}}>{body}</View>
-      </View>
-    </SafeAreaView>
+    <AnchorConnectionProvider primaryAnchorUrl={primaryAnchorUrl}>
+      <SafeAreaView
+        edges={['top', 'bottom']}
+        className="flex-1 bg-bg"
+        nativeID="app-root">
+        {Platform.OS !== 'web' ? <StatusBar barStyle="light-content" /> : null}
+        <View style={{flex: 1, flexDirection: 'column'}}>
+          <WorkspaceBar
+            onAddServer={() => setScreen({kind: 'add-server'})}
+            onSelectServer={handleSelectServer}
+            onSelectDm={() => setScreen({kind: 'dm'})}
+            dmActive={screen.kind === 'dm'}
+            activeServerUrl={
+              screen.kind === 'channel' ? screen.serverUrl : null
+            }
+            bindingUrl={bindingUrl}
+          />
+          <DegradedModeBanner />
+          <View style={{flex: 1}}>{body}</View>
+        </View>
+      </SafeAreaView>
+    </AnchorConnectionProvider>
   );
 }

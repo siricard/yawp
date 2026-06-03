@@ -36,13 +36,26 @@ defmodule Yawp.Federation do
           {:ok, Yawp.Federation.InboxEntry.t()} | {:error, term()}
   def append_inbox(recipient_did, envelope)
       when is_binary(recipient_did) and is_map(envelope) do
-    append_inbox_entry(%{
-      recipient_did: recipient_did,
-      envelope_id: Map.fetch!(envelope, "envelope_id"),
-      conversation_id: Map.get(envelope, "conversation_id"),
-      kind: Map.get(envelope, "kind", "dm"),
-      envelope: envelope
-    })
+    result =
+      append_inbox_entry(%{
+        recipient_did: recipient_did,
+        envelope_id: Map.fetch!(envelope, "envelope_id"),
+        conversation_id: Map.get(envelope, "conversation_id"),
+        kind: Map.get(envelope, "kind", "dm"),
+        envelope: envelope
+      })
+
+    with {:ok, entry} <- result do
+      bare = String.replace_prefix(recipient_did, "did:yawp:", "")
+
+      Phoenix.PubSub.broadcast(
+        Yawp.PubSub,
+        YawpWeb.UserChannel.inbox_topic(bare),
+        {:inbox, entry}
+      )
+    end
+
+    result
   end
 
   @doc """
