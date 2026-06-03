@@ -11,6 +11,7 @@ type Props = {
   bindError: string | null;
   onOpenPassphraseSettings: () => void;
   onOpenAddServer: () => void;
+  onOpenAddAnchor: () => void;
   onOpenVectorTest: () => void;
   onClearBindError: () => void;
 };
@@ -19,6 +20,7 @@ export function HomeScreen({
   bindError,
   onOpenPassphraseSettings,
   onOpenAddServer,
+  onOpenAddAnchor,
   onOpenVectorTest,
   onClearBindError,
 }: Props) {
@@ -53,7 +55,7 @@ export function HomeScreen({
                   variant="primary"
                   size="sm"
                   label="Add a second anchor"
-                  onPress={onOpenAddServer}
+                  onPress={onOpenAddAnchor}
                 />
                 <Button
                   testID="second-anchor-nudge-dismiss"

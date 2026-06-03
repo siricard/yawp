@@ -54,6 +54,15 @@ defmodule YawpWeb.FederationController do
     end)
   end
 
+  def adopt(conn, params) do
+    with_inner(conn, params, fn inner, _anchor ->
+      case Identity.adopt_identity(inner) do
+        {:ok, :adopted} -> ok(conn, %{"status" => "adopted"})
+        {:error, _} -> error(conn, 422, "invalid_adoption")
+      end
+    end)
+  end
+
   def devices_changed(conn, params) do
     with_inner(conn, params, fn inner, _anchor ->
       with %{"did" => did, "device_subkeys" => subkeys}

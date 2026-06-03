@@ -73,6 +73,7 @@ defmodule YawpWeb.Router do
     post "/blob/push", FederationController, :blob_push
     post "/inbox/push", FederationController, :inbox_push
     post "/devices/changed", FederationController, :devices_changed
+    post "/anchors/adopt", FederationController, :adopt
     post "/pull", FederationController, :pull
   end
 

@@ -33,6 +33,11 @@ defmodule Yawp.Federation.Client do
     post(peer_host, "/federation/inbox/push", envelope)
   end
 
+  @spec adopt!(String.t(), map()) :: {:ok, map()} | {:error, term()}
+  def adopt!(peer_host, adoption) when is_binary(peer_host) and is_map(adoption) do
+    post(peer_host, "/federation/anchors/adopt", adoption)
+  end
+
   @spec push_devices_changed!(String.t(), map()) :: {:ok, map()} | {:error, term()}
   def push_devices_changed!(peer_host, change) when is_binary(peer_host) and is_map(change) do
     post(peer_host, "/federation/devices/changed", change)

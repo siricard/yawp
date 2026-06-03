@@ -35,6 +35,8 @@ defmodule Yawp.Identity do
         show_metadata: [:session_token, :refresh_token, :expires_at]
 
       rpc_action :revoke_device_sessions, :revoke_device_sessions, identities: [:unique_did]
+
+      rpc_action :add_anchor, :add_anchor, identities: [:unique_did]
     end
 
     resource Yawp.Identity.RefreshToken do
@@ -49,6 +51,7 @@ defmodule Yawp.Identity do
       define :get_chat_owner, action: :get_chat_owner, not_found_error?: false
       define :get_identity_by_did, action: :get_by_did, args: [:did]
       define :bind_device, action: :bind_device
+      define :add_anchor, action: :add_anchor
     end
 
     resource Yawp.Identity.SessionToken do
@@ -65,6 +68,72 @@ defmodule Yawp.Identity do
       define :get_private_blob_by_did, action: :get_by_did, args: [:did], not_found_error?: false
     end
   end
+
+  @doc """
+  Adopts a user at this anchor from a signed adoption envelope relayed
+  by one of the user's existing anchors. Verifies the DID derives from
+  the supplied master public key, creates (or upserts) the local
+  Identity row carrying the source anchor in its `anchor_list`, and
+  caches the user's signed PPE so this anchor can render them.
+
+  Returns `{:ok, :adopted}` on success, `{:error, reason}` otherwise.
+  """
+  @spec adopt_identity(map()) :: {:ok, :adopted} | {:error, term()}
+  def adopt_identity(%{"did" => did, "master_public_key" => pk_b64} = envelope)
+      when is_binary(did) and is_binary(pk_b64) do
+    ppe = Map.get(envelope, "ppe", %{})
+    source_anchor = Map.get(envelope, "source_anchor")
+
+    with {:ok, pk} <- decode_master_key(pk_b64),
+         :ok <- verify_did_derivation(did, pk),
+         {:ok, _identity} <- upsert_adopted_identity(did, pk, source_anchor),
+         :ok <- maybe_cache_ppe(ppe) do
+      {:ok, :adopted}
+    end
+  end
+
+  def adopt_identity(_), do: {:error, :invalid_adoption}
+
+  defp decode_master_key(pk_b64) do
+    raw = String.replace_prefix(pk_b64, "ed25519:", "")
+
+    decoded =
+      case Base.url_decode64(raw, padding: false) do
+        {:ok, bytes} -> {:ok, bytes}
+        :error -> Base.decode64(raw, padding: false)
+      end
+
+    case decoded do
+      {:ok, bytes} when byte_size(bytes) == 32 -> {:ok, bytes}
+      _ -> {:error, :invalid_adoption}
+    end
+  end
+
+  defp verify_did_derivation(did, pk) do
+    expected = "did:yawp:" <> did_from_pubkey(pk)
+    if did == expected, do: :ok, else: {:error, :invalid_adoption}
+  end
+
+  defp upsert_adopted_identity(did, pk, source_anchor) do
+    anchor_list = if is_binary(source_anchor), do: [source_anchor], else: []
+
+    Yawp.Identity.Identity
+    |> Ash.Changeset.for_create(:adopt, %{
+      did: did,
+      master_public_key: pk,
+      anchor_list: anchor_list
+    })
+    |> Ash.create(authorize?: false)
+  end
+
+  defp maybe_cache_ppe(ppe) when is_map(ppe) and map_size(ppe) > 0 do
+    case apply_ppe_if_newer(ppe) do
+      {:ok, _} -> :ok
+      {:error, _} -> :ok
+    end
+  end
+
+  defp maybe_cache_ppe(_), do: :ok
 
   @doc """
   Applies an inbound PPE to the local cache if it is newer than what

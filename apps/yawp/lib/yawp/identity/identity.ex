@@ -83,6 +83,20 @@ defmodule Yawp.Identity.Identity do
       upsert_identity :unique_did
     end
 
+    create :adopt do
+      description """
+      Creates a local Identity row when this anchor adopts an existing
+      user relayed from one of the user's other anchors. DID derivation
+      is verified by the caller (`Yawp.Identity.adopt_identity/1`)
+      before this action runs. Re-adopting the same DID is an
+      idempotent upsert keyed on `:unique_did`.
+      """
+
+      accept [:did, :master_public_key, :anchor_list]
+      upsert? true
+      upsert_identity :unique_did
+    end
+
     read :get_chat_owner do
       description "Returns the singleton chat-owner row (or nil)."
       get? true
@@ -124,6 +138,26 @@ defmodule Yawp.Identity.Identity do
       argument :device_id, :uuid, allow_nil?: false
 
       change Yawp.Identity.Identity.Changes.RevokeDeviceSessions
+    end
+
+    update :add_anchor do
+      description """
+      Adds a second anchor host to the identity's `anchor_list`,
+      increments `profile_version`, and enqueues the adoption handshake
+      with the new anchor (which starts private-blob replication from
+      the existing anchors). Authenticated: the actor MUST be the
+      Identity being modified. Adding a host that is already present is
+      an idempotent no-op (no version bump, no re-enqueue).
+      """
+
+      require_atomic? false
+      accept []
+
+      argument :new_anchor, :string, allow_nil?: false
+
+      change Yawp.Identity.Identity.Changes.ValidateAnchorHost
+      change Yawp.Identity.Identity.Changes.AppendAnchorHost
+      change Yawp.Identity.Identity.Changes.EnqueueAnchorAdoption
     end
 
     update :bind_device do

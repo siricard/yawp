@@ -118,6 +118,7 @@ function RenderHomeIfReady() {
       bindError={null}
       onOpenPassphraseSettings={() => {}}
       onOpenAddServer={() => {}}
+      onOpenAddAnchor={() => {}}
       onOpenVectorTest={() => {}}
       onClearBindError={() => {}}
     />

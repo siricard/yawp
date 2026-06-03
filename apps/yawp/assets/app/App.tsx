@@ -12,6 +12,7 @@ import {
   type Identity,
   type WorkspaceServer,
 } from './identity-context';
+import {AddAnchorScreen} from './screens/AddAnchorScreen';
 import {AddServerScreen} from './screens/AddServerScreen';
 import {DmListScreen} from './screens/DmListScreen';
 import {HomeScreen} from './screens/HomeScreen';
@@ -46,6 +47,7 @@ type Screen =
   | {kind: 'home'}
   | {kind: 'vector'}
   | {kind: 'add-server'}
+  | {kind: 'add-anchor'}
   | {kind: 'passphrase-settings'}
   | {kind: 'dm'}
   | {
@@ -150,6 +152,7 @@ function AppShell() {
             setScreen({kind: 'passphrase-settings'})
           }
           onOpenAddServer={() => setScreen({kind: 'add-server'})}
+          onOpenAddAnchor={() => setScreen({kind: 'add-anchor'})}
           onOpenVectorTest={() => setScreen({kind: 'vector'})}
           onClearBindError={() => setBindError(null)}
         />
@@ -166,6 +169,14 @@ function AppShell() {
           onNavigateToServer={server => {
             handleSelectServer(server);
           }}
+        />
+      );
+      break;
+    case 'add-anchor':
+      body = (
+        <AddAnchorScreen
+          onCancel={() => setScreen({kind: 'home'})}
+          onAdded={() => setScreen({kind: 'home'})}
         />
       );
       break;

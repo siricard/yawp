@@ -201,6 +201,82 @@ export async function executeValidationRpcRequest<T>(
 
 
 
+export type AddAnchorInput = {
+  newAnchor: string;
+};
+
+export type AddAnchorFields = UnifiedFieldSelection<IdentityResourceSchema>[];
+
+export type InferAddAnchorResult<
+  Fields extends AddAnchorFields | undefined,
+> = InferResult<IdentityResourceSchema, Fields>;
+
+export type AddAnchorResult<Fields extends AddAnchorFields | undefined = undefined> = | { success: true; data: InferAddAnchorResult<Fields>; }
+| { success: false; errors: AshRpcError[]; }
+
+;
+
+/**
+ * Update an existing Identity
+ *
+ * @ashActionType :update
+ */
+export async function addAnchor<Fields extends AddAnchorFields | undefined = undefined>(
+  config: {
+  tenant?: string;
+  identity: { did: string };
+  input: AddAnchorInput;
+  fields?: Fields;
+  headers?: Record<string, string>;
+  fetchOptions?: RequestInit;
+  customFetch?: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
+}
+): Promise<AddAnchorResult<Fields extends undefined ? [] : Fields>> {
+  const payload = {
+    action: "add_anchor",
+    ...(config.tenant !== undefined && { tenant: config.tenant }),
+    identity: config.identity,
+    input: config.input,
+    ...(config.fields !== undefined && { fields: config.fields })
+  };
+
+  return executeActionRpcRequest<AddAnchorResult<Fields extends undefined ? [] : Fields>>(
+    payload,
+    config
+  );
+}
+
+
+/**
+ * Validate: Update an existing Identity
+ *
+ * @ashActionType :update
+ * @validation true
+ */
+export async function validateAddAnchor(
+  config: {
+  tenant?: string;
+  identity: { did: string };
+  input: AddAnchorInput;
+  headers?: Record<string, string>;
+  fetchOptions?: RequestInit;
+  customFetch?: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
+}
+): Promise<ValidationResult> {
+  const payload = {
+    action: "add_anchor",
+    ...(config.tenant !== undefined && { tenant: config.tenant }),
+    identity: config.identity,
+    input: config.input
+  };
+
+  return executeValidationRpcRequest<ValidationResult>(
+    payload,
+    config
+  );
+}
+
+
 export type BindDeviceInput = {
   deviceId: UUID;
   devicePk: string;
