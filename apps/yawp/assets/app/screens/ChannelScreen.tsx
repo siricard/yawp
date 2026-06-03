@@ -43,6 +43,17 @@ export function displayAuthor(authorDid: string): string {
   return full.length <= 18 ? full : `${full.slice(0, 12)}…${full.slice(-4)}`;
 }
 
+export function authorLabel(message: {
+  sender_did: string;
+  sender_display_name?: string | null;
+}): string {
+  const name = message.sender_display_name;
+  if (typeof name === 'string' && name.trim().length > 0) {
+    return name;
+  }
+  return displayAuthor(message.sender_did);
+}
+
 function formatTimestamp(iso: string): string {
   try {
     const d = new Date(iso);
@@ -85,7 +96,7 @@ function MessageRow({
 }) {
   const isSelf = selfDid !== null && message.sender_did === selfDid;
   const label =
-    isSelf && selfDisplayName ? selfDisplayName : displayAuthor(message.sender_did);
+    isSelf && selfDisplayName ? selfDisplayName : authorLabel(message);
   const deleted = message.body === null;
   const canEdit = isSelf && !deleted;
   const canDelete = (isSelf || canManageMessages) && !deleted;
@@ -100,7 +111,7 @@ function MessageRow({
             className="text-xs text-text-secondary"
             style={{fontFamily: monospace}}
             numberOfLines={1}>
-            ↳ {displayAuthor(replyTo.sender_did)}
+            ↳ {authorLabel(replyTo)}
           </Text>
           <Text className="text-xs text-text-tertiary" numberOfLines={1}>
             {replyTo.body === null ? '[deleted]' : replyTo.body}
@@ -559,7 +570,7 @@ export function ChannelScreen({
           className="px-6 py-2 border-t border-border-soft bg-surface flex-row items-center justify-between">
           <View className="flex-1 pl-3 border-l-2 border-primary" style={{marginRight: 8}}>
             <Text className="text-xs text-text-secondary" style={{fontFamily: monospace}}>
-              Replying to {displayAuthor(replyTo.sender_did)}
+              Replying to {authorLabel(replyTo)}
             </Text>
             <Text className="text-xs text-text-tertiary" numberOfLines={1}>
               {replyTo.body === null ? '[deleted]' : replyTo.body}

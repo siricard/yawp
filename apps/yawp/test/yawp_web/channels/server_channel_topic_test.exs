@@ -258,6 +258,52 @@ defmodule YawpWeb.ServerChannelTopicTest do
       assert_reply ref, :error, %{reason: "invalid_signature"}
       refute_broadcast "new_message", _
     end
+
+    test "new_message carries the sender's cached PPE display name", ctx do
+      Ash.Seed.seed!(Yawp.Identity.Ppe, %{
+        did: ctx.actor.did,
+        display_name: "Alice",
+        profile_version: 3,
+        envelope: %{"did" => ctx.actor.did, "display_name" => "Alice"}
+      })
+
+      ref = push(ctx.socket, "send_message", send_payload(ctx.channel, ctx.actor, "hi"))
+      assert_reply ref, :ok, %{sender_display_name: "Alice"}
+      assert_broadcast "new_message", %{sender_display_name: "Alice"}
+    end
+
+    test "new_message display name is nil when no PPE is cached", ctx do
+      ref = push(ctx.socket, "send_message", send_payload(ctx.channel, ctx.actor, "hi"))
+      assert_reply ref, :ok, %{sender_display_name: nil}
+    end
+  end
+
+  describe "history display names" do
+    test "history serializes the cached PPE display name for each sender", ctx do
+      sender = seed_identity()
+      seed_membership(sender, ctx.server, [:read_messages, :send_messages])
+      {:ok, _, sender_socket} = join_channel(sender, ctx.server, ctx.channel)
+      assert_push "history", _
+      assert_push "presence_state", _
+
+      ref = push(sender_socket, "send_message", send_payload(ctx.channel, sender, "from alice"))
+      assert_reply ref, :ok, _
+
+      Ash.Seed.seed!(Yawp.Identity.Ppe, %{
+        did: sender.did,
+        display_name: "Alice",
+        profile_version: 5,
+        envelope: %{"did" => sender.did, "display_name" => "Alice"}
+      })
+
+      viewer = seed_identity()
+      seed_membership(viewer, ctx.server, [:read_messages])
+      {:ok, _, _viewer_socket} = join_channel(viewer, ctx.server, ctx.channel)
+
+      assert_push "history", %{messages: [message]}
+      assert message.sender_display_name == "Alice"
+      assert_push "presence_state", _
+    end
   end
 
   test "send_message is denied without the send_messages bit", ctx do

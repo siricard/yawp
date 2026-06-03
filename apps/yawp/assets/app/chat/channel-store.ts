@@ -15,6 +15,7 @@ export type ChannelMessage = {
    * `identity.did` — the client prefixes `did:yawp:` for display.
    */
   sender_did: string;
+  sender_display_name?: string | null;
   body: string | null;
   reply_to_message_id: string | null;
   mentions: string[];

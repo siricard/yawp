@@ -30,6 +30,7 @@ defmodule YawpWeb.ServerChannelTopic do
 
   require Ash.Query
 
+  alias Yawp.Identity
   alias Yawp.Identity.Identity, as: IdentityResource
   alias Yawp.Servers
   alias Yawp.Servers.Permissions
@@ -67,9 +68,10 @@ defmodule YawpWeb.ServerChannelTopic do
 
     {:ok, messages} = Servers.list_channel_messages(channel.id, authorize?: false)
     latest_edits = latest_edits_for(messages)
+    display_names = display_names_for(messages)
 
     push(socket, "history", %{
-      messages: Enum.map(messages, &serialize_message(&1, latest_edits))
+      messages: Enum.map(messages, &serialize_message(&1, latest_edits, display_names))
     })
 
     {:ok, _} =
@@ -117,7 +119,7 @@ defmodule YawpWeb.ServerChannelTopic do
 
         case Servers.send_server_message(attrs) do
           {:ok, message} ->
-            serialized = serialize_message(message)
+            serialized = serialize_message(message, %{}, display_names_for([message]))
             broadcast!(socket, "new_message", serialized)
             {:reply, {:ok, serialized}, socket}
 
@@ -262,13 +264,14 @@ defmodule YawpWeb.ServerChannelTopic do
 
   defp valid_delete_payload?(_), do: false
 
-  defp serialize_message(%Servers.Message{} = m, latest_edits \\ %{}) do
+  defp serialize_message(%Servers.Message{} = m, latest_edits, display_names) do
     edit = Map.get(latest_edits, m.id)
 
     %{
       id: m.id,
       channel_id: m.channel_id,
       sender_did: bare_did(m.sender_did),
+      sender_display_name: Map.get(display_names, m.sender_did),
       body: if(edit, do: edit.body, else: m.body),
       reply_to_message_id: m.reply_to_message_id,
       mentions: m.mentions,
@@ -279,6 +282,23 @@ defmodule YawpWeb.ServerChannelTopic do
       server_inserted_at: DateTime.to_iso8601(m.server_inserted_at),
       edited: edit != nil
     }
+  end
+
+  defp display_names_for([]), do: %{}
+
+  defp display_names_for(messages) do
+    messages
+    |> Enum.map(& &1.sender_did)
+    |> Enum.uniq()
+    |> Enum.reduce(%{}, fn did, acc ->
+      case Identity.get_ppe_by_did(did) do
+        {:ok, %Identity.Ppe{display_name: name}} when is_binary(name) and name != "" ->
+          Map.put(acc, did, name)
+
+        _ ->
+          acc
+      end
+    end)
   end
 
   defp latest_edits_for([]), do: %{}
