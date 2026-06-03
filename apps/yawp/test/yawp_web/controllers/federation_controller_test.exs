@@ -6,12 +6,14 @@ defmodule YawpWeb.FederationControllerTest do
   `Req.Test`) before applying the inner payload to local state.
   """
   use YawpWeb.ConnCase, async: false
+  use Oban.Testing, repo: Yawp.Repo
 
   import Bitwise
 
   alias Yawp.Federation
   alias Yawp.Federation.DeliveryNonceCache
   alias Yawp.Federation.KeyDocCache
+  alias Yawp.Federation.PpeRefreshWorker
   alias Yawp.Federation.Wrapper
   alias Yawp.Identity
 
@@ -231,6 +233,55 @@ defmodule YawpWeb.FederationControllerTest do
     test "rejects an envelope with no recipient with 422", %{conn: conn} do
       conn = post_federation(conn, "/federation/inbox/push", %{"envelope_id" => "x"})
       assert json_response(conn, 422) == %{"error" => "invalid_envelope"}
+    end
+
+    test "enqueues a PPE refresh when the envelope advertises a newer sender_profile_version",
+         %{conn: conn} do
+      sender_did = "did:yawp:inbox-sender-stale"
+
+      {:ok, :applied} =
+        Identity.apply_ppe_if_newer(
+          ppe_envelope(sender_did, 2, %{"anchors" => ["anchor-a.example"]})
+        )
+
+      envelope = %{
+        "envelope_id" => "env-#{System.unique_integer([:positive])}",
+        "recipient_did" => "did:yawp:inbox-recipient",
+        "kind" => "dm",
+        "sender_did" => sender_did,
+        "sender_profile_version" => 9
+      }
+
+      conn = post_federation(conn, "/federation/inbox/push", envelope)
+      assert json_response(conn, 200) == %{"status" => "appended"}
+
+      assert_enqueued(
+        worker: PpeRefreshWorker,
+        args: %{"did" => sender_did, "anchors" => ["anchor-a.example"]}
+      )
+    end
+
+    test "does not enqueue a PPE refresh when the sender_profile_version is not newer",
+         %{conn: conn} do
+      sender_did = "did:yawp:inbox-sender-fresh"
+
+      {:ok, :applied} =
+        Identity.apply_ppe_if_newer(
+          ppe_envelope(sender_did, 9, %{"anchors" => ["anchor-a.example"]})
+        )
+
+      envelope = %{
+        "envelope_id" => "env-#{System.unique_integer([:positive])}",
+        "recipient_did" => "did:yawp:inbox-recipient-2",
+        "kind" => "dm",
+        "sender_did" => sender_did,
+        "sender_profile_version" => 9
+      }
+
+      conn = post_federation(conn, "/federation/inbox/push", envelope)
+      assert json_response(conn, 200) == %{"status" => "appended"}
+
+      refute_enqueued(worker: PpeRefreshWorker)
     end
   end
 

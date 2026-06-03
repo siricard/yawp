@@ -22,6 +22,7 @@ defmodule YawpWeb.FederationController do
   use YawpWeb, :controller
 
   alias Yawp.Federation
+  alias Yawp.Federation.MessagePipeline
   alias Yawp.Federation.PresenceBroker
   alias Yawp.Federation.RemotePresence
   alias Yawp.Federation.Wrapper
@@ -52,8 +53,12 @@ defmodule YawpWeb.FederationController do
   def inbox_push(conn, params) do
     with_inner(conn, params, fn inner, _anchor ->
       case append_envelope(inner) do
-        :ok -> ok(conn, %{"status" => "appended"})
-        :error -> error(conn, 422, "invalid_envelope")
+        :ok ->
+          MessagePipeline.maybe_refresh_ppe(inner)
+          ok(conn, %{"status" => "appended"})
+
+        :error ->
+          error(conn, 422, "invalid_envelope")
       end
     end)
   end
