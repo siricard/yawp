@@ -144,6 +144,70 @@ defmodule Yawp.Federation.TwoAnchorTest do
     assert pulled["conversation_id"] == "conv-xa"
   end
 
+  test "a presence change at A reaches B's guest channel presence" do
+    {master_pk, _sk} = :crypto.generate_key(:eddsa, :ed25519)
+    did = "did:yawp:" <> Identity.did_from_pubkey(master_pk)
+
+    identity =
+      Ash.Seed.seed!(Yawp.Identity.Identity, %{did: did, master_public_key: master_pk})
+
+    {:ok, server} = Yawp.Servers.create_server("Guest-#{System.unique_integer([:positive])}")
+
+    {:ok, channel} =
+      Yawp.Servers.create_channel(
+        %{server_id: server.id, name: "general", type: :text},
+        authorize?: false
+      )
+
+    Ash.Seed.seed!(Yawp.Servers.Membership, %{
+      identity_id: identity.id,
+      server_id: server.id,
+      role_ids: [],
+      kind: :guest
+    })
+
+    topic = "server:#{server.id}:channel:#{channel.id}"
+    bare = String.replace_prefix(did, "did:yawp:", "")
+
+    test = self()
+
+    name = :"two_anchor_broker_#{System.unique_integer([:positive])}"
+
+    start_supervised!(
+      {Yawp.Federation.PresenceBroker,
+       name: name,
+       idle_after_ms: 60_000,
+       notifier: fn peer_host, d, state ->
+         {:ok, _} =
+           Client.notify_presence!(peer_host, %{"did" => d, "state" => to_string(state)})
+
+         send(test, {:notified, peer_host, d, state})
+       end}
+    )
+
+    Phoenix.PubSub.subscribe(Yawp.PubSub, "user:#{bare}")
+
+    tracker =
+      spawn(fn ->
+        {:ok, _} =
+          YawpWeb.Presence.track(self(), "user:#{bare}", "device-1", %{
+            online_at: System.system_time(:second)
+          })
+
+        send(test, :tracked)
+        receive(do: (:stop -> :ok))
+      end)
+
+    assert_receive :tracked, 2000
+
+    :ok = Yawp.Federation.PresenceBroker.subscribe(name, did, peer(@anchor_b_port))
+
+    assert_receive {:notified, _, ^did, :online}, 30_000
+    assert Map.has_key?(YawpWeb.Presence.list(topic), bare)
+
+    send(tracker, :stop)
+  end
+
   test "a replayed wrapper is rejected by the receiving anchor" do
     did = "did:yawp:two-anchor-replay"
 

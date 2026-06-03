@@ -14,12 +14,16 @@ defmodule YawpWeb.FederationController do
   - `POST /federation/blob/push` — persist an inbound private blob if newer.
   - `POST /federation/inbox/push` — append a DM/notification envelope to the inbox.
   - `POST /federation/devices/changed` — apply a device-subkey change to an identity.
+  - `POST /federation/presence/subscribe` — register a peer as a subscriber to a user's presence.
+  - `POST /federation/presence/notify` — apply an inbound coarse presence diff for a guest user.
   - `POST /federation/pull` — return recent inbox envelopes since a cursor.
   """
 
   use YawpWeb, :controller
 
   alias Yawp.Federation
+  alias Yawp.Federation.PresenceBroker
+  alias Yawp.Federation.RemotePresence
   alias Yawp.Federation.Wrapper
   alias Yawp.Identity
 
@@ -73,6 +77,30 @@ defmodule YawpWeb.FederationController do
       else
         {:error, :not_found} -> error(conn, 404, "unknown_identity")
         _ -> error(conn, 422, "invalid_device_change")
+      end
+    end)
+  end
+
+  def presence_subscribe(conn, params) do
+    with_inner(conn, params, fn inner, _anchor ->
+      with %{"did" => did, "peer_host" => peer_host}
+           when is_binary(did) and is_binary(peer_host) <- inner do
+        :ok = PresenceBroker.subscribe(did, peer_host)
+        ok(conn, %{"status" => "subscribed"})
+      else
+        _ -> error(conn, 422, "invalid_subscribe")
+      end
+    end)
+  end
+
+  def presence_notify(conn, params) do
+    with_inner(conn, params, fn inner, _anchor ->
+      with %{"did" => did, "state" => state}
+           when is_binary(did) and state in ["online", "idle", "offline"] <- inner do
+        :ok = RemotePresence.apply(did, state)
+        ok(conn, %{"status" => "noted"})
+      else
+        _ -> error(conn, 422, "invalid_notify")
       end
     end)
   end

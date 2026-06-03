@@ -43,6 +43,18 @@ defmodule Yawp.Federation.Client do
     post(peer_host, "/federation/devices/changed", change)
   end
 
+  @spec subscribe_presence!(String.t(), map()) :: {:ok, map()} | {:error, term()}
+  def subscribe_presence!(peer_host, subscription)
+      when is_binary(peer_host) and is_map(subscription) do
+    post(peer_host, "/federation/presence/subscribe", subscription)
+  end
+
+  @spec notify_presence!(String.t(), map()) :: {:ok, map()} | {:error, term()}
+  def notify_presence!(peer_host, notification)
+      when is_binary(peer_host) and is_map(notification) do
+    post(peer_host, "/federation/presence/notify", notification)
+  end
+
   @spec pull!(String.t(), map()) :: {:ok, map()} | {:error, term()}
   def pull!(peer_host, request) when is_binary(peer_host) and is_map(request) do
     post(peer_host, "/federation/pull", request)

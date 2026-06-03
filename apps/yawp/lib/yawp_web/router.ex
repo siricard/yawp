@@ -74,6 +74,8 @@ defmodule YawpWeb.Router do
     post "/inbox/push", FederationController, :inbox_push
     post "/devices/changed", FederationController, :devices_changed
     post "/anchors/adopt", FederationController, :adopt
+    post "/presence/subscribe", FederationController, :presence_subscribe
+    post "/presence/notify", FederationController, :presence_notify
     post "/pull", FederationController, :pull
   end
 
