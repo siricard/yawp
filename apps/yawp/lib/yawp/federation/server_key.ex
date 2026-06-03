@@ -36,9 +36,9 @@ defmodule Yawp.Federation.ServerKey do
   end
 
   cloak do
-    vault(Yawp.Vault)
+    vault Yawp.Vault
     attributes [:private_key]
-    decrypt_by_default([:private_key])
+    decrypt_by_default [:private_key]
   end
 
   actions do

@@ -11,6 +11,7 @@
     :ash_authentication,
     :ash_postgres,
     :ash_phoenix,
+    :ash_cloak,
     :ash,
     :reactor,
     :ecto,

@@ -56,6 +56,104 @@ defmodule Yawp.Identity do
     end
 
     resource Yawp.Identity.RefreshToken
+
+    resource Yawp.Identity.Ppe do
+      define :get_ppe_by_did, action: :get_by_did, args: [:did], not_found_error?: false
+    end
+
+    resource Yawp.Identity.PrivateBlob do
+      define :get_private_blob_by_did, action: :get_by_did, args: [:did], not_found_error?: false
+    end
+  end
+
+  @doc """
+  Applies an inbound PPE to the local cache if it is newer than what
+  we hold (higher `profile_version`). Returns `{:ok, :applied}` when
+  written, `{:ok, :stale}` when the inbound version is not newer.
+  """
+  @spec apply_ppe_if_newer(map()) :: {:ok, :applied | :stale} | {:error, term()}
+  def apply_ppe_if_newer(envelope) when is_map(envelope) do
+    did = Map.fetch!(envelope, "did")
+    incoming_version = Map.get(envelope, "profile_version", 0)
+
+    case get_ppe_by_did(did) do
+      {:ok, %Yawp.Identity.Ppe{profile_version: current}} when current >= incoming_version ->
+        {:ok, :stale}
+
+      {:ok, _} ->
+        do_upsert_ppe(did, incoming_version, envelope)
+    end
+  end
+
+  defp do_upsert_ppe(did, version, envelope) do
+    Yawp.Identity.Ppe
+    |> Ash.Changeset.for_create(:upsert, %{
+      did: did,
+      display_name: Map.get(envelope, "display_name"),
+      avatar_ref: Map.get(envelope, "avatar_ref"),
+      bio: Map.get(envelope, "bio"),
+      profile_version: version,
+      envelope: envelope
+    })
+    |> Ash.create(authorize?: false)
+    |> case do
+      {:ok, _} -> {:ok, :applied}
+      {:error, _} = err -> err
+    end
+  end
+
+  @doc """
+  Applies an inbound private-blob update if it is newer than what we
+  hold (higher `blob_version`). `ciphertext` is the raw opaque bytes.
+  """
+  @spec apply_blob_if_newer(String.t(), binary(), integer()) ::
+          {:ok, :applied | :stale} | {:error, term()}
+  def apply_blob_if_newer(did, ciphertext, blob_version)
+      when is_binary(did) and is_binary(ciphertext) and is_integer(blob_version) do
+    case get_private_blob_by_did(did) do
+      {:ok, %Yawp.Identity.PrivateBlob{blob_version: current}} when current >= blob_version ->
+        {:ok, :stale}
+
+      {:ok, _} ->
+        Yawp.Identity.PrivateBlob
+        |> Ash.Changeset.for_create(:upsert, %{
+          did: did,
+          ciphertext: ciphertext,
+          blob_version: blob_version
+        })
+        |> Ash.create(authorize?: false)
+        |> case do
+          {:ok, _} -> {:ok, :applied}
+          {:error, _} = err -> err
+        end
+    end
+  end
+
+  @doc """
+  Applies a device-subkey change to an existing identity, replacing
+  its `device_subkeys` map and bumping `profile_version`. Returns
+  `{:error, :not_found}` when no identity matches the DID.
+  """
+  @spec apply_device_subkey_change(String.t(), map(), integer() | nil) ::
+          {:ok, Yawp.Identity.Identity.t()} | {:error, term()}
+  def apply_device_subkey_change(did, device_subkeys, profile_version \\ nil)
+      when is_binary(did) and is_map(device_subkeys) do
+    case get_identity_by_did(did) do
+      {:ok, %Yawp.Identity.Identity{} = identity} ->
+        attrs = %{device_subkeys: device_subkeys}
+
+        attrs =
+          if is_integer(profile_version),
+            do: Map.put(attrs, :profile_version, profile_version),
+            else: attrs
+
+        identity
+        |> Ash.Changeset.for_update(:apply_device_change, attrs)
+        |> Ash.update(authorize?: false)
+
+      _ ->
+        {:error, :not_found}
+    end
   end
 
   @doc """

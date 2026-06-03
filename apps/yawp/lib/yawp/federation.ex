@@ -20,6 +20,44 @@ defmodule Yawp.Federation do
       define :list_published_server_keys, action: :list_published
       define :revoke_server_key, action: :revoke
     end
+
+    resource Yawp.Federation.InboxEntry do
+      define :append_inbox_entry, action: :append
+      define :pull_inbox_entries, action: :pull
+    end
+  end
+
+  @doc """
+  Idempotently appends an inner envelope (DM or notification) to a
+  recipient's inbox, keyed by `envelope_id`. A repeated `envelope_id`
+  is a no-op that returns the existing row.
+  """
+  @spec append_inbox(String.t(), map()) ::
+          {:ok, Yawp.Federation.InboxEntry.t()} | {:error, term()}
+  def append_inbox(recipient_did, envelope)
+      when is_binary(recipient_did) and is_map(envelope) do
+    append_inbox_entry(%{
+      recipient_did: recipient_did,
+      envelope_id: Map.fetch!(envelope, "envelope_id"),
+      conversation_id: Map.get(envelope, "conversation_id"),
+      kind: Map.get(envelope, "kind", "dm"),
+      envelope: envelope
+    })
+  end
+
+  @doc """
+  Returns recent inbox envelopes for a recipient after a cursor
+  serial, oldest first, capped at the pull ceiling.
+  """
+  @spec pull_inbox(String.t(), integer(), integer()) ::
+          {:ok, [Yawp.Federation.InboxEntry.t()]} | {:error, term()}
+  def pull_inbox(recipient_did, since_serial \\ 0, limit \\ 1000)
+      when is_binary(recipient_did) do
+    pull_inbox_entries(%{
+      recipient_did: recipient_did,
+      since_serial: since_serial,
+      limit: limit
+    })
   end
 
   @doc """

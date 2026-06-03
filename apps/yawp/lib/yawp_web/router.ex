@@ -61,6 +61,20 @@ defmodule YawpWeb.Router do
     get "/server-info", ServerInfoController, :show
   end
 
+  pipeline :federation do
+    plug :accepts, ["json"]
+  end
+
+  scope "/federation", YawpWeb do
+    pipe_through :federation
+
+    post "/ppe/push", FederationController, :ppe_push
+    post "/blob/push", FederationController, :blob_push
+    post "/inbox/push", FederationController, :inbox_push
+    post "/devices/changed", FederationController, :devices_changed
+    post "/pull", FederationController, :pull
+  end
+
   scope "/", YawpWeb do
     pipe_through :browser
 

@@ -94,6 +94,18 @@ defmodule Yawp.Identity.Identity do
       get_by [:did]
     end
 
+    update :apply_device_change do
+      description """
+      Replaces the inline `device_subkeys` map from a federated
+      `DeviceSubkeyChange` and optionally sets the new
+      `profile_version`. The originating anchor has already verified
+      the master-key signature over the change; this action only
+      persists the result.
+      """
+
+      accept [:device_subkeys, :profile_version]
+    end
+
     update :revoke_device_sessions do
       description """
       revokes every session + refresh
