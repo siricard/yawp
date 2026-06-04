@@ -33,6 +33,15 @@ defmodule YawpWeb.UserChannelTest do
 
   defp bare(did), do: String.replace_prefix(did, "did:yawp:", "")
 
+  defp notify_did(conn) do
+    with body when is_binary(body) <- IO.iodata_to_binary(Req.Test.raw_body(conn)),
+         {:ok, %{"inner" => %{"did" => did}}} <- Jason.decode(body) do
+      did
+    else
+      _ -> nil
+    end
+  end
+
   defp join_user(actor, did, params \\ %{}) do
     YawpWeb.UserSocket
     |> Phoenix.ChannelTest.socket(
@@ -206,7 +215,7 @@ defmodule YawpWeb.UserChannelTest do
       )
 
       Req.Test.stub(__MODULE__, fn conn ->
-        send(test, {:notify_posted, conn.request_path})
+        send(test, {:notify_posted, conn.request_path, notify_did(conn)})
         Req.Test.json(conn, %{"status" => "noted"})
       end)
 
@@ -228,15 +237,17 @@ defmodule YawpWeb.UserChannelTest do
                join_user(actor, actor.did, %{"guest_anchors" => ["peer-guest.example"]})
 
       assert_push "presence_state", _
-      assert_receive {:notify_posted, "/federation/presence/notify"}, 2000
+      assert_receive {:notify_posted, "/federation/presence/notify", did}, 2000
+      assert did == actor.did
     end
 
     test "joining with no guest anchors posts no presence notify" do
       actor = seed_identity()
+      did = actor.did
 
       assert {:ok, _reply, _socket} = join_user(actor, actor.did)
       assert_push "presence_state", _
-      refute_receive {:notify_posted, _}, 500
+      refute_receive {:notify_posted, _, ^did}, 500
     end
   end
 
