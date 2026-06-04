@@ -254,6 +254,15 @@ defmodule YawpWeb.FederationControllerTest do
     defp device_keypair, do: :crypto.generate_key(:eddsa, :ed25519)
 
     defp seed_sender_ppe(master_pub, master_priv, device_pub, device_id, opts \\ []) do
+      issued_at = "2026-01-01T00:00:00Z"
+      device_pk_b64 = Base.url_encode64(device_pub, padding: false)
+
+      device_signature =
+        %{"device_id" => device_id, "pk" => device_pk_b64, "issued_at" => issued_at}
+        |> Yawp.CanonicalJson.encode()
+        |> then(&:crypto.sign(:eddsa, :none, &1, [master_priv, :ed25519]))
+        |> Base.url_encode64(padding: false)
+
       ppe =
         %{
           "did" => did_for(master_pub),
@@ -264,9 +273,9 @@ defmodule YawpWeb.FederationControllerTest do
           "device_subkeys" => [
             %{
               "device_id" => device_id,
-              "pk" => Base.url_encode64(device_pub, padding: false),
-              "signature" => Base.url_encode64(:crypto.strong_rand_bytes(64), padding: false),
-              "issued_at" => "2026-01-01T00:00:00Z"
+              "pk" => device_pk_b64,
+              "signature" => device_signature,
+              "issued_at" => issued_at
             }
           ]
         }
@@ -517,6 +526,14 @@ defmodule YawpWeb.FederationControllerTest do
       device_id = "device-fetched"
       sender_did = did_for(master_pub)
       recipient = "did:yawp:inbox-firstcontact-ok"
+      issued_at = "2026-01-01T00:00:00Z"
+      device_pk_b64 = Base.url_encode64(device_pub, padding: false)
+
+      device_signature =
+        %{"device_id" => device_id, "pk" => device_pk_b64, "issued_at" => issued_at}
+        |> Yawp.CanonicalJson.encode()
+        |> then(&:crypto.sign(:eddsa, :none, &1, [master_priv, :ed25519]))
+        |> Base.url_encode64(padding: false)
 
       fetched_ppe =
         %{
@@ -528,9 +545,9 @@ defmodule YawpWeb.FederationControllerTest do
           "device_subkeys" => [
             %{
               "device_id" => device_id,
-              "pk" => Base.url_encode64(device_pub, padding: false),
-              "signature" => Base.url_encode64(:crypto.strong_rand_bytes(64), padding: false),
-              "issued_at" => "2026-01-01T00:00:00Z"
+              "pk" => device_pk_b64,
+              "signature" => device_signature,
+              "issued_at" => issued_at
             }
           ]
         }
@@ -637,6 +654,14 @@ defmodule YawpWeb.FederationControllerTest do
       {device_pub, device_priv} = :crypto.generate_key(:eddsa, :ed25519)
       device_id = "device-pull"
       did = "did:yawp:pull"
+      issued_at = "2026-01-01T00:00:00Z"
+      device_pk_b64 = Base.url_encode64(device_pub, padding: false)
+
+      device_signature =
+        %{"device_id" => device_id, "pk" => device_pk_b64, "issued_at" => issued_at}
+        |> Yawp.CanonicalJson.encode()
+        |> then(&:crypto.sign(:eddsa, :none, &1, [master_priv, :ed25519]))
+        |> Base.url_encode64(padding: false)
 
       ppe =
         %{
@@ -648,9 +673,9 @@ defmodule YawpWeb.FederationControllerTest do
           "device_subkeys" => [
             %{
               "device_id" => device_id,
-              "pk" => Base.url_encode64(device_pub, padding: false),
-              "signature" => Base.url_encode64(:crypto.strong_rand_bytes(64), padding: false),
-              "issued_at" => "2026-01-01T00:00:00Z"
+              "pk" => device_pk_b64,
+              "signature" => device_signature,
+              "issued_at" => issued_at
             }
           ]
         }

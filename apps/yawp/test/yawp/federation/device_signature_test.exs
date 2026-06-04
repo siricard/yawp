@@ -16,8 +16,25 @@ defmodule Yawp.Federation.DeviceSignatureTest do
     Map.put(payload, sig_field, b64(sig))
   end
 
+  defp sign_device_delegation(device_id, device_pub, issued_at, master_priv) do
+    canonical =
+      Yawp.CanonicalJson.encode(%{
+        "device_id" => device_id,
+        "pk" => b64(device_pub),
+        "issued_at" => issued_at
+      })
+
+    :crypto.sign(:eddsa, :none, canonical, [master_priv, :ed25519])
+  end
+
   defp seed_ppe(master_pub, master_priv, device_pub, device_id, opts \\ []) do
     anchors = Keyword.get(opts, :anchors, ["anchor-a.example"])
+    issued_at = Keyword.get(opts, :issued_at, "2026-01-01T00:00:00Z")
+
+    signature =
+      Keyword.get_lazy(opts, :device_signature, fn ->
+        sign_device_delegation(device_id, device_pub, issued_at, master_priv)
+      end)
 
     ppe =
       %{
@@ -30,8 +47,8 @@ defmodule Yawp.Federation.DeviceSignatureTest do
           %{
             "device_id" => device_id,
             "pk" => b64(device_pub),
-            "signature" => b64(:crypto.strong_rand_bytes(64)),
-            "issued_at" => "2026-01-01T00:00:00Z"
+            "signature" => b64(signature),
+            "issued_at" => issued_at
           }
         ]
       }
@@ -73,6 +90,20 @@ defmodule Yawp.Federation.DeviceSignatureTest do
 
     seed_ppe(master_pub, master_priv, device_pub, device_id)
     env = envelope(master_pub, master_priv, device_id)
+
+    assert {:error, :invalid_inner_signature} = DeviceSignature.verify(env)
+  end
+
+  test "rejects a DM whose published device subkey lacks a valid master delegation" do
+    {master_pub, master_priv} = keypair()
+    {device_pub, device_priv} = keypair()
+    device_id = "device-1"
+
+    seed_ppe(master_pub, master_priv, device_pub, device_id,
+      device_signature: :crypto.strong_rand_bytes(64)
+    )
+
+    env = envelope(master_pub, device_priv, device_id)
 
     assert {:error, :invalid_inner_signature} = DeviceSignature.verify(env)
   end

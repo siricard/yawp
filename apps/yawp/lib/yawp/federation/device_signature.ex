@@ -29,11 +29,39 @@ defmodule Yawp.Federation.DeviceSignature do
   defp resolve_sender_ppe(sender_did, envelope) do
     case Identity.get_ppe_by_did(sender_did) do
       {:ok, %Identity.Ppe{envelope: cached}} when is_map(cached) ->
-        {:ok, cached}
+        maybe_refresh_cached_ppe(sender_did, cached, envelope)
 
       _ ->
         fetch_sender_ppe(sender_did, sender_anchors(envelope))
     end
+  end
+
+  defp maybe_refresh_cached_ppe(sender_did, cached, envelope) do
+    signed_by = Map.get(envelope, "signed_by")
+
+    if refresh_cached_ppe?(cached, envelope, signed_by) do
+      case fetch_sender_ppe(sender_did, sender_anchors_from_cached(cached, envelope)) do
+        {:ok, fresh} -> {:ok, fresh}
+        {:error, _} -> {:ok, cached}
+      end
+    else
+      {:ok, cached}
+    end
+  end
+
+  defp refresh_cached_ppe?(cached, envelope, signed_by) do
+    advertised_version = Map.get(envelope, "sender_profile_version")
+    cached_version = Map.get(cached, "profile_version")
+
+    newer_profile? =
+      is_integer(advertised_version) and
+        (not is_integer(cached_version) or advertised_version > cached_version)
+
+    missing_device? =
+      is_binary(signed_by) and
+        match?({:error, :missing_device}, delegated_device_pk(cached, signed_by))
+
+    newer_profile? or missing_device?
   end
 
   defp fetch_sender_ppe(_sender_did, []), do: {:error, :unresolvable_sender}
@@ -63,7 +91,26 @@ defmodule Yawp.Federation.DeviceSignature do
     end
   end
 
+  defp sender_anchors_from_cached(cached, envelope) do
+    ppe_anchors =
+      case Map.get(cached, "anchors") do
+        anchors when is_list(anchors) -> anchors
+        _ -> []
+      end
+
+    (sender_anchors(envelope) ++ ppe_anchors)
+    |> Enum.filter(&(is_binary(&1) and &1 != ""))
+    |> Enum.uniq()
+  end
+
   defp device_pk_from_ppe(ppe, signed_by) do
+    case delegated_device_pk(ppe, signed_by) do
+      {:ok, device_pk} -> {:ok, device_pk}
+      _ -> :error
+    end
+  end
+
+  defp delegated_device_pk(ppe, signed_by) do
     subkeys =
       case Map.get(ppe, "device_subkeys") do
         list when is_list(list) -> list
@@ -71,10 +118,37 @@ defmodule Yawp.Federation.DeviceSignature do
       end
 
     case Enum.find(subkeys, fn s -> is_map(s) and Map.get(s, "device_id") == signed_by end) do
-      %{"pk" => pk_b64} -> decode(pk_b64, 32)
-      _ -> :error
+      %{"pk" => pk_b64, "signature" => sig_b64, "issued_at" => issued_at} ->
+        with {:ok, master_pk} <- decode(Map.get(ppe, "public_key"), 32),
+             {:ok, device_pk} <- decode(pk_b64, 32),
+             {:ok, delegation_sig} <- decode(sig_b64, 64),
+             true <-
+               verify_device_delegation(signed_by, pk_b64, issued_at, delegation_sig, master_pk) do
+          {:ok, device_pk}
+        else
+          _ -> {:error, :invalid_delegation}
+        end
+
+      _ ->
+        {:error, :missing_device}
     end
   end
+
+  defp verify_device_delegation(device_id, pk_b64, issued_at, signature, master_pk)
+       when is_binary(device_id) and is_binary(pk_b64) and is_binary(issued_at) do
+    canonical =
+      CanonicalJson.encode(%{
+        "device_id" => device_id,
+        "pk" => pk_b64,
+        "issued_at" => issued_at
+      })
+
+    :crypto.verify(:eddsa, :none, canonical, signature, [master_pk, :ed25519])
+  rescue
+    _ -> false
+  end
+
+  defp verify_device_delegation(_, _, _, _, _), do: false
 
   defp verify_signature(envelope, sig, device_pk) do
     canonical =

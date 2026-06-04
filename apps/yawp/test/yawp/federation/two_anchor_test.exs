@@ -21,6 +21,18 @@ defmodule Yawp.Federation.TwoAnchorTest do
     Map.put(payload, sig_field, Base.url_encode64(sig, padding: false))
   end
 
+  defp device_delegation_signature(device_id, device_pub, issued_at, master_priv) do
+    canonical =
+      Yawp.CanonicalJson.encode(%{
+        "device_id" => device_id,
+        "pk" => Base.url_encode64(device_pub, padding: false),
+        "issued_at" => issued_at
+      })
+
+    :crypto.sign(:eddsa, :none, canonical, [master_priv, :ed25519])
+    |> Base.url_encode64(padding: false)
+  end
+
   defp sign_server_inner(anchor, payload) do
     {:ok, active} = TwoAnchor.call(anchor, Yawp.Federation, :get_active_server_key, [])
 
@@ -117,6 +129,7 @@ defmodule Yawp.Federation.TwoAnchorTest do
     {master_pub, master_priv} = user_keypair()
     {device_pub, device_priv} = user_keypair()
     device_id = "device-xa"
+    issued_at = "2026-01-01T00:00:00Z"
     sender_did = did_for(master_pub)
     recipient = "did:yawp:two-anchor-inbox"
     env_id = "env-#{System.unique_integer([:positive])}"
@@ -132,8 +145,9 @@ defmodule Yawp.Federation.TwoAnchorTest do
           %{
             "device_id" => device_id,
             "pk" => Base.url_encode64(device_pub, padding: false),
-            "signature" => Base.url_encode64(:crypto.strong_rand_bytes(64), padding: false),
-            "issued_at" => "2026-01-01T00:00:00Z"
+            "signature" =>
+              device_delegation_signature(device_id, device_pub, issued_at, master_priv),
+            "issued_at" => issued_at
           }
         ]
       }
@@ -171,6 +185,132 @@ defmodule Yawp.Federation.TwoAnchorTest do
 
     assert pulled["envelope_id"] == env_id
     assert pulled["conversation_id"] == "conv-xa"
+  end
+
+  test "B refreshes stale cached PPE before rejecting a newly bound DM device",
+       %{a: a, b: b} do
+    {master_pub, master_priv} = user_keypair()
+    {old_device_pub, _old_device_priv} = user_keypair()
+    {new_device_pub, new_device_priv} = user_keypair()
+    old_device_id = "device-old"
+    new_device_id = "device-new"
+    old_issued_at = "2026-01-01T00:00:00Z"
+    new_issued_at = "2026-01-02T00:00:00Z"
+    sender_did = did_for(master_pub)
+    recipient = "did:yawp:two-anchor-stale-refresh"
+
+    cached_ppe =
+      %{
+        "did" => sender_did,
+        "profile_version" => 1,
+        "public_key" => pubkey_b64(master_pub),
+        "anchors" => [TwoAnchor.host(a)],
+        "display_name" => "Alice",
+        "device_subkeys" => [
+          %{
+            "device_id" => old_device_id,
+            "pk" => Base.url_encode64(old_device_pub, padding: false),
+            "signature" =>
+              device_delegation_signature(
+                old_device_id,
+                old_device_pub,
+                old_issued_at,
+                master_priv
+              ),
+            "issued_at" => old_issued_at
+          }
+        ]
+      }
+      |> sign_inner("signature", master_priv)
+
+    fresh_ppe =
+      put_in(cached_ppe, ["profile_version"], 2)
+      |> put_in(["device_subkeys"], [
+        hd(cached_ppe["device_subkeys"]),
+        %{
+          "device_id" => new_device_id,
+          "pk" => Base.url_encode64(new_device_pub, padding: false),
+          "signature" =>
+            device_delegation_signature(new_device_id, new_device_pub, new_issued_at, master_priv),
+          "issued_at" => new_issued_at
+        }
+      ])
+      |> sign_inner("signature", master_priv)
+
+    assert {:ok, :applied} = TwoAnchor.call(b, Yawp.Identity, :apply_ppe_if_newer, [cached_ppe])
+    assert {:ok, :applied} = TwoAnchor.call(a, Yawp.Identity, :apply_ppe_if_newer, [fresh_ppe])
+
+    envelope =
+      %{
+        "envelope_id" => "env-#{System.unique_integer([:positive])}",
+        "sender_did" => sender_did,
+        "signed_by" => new_device_id,
+        "recipient_did" => recipient,
+        "conversation_id" => "conv-stale-refresh",
+        "kind" => "dm",
+        "sender_profile_version" => 2,
+        "sender_anchors" => [TwoAnchor.host(a)]
+      }
+      |> sign_inner("sender_signature", new_device_priv)
+
+    body = TwoAnchor.sign_on(a, envelope)
+
+    assert {:ok, %Req.Response{status: 200, body: %{"status" => "appended"}}} =
+             TwoAnchor.post(b, "/federation/inbox/push", body)
+
+    assert {:ok, refreshed} = TwoAnchor.call(b, Yawp.Identity, :get_ppe_by_did, [sender_did])
+    assert refreshed.profile_version == 2
+    assert {:ok, [entry]} = TwoAnchor.call(b, Yawp.Federation, :pull_inbox, [recipient, 0, 100])
+    assert entry.envelope_id == envelope["envelope_id"]
+  end
+
+  test "B rejects a DM whose published device delegation is forged",
+       %{a: a, b: b} do
+    {master_pub, master_priv} = user_keypair()
+    {device_pub, device_priv} = user_keypair()
+    device_id = "device-forged-delegation"
+    sender_did = did_for(master_pub)
+    recipient = "did:yawp:two-anchor-forged-delegation"
+
+    ppe =
+      %{
+        "did" => sender_did,
+        "profile_version" => 1,
+        "public_key" => pubkey_b64(master_pub),
+        "anchors" => [TwoAnchor.host(a)],
+        "display_name" => "Alice",
+        "device_subkeys" => [
+          %{
+            "device_id" => device_id,
+            "pk" => Base.url_encode64(device_pub, padding: false),
+            "signature" => Base.url_encode64(:crypto.strong_rand_bytes(64), padding: false),
+            "issued_at" => "2026-01-01T00:00:00Z"
+          }
+        ]
+      }
+      |> sign_inner("signature", master_priv)
+
+    assert {:ok, :applied} = TwoAnchor.call(a, Yawp.Identity, :apply_ppe_if_newer, [ppe])
+
+    envelope =
+      %{
+        "envelope_id" => "env-#{System.unique_integer([:positive])}",
+        "sender_did" => sender_did,
+        "signed_by" => device_id,
+        "recipient_did" => recipient,
+        "conversation_id" => "conv-forged-delegation",
+        "kind" => "dm",
+        "sender_profile_version" => 1,
+        "sender_anchors" => [TwoAnchor.host(a)]
+      }
+      |> sign_inner("sender_signature", device_priv)
+
+    body = TwoAnchor.sign_on(a, envelope)
+
+    assert {:ok, %Req.Response{status: 403, body: %{"error" => "invalid_inner_signature"}}} =
+             TwoAnchor.post(b, "/federation/inbox/push", body)
+
+    assert {:ok, []} = TwoAnchor.call(b, Yawp.Federation, :pull_inbox, [recipient, 0, 100])
   end
 
   test "B rejects a DM whose signing device is not a published subkey of the sender",
