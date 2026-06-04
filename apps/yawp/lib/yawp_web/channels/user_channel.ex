@@ -26,11 +26,12 @@ defmodule YawpWeb.UserChannel do
 
   use Phoenix.Channel
 
+  alias Yawp.Federation.PresenceBroker
   alias Yawp.Identity.Identity, as: IdentityResource
   alias YawpWeb.Presence
 
   @impl true
-  def join("user:" <> bare_did, _params, socket) do
+  def join("user:" <> bare_did, params, socket) do
     identity = socket.assigns[:current_identity]
 
     with %IdentityResource{} = identity <- identity,
@@ -40,7 +41,10 @@ defmodule YawpWeb.UserChannel do
 
       Phoenix.PubSub.subscribe(Yawp.PubSub, inbox_topic(bare_did))
 
-      {:ok, assign(socket, :did, bare_did)}
+      {:ok,
+       socket
+       |> assign(:did, bare_did)
+       |> assign(:guest_anchors, guest_anchors(params))}
     else
       _ -> {:error, %{reason: "unauthorized"}}
     end
@@ -54,6 +58,12 @@ defmodule YawpWeb.UserChannel do
       })
 
     push(socket, "presence_state", Presence.list(socket))
+
+    PresenceBroker.subscribe_peers(
+      "did:yawp:" <> socket.assigns.did,
+      socket.assigns.guest_anchors
+    )
+
     {:noreply, socket}
   end
 
@@ -134,6 +144,16 @@ defmodule YawpWeb.UserChannel do
   end
 
   defp valid_read_marker?(_), do: false
+
+  defp guest_anchors(params) do
+    case params do
+      %{"guest_anchors" => anchors} when is_list(anchors) ->
+        Enum.filter(anchors, &(is_binary(&1) and &1 != ""))
+
+      _ ->
+        []
+    end
+  end
 
   defp bare("did:yawp:" <> base58), do: base58
   defp bare(other) when is_binary(other), do: other

@@ -1,25 +1,5 @@
 defmodule Yawp.Federation.PresenceBroker do
-  @moduledoc """
-  Brokers a user's coarse presence (`online` / `idle` / `offline`) to
-  peer anchors per the federation routing model.
-
-  The broker subscribes to local Phoenix Presence diffs for the
-  `user:<bare-did>` topics tracked by `YawpWeb.UserChannel`. When a peer
-  anchor subscribes (via `POST /federation/presence/subscribe`), the
-  broker records the peer and immediately pushes the user's current
-  state to it. Subsequent presence changes are pushed to every
-  subscribed peer.
-
-  Idle detection: while a user is online, a timer runs for
-  `idle_after_ms` (default five minutes). A presence join resets it; if
-  it fires with no intervening activity the user transitions to `:idle`
-  and subscribers are notified.
-
-  The `:notifier` is a 3-arity function `(peer_host, did, state)` that
-  performs the actual push. In production it relays through
-  `Yawp.Federation.Client.notify_presence!/2`; tests inject a function
-  that captures the calls.
-  """
+  @moduledoc false
 
   use GenServer
 
@@ -35,19 +15,22 @@ defmodule Yawp.Federation.PresenceBroker do
     GenServer.start_link(__MODULE__, opts, name: name)
   end
 
-  @doc """
-  Records `peer_host` as a subscriber to `did`'s presence and pushes the
-  user's current state to that peer.
-  """
   @spec subscribe(GenServer.server(), String.t(), String.t()) :: :ok
   def subscribe(server \\ __MODULE__, did, peer_host)
       when is_binary(did) and is_binary(peer_host) do
     GenServer.call(server, {:subscribe, did, peer_host})
   end
 
-  @doc """
-  Removes `peer_host` as a subscriber to `did`'s presence.
-  """
+  @spec subscribe_peers(GenServer.server(), String.t(), [String.t()]) :: :ok
+  def subscribe_peers(server \\ __MODULE__, did, peers)
+      when is_binary(did) and is_list(peers) do
+    for peer <- peers, is_binary(peer) and peer != "" do
+      subscribe(server, did, peer)
+    end
+
+    :ok
+  end
+
   @spec unsubscribe(GenServer.server(), String.t(), String.t()) :: :ok
   def unsubscribe(server \\ __MODULE__, did, peer_host)
       when is_binary(did) and is_binary(peer_host) do
@@ -58,7 +41,7 @@ defmodule Yawp.Federation.PresenceBroker do
   def init(opts) do
     state = %{
       notifier: Keyword.get(opts, :notifier, &default_notifier/3),
-      idle_after_ms: Keyword.get(opts, :idle_after_ms, @default_idle_after_ms),
+      idle_after_ms: Keyword.get_lazy(opts, :idle_after_ms, &configured_idle_after_ms/0),
       subscriptions: %{},
       bare_to_did: %{},
       presence: %{},
@@ -198,6 +181,10 @@ defmodule Yawp.Federation.PresenceBroker do
 
   defp push(state, did, peer_host, presence_state) do
     state.notifier.(peer_host, did, presence_state)
+  rescue
+    _ -> :ok
+  catch
+    _, _ -> :ok
   end
 
   defp current_presence(bare) do
@@ -218,5 +205,10 @@ defmodule Yawp.Federation.PresenceBroker do
   defp default_notifier(peer_host, did, presence_state) do
     Client.notify_presence!(peer_host, %{"did" => did, "state" => to_string(presence_state)})
     :ok
+  end
+
+  defp configured_idle_after_ms do
+    Application.get_env(:yawp, __MODULE__, [])
+    |> Keyword.get(:idle_after_ms, @default_idle_after_ms)
   end
 end

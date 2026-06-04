@@ -33,13 +33,13 @@ defmodule YawpWeb.UserChannelTest do
 
   defp bare(did), do: String.replace_prefix(did, "did:yawp:", "")
 
-  defp join_user(actor, did) do
+  defp join_user(actor, did, params \\ %{}) do
     YawpWeb.UserSocket
     |> Phoenix.ChannelTest.socket(
       "identity_socket:#{actor.identity.id}-#{System.unique_integer([:positive])}",
       %{current_identity: actor.identity}
     )
-    |> subscribe_and_join(YawpWeb.UserChannel, "user:#{bare(did)}")
+    |> subscribe_and_join(YawpWeb.UserChannel, "user:#{bare(did)}", params)
   end
 
   describe "join authorization" do
@@ -169,6 +169,54 @@ defmodule YawpWeb.UserChannelTest do
 
       ref = push(socket, "read_marker", %{"conversation_id" => "conv-1"})
       assert_reply ref, :error, %{reason: "invalid_payload"}
+    end
+  end
+
+  describe "federated presence subscription on client open" do
+    setup do
+      test = self()
+      Req.Test.set_req_test_to_shared()
+      {:ok, _} = Federation.generate_server_key()
+
+      prev = Application.get_env(:yawp, Federation.Client)
+
+      Application.put_env(:yawp, Federation.Client,
+        anchor_id: "home.example",
+        req_options: [plug: {Req.Test, __MODULE__}]
+      )
+
+      Req.Test.stub(__MODULE__, fn conn ->
+        send(test, {:notify_posted, conn.request_path})
+        Req.Test.json(conn, %{"status" => "noted"})
+      end)
+
+      on_exit(fn ->
+        if prev do
+          Application.put_env(:yawp, Federation.Client, prev)
+        else
+          Application.delete_env(:yawp, Federation.Client)
+        end
+      end)
+
+      :ok
+    end
+
+    test "joining with guest anchors subscribes those peers in the presence broker" do
+      actor = seed_identity()
+
+      assert {:ok, _reply, _socket} =
+               join_user(actor, actor.did, %{"guest_anchors" => ["peer-guest.example"]})
+
+      assert_push "presence_state", _
+      assert_receive {:notify_posted, "/federation/presence/notify"}, 2000
+    end
+
+    test "joining with no guest anchors posts no presence notify" do
+      actor = seed_identity()
+
+      assert {:ok, _reply, _socket} = join_user(actor, actor.did)
+      assert_push "presence_state", _
+      refute_receive {:notify_posted, _}, 500
     end
   end
 

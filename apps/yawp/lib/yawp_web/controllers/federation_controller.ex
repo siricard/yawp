@@ -82,10 +82,10 @@ defmodule YawpWeb.FederationController do
   end
 
   def presence_subscribe(conn, params) do
-    with_inner(conn, params, fn inner, _anchor ->
-      with %{"did" => did, "peer_host" => peer_host}
-           when is_binary(did) and is_binary(peer_host) <- inner do
-        :ok = PresenceBroker.subscribe(did, peer_host)
+    with_inner(conn, params, fn inner, anchor ->
+      with %{"did" => did} when is_binary(did) and did != "" <- inner,
+           true <- is_binary(anchor) and anchor != "" do
+        :ok = PresenceBroker.subscribe(did, anchor)
         ok(conn, %{"status" => "subscribed"})
       else
         _ -> error(conn, 422, "invalid_subscribe")

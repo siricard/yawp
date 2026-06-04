@@ -1,15 +1,5 @@
 defmodule Yawp.Federation.RemotePresence do
-  @moduledoc """
-  Owns local Phoenix Presence entries for users anchored elsewhere.
-
-  When a peer anchor notifies this server that one of its users changed
-  coarse presence (`POST /federation/presence/notify`), this process
-  tracks (online / idle) or untracks (offline) that user under their
-  bare DID on every channel topic where they are a guest. Because
-  Phoenix Presence entries are owned by the tracking process, a single
-  long-lived owner here keeps remote-user presence visible to the
-  channels' live subscribers without a socket of their own.
-  """
+  @moduledoc false
 
   use GenServer
 
@@ -24,11 +14,6 @@ defmodule Yawp.Federation.RemotePresence do
     GenServer.start_link(__MODULE__, opts, name: name)
   end
 
-  @doc """
-  Applies a coarse presence diff for `did`. `state` is `"online"`,
-  `"idle"`, or `"offline"`. Online/idle track the user on every guest
-  channel; offline untracks them.
-  """
   @spec apply(GenServer.server(), String.t(), String.t()) :: :ok
   def apply(server \\ __MODULE__, did, state)
       when is_binary(did) and state in ["online", "idle", "offline"] do
@@ -81,7 +66,7 @@ defmodule Yawp.Federation.RemotePresence do
     case Yawp.Identity.get_identity_by_did(did) do
       {:ok, identity} ->
         Servers.Membership
-        |> Ash.Query.filter(identity_id == ^identity.id)
+        |> Ash.Query.filter(identity_id == ^identity.id and kind == :guest)
         |> Ash.read!(authorize?: false)
         |> Enum.map(& &1.server_id)
 
