@@ -4,6 +4,7 @@ defmodule YawpWeb.FederationController do
   use YawpWeb, :controller
 
   alias Yawp.Federation
+  alias Yawp.Federation.DeviceSignature
   alias Yawp.Federation.InnerSignature
   alias Yawp.Federation.MessagePipeline
   alias Yawp.Federation.PresenceBroker
@@ -45,8 +46,8 @@ defmodule YawpWeb.FederationController do
   def inbox_push(conn, params) do
     with_inner(conn, params, fn inner, _anchor ->
       with :ok <- validate_envelope_recipients(inner),
-           :ok <- InnerSignature.verify(inner, "sender_did", "sender_signature"),
-           :ok <- ensure_refreshable_sender(inner),
+           :ok <- DeviceSignature.verify(inner),
+           {:ok, _} <- MessagePipeline.maybe_refresh_ppe(inner),
            :ok <- append_envelope(inner) do
         ok(conn, %{"status" => "appended"})
       else
@@ -55,14 +56,6 @@ defmodule YawpWeb.FederationController do
         _ -> error(conn, 422, "invalid_envelope")
       end
     end)
-  end
-
-  defp ensure_refreshable_sender(inner) do
-    case MessagePipeline.maybe_refresh_ppe(inner) do
-      {:ok, :no_anchors} -> {:error, :unresolvable_sender}
-      {:ok, _} -> :ok
-      {:error, _} = err -> err
-    end
   end
 
   def adopt(conn, params) do

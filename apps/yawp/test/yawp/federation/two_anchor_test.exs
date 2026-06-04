@@ -97,35 +97,114 @@ defmodule Yawp.Federation.TwoAnchorTest do
     assert stored.ciphertext == ciphertext
   end
 
-  test "an inbox envelope pushed to B is retrievable via a pull from B", %{a: a, b: b} do
-    {pub, priv} = user_keypair()
-    did = "did:yawp:two-anchor-inbox"
+  test "a device-signed DM verified against the sender's federated PPE round-trips A→B",
+       %{a: a, b: b} do
+    {master_pub, master_priv} = user_keypair()
+    {device_pub, device_priv} = user_keypair()
+    device_id = "device-xa"
+    sender_did = did_for(master_pub)
+    recipient = "did:yawp:two-anchor-inbox"
     env_id = "env-#{System.unique_integer([:positive])}"
+
+    ppe =
+      %{
+        "did" => sender_did,
+        "profile_version" => 2,
+        "public_key" => Base.url_encode64(master_pub, padding: false),
+        "anchors" => [TwoAnchor.host(a)],
+        "display_name" => "Alice",
+        "device_subkeys" => [
+          %{
+            "device_id" => device_id,
+            "pk" => Base.url_encode64(device_pub, padding: false),
+            "signature" => Base.url_encode64(:crypto.strong_rand_bytes(64), padding: false),
+            "issued_at" => "2026-01-01T00:00:00Z"
+          }
+        ]
+      }
+      |> sign_inner("signature", master_priv)
+
+    assert {:ok, :applied} = TwoAnchor.call(a, Yawp.Identity, :apply_ppe_if_newer, [ppe])
+    assert {:ok, nil} = TwoAnchor.call(b, Yawp.Identity, :get_ppe_by_did, [sender_did])
 
     envelope =
       %{
         "envelope_id" => env_id,
-        "sender_did" => did_for(pub),
-        "public_key" => Base.url_encode64(pub, padding: false),
-        "recipient_did" => did,
+        "sender_did" => sender_did,
+        "signed_by" => device_id,
+        "recipient_did" => recipient,
         "conversation_id" => "conv-xa",
-        "kind" => "dm"
+        "kind" => "dm",
+        "sender_profile_version" => 2,
+        "sender_anchors" => [TwoAnchor.host(a)]
       }
-      |> sign_inner("sender_signature", priv)
+      |> sign_inner("sender_signature", device_priv)
 
     body = TwoAnchor.sign_on(a, envelope)
 
     assert {:ok, %Req.Response{status: 200, body: %{"status" => "appended"}}} =
              TwoAnchor.post(b, "/federation/inbox/push", body)
 
+    assert {:ok, fetched} = TwoAnchor.call(b, Yawp.Identity, :get_ppe_by_did, [sender_did])
+    assert fetched.display_name == "Alice"
+
     pull_body =
-      TwoAnchor.sign_on(a, %{"recipient_did" => did, "since_serial" => 0})
+      TwoAnchor.sign_on(a, %{"recipient_did" => recipient, "since_serial" => 0})
 
     assert {:ok, %Req.Response{status: 200, body: %{"envelopes" => [pulled]}}} =
              TwoAnchor.post(b, "/federation/pull", pull_body)
 
     assert pulled["envelope_id"] == env_id
     assert pulled["conversation_id"] == "conv-xa"
+  end
+
+  test "B rejects a DM whose signing device is not a published subkey of the sender",
+       %{a: a, b: b} do
+    {master_pub, master_priv} = user_keypair()
+    {device_pub, _device_priv} = user_keypair()
+    {_rogue_pub, rogue_priv} = user_keypair()
+    device_id = "device-real"
+    sender_did = did_for(master_pub)
+    recipient = "did:yawp:two-anchor-rogue"
+
+    ppe =
+      %{
+        "did" => sender_did,
+        "profile_version" => 1,
+        "public_key" => Base.url_encode64(master_pub, padding: false),
+        "anchors" => [TwoAnchor.host(a)],
+        "display_name" => "Alice",
+        "device_subkeys" => [
+          %{
+            "device_id" => device_id,
+            "pk" => Base.url_encode64(device_pub, padding: false),
+            "signature" => Base.url_encode64(:crypto.strong_rand_bytes(64), padding: false),
+            "issued_at" => "2026-01-01T00:00:00Z"
+          }
+        ]
+      }
+      |> sign_inner("signature", master_priv)
+
+    assert {:ok, :applied} = TwoAnchor.call(a, Yawp.Identity, :apply_ppe_if_newer, [ppe])
+
+    envelope =
+      %{
+        "envelope_id" => "env-#{System.unique_integer([:positive])}",
+        "sender_did" => sender_did,
+        "signed_by" => "device-rogue",
+        "recipient_did" => recipient,
+        "conversation_id" => "conv-rogue",
+        "kind" => "dm",
+        "sender_anchors" => [TwoAnchor.host(a)]
+      }
+      |> sign_inner("sender_signature", rogue_priv)
+
+    body = TwoAnchor.sign_on(a, envelope)
+
+    assert {:ok, %Req.Response{status: 403, body: %{"error" => "invalid_inner_signature"}}} =
+             TwoAnchor.post(b, "/federation/inbox/push", body)
+
+    assert {:ok, []} = TwoAnchor.call(b, Yawp.Federation, :pull_inbox, [recipient, 0, 100])
   end
 
   test "a replayed wrapper is rejected by the receiving anchor", %{a: a, b: b} do

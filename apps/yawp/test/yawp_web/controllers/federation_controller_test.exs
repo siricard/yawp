@@ -249,36 +249,71 @@ defmodule YawpWeb.FederationControllerTest do
   end
 
   describe "POST /federation/inbox/push" do
-    defp signed_envelope(pub, priv, attrs) do
+    defp device_keypair, do: :crypto.generate_key(:eddsa, :ed25519)
+
+    defp seed_sender_ppe(master_pub, master_priv, device_pub, device_id, opts \\ []) do
+      ppe =
+        %{
+          "did" => did_for(master_pub),
+          "profile_version" => Keyword.get(opts, :version, 1),
+          "public_key" => Base.url_encode64(master_pub, padding: false),
+          "anchors" => Keyword.get(opts, :anchors, ["anchor-a.example"]),
+          "display_name" => "Sender",
+          "device_subkeys" => [
+            %{
+              "device_id" => device_id,
+              "pk" => Base.url_encode64(device_pub, padding: false),
+              "signature" => Base.url_encode64(:crypto.strong_rand_bytes(64), padding: false),
+              "issued_at" => "2026-01-01T00:00:00Z"
+            }
+          ]
+        }
+        |> sign_inner("signature", master_priv)
+
+      {:ok, _} = Identity.apply_ppe_if_newer(ppe)
+      :ok
+    end
+
+    defp dm_envelope(master_pub, device_priv, device_id, attrs) do
       %{
         "envelope_id" => "env-#{System.unique_integer([:positive])}",
-        "sender_did" => did_for(pub),
-        "public_key" => Base.url_encode64(pub, padding: false),
+        "sender_did" => did_for(master_pub),
+        "signed_by" => device_id,
         "kind" => "dm"
       }
       |> Map.merge(attrs)
-      |> sign_inner("sender_signature", priv)
+      |> sign_inner("sender_signature", device_priv)
     end
 
-    test "appends an envelope addressed to a single recipient", %{conn: conn} do
-      {pub, priv} = user_keypair()
-      did = "did:yawp:inbox-one"
+    test "appends a device-signed envelope addressed to a single recipient", %{conn: conn} do
+      {master_pub, master_priv} = user_keypair()
+      {device_pub, device_priv} = device_keypair()
+      device_id = "device-one"
+      seed_sender_ppe(master_pub, master_priv, device_pub, device_id)
+
+      recipient = "did:yawp:inbox-one"
 
       envelope =
-        signed_envelope(pub, priv, %{"recipient_did" => did, "conversation_id" => "conv-1"})
+        dm_envelope(master_pub, device_priv, device_id, %{
+          "recipient_did" => recipient,
+          "conversation_id" => "conv-1"
+        })
 
       conn = post_federation(conn, "/federation/inbox/push", envelope)
 
       assert json_response(conn, 200) == %{"status" => "appended"}
-      assert {:ok, [entry]} = Federation.pull_inbox(did, 0, 100)
+      assert {:ok, [entry]} = Federation.pull_inbox(recipient, 0, 100)
       assert entry.envelope_id == envelope["envelope_id"]
     end
 
-    test "fans an envelope out to multiple recipients", %{conn: conn} do
-      {pub, priv} = user_keypair()
+    test "fans a device-signed envelope out to multiple recipients", %{conn: conn} do
+      {master_pub, master_priv} = user_keypair()
+      {device_pub, device_priv} = device_keypair()
+      device_id = "device-fan"
+      seed_sender_ppe(master_pub, master_priv, device_pub, device_id)
 
       envelope =
-        signed_envelope(pub, priv, %{
+        dm_envelope(master_pub, device_priv, device_id, %{
           "recipient_dids" => ["did:yawp:r1", "did:yawp:r2"],
           "kind" => "notification"
         })
@@ -293,22 +328,36 @@ defmodule YawpWeb.FederationControllerTest do
     end
 
     test "rejects an envelope with no recipient with 422", %{conn: conn} do
-      {pub, priv} = user_keypair()
-      envelope = signed_envelope(pub, priv, %{})
+      {master_pub, master_priv} = user_keypair()
+      {device_pub, device_priv} = device_keypair()
+      device_id = "device-x"
+      seed_sender_ppe(master_pub, master_priv, device_pub, device_id)
+
+      envelope = dm_envelope(master_pub, device_priv, device_id, %{})
       conn = post_federation(conn, "/federation/inbox/push", envelope)
       assert json_response(conn, 422) == %{"error" => "invalid_envelope"}
     end
 
     test "rejects an envelope whose recipient_dids contain a non-string with 422", %{conn: conn} do
-      {pub, priv} = user_keypair()
-      envelope = signed_envelope(pub, priv, %{"recipient_dids" => [123]})
+      {master_pub, master_priv} = user_keypair()
+      {device_pub, device_priv} = device_keypair()
+      device_id = "device-x"
+      seed_sender_ppe(master_pub, master_priv, device_pub, device_id)
+
+      envelope = dm_envelope(master_pub, device_priv, device_id, %{"recipient_dids" => [123]})
       conn = post_federation(conn, "/federation/inbox/push", envelope)
       assert json_response(conn, 422) == %{"error" => "invalid_envelope"}
     end
 
-    test "rejects an envelope with an invalid inner signature with 403", %{conn: conn} do
-      {pub, priv} = user_keypair()
-      envelope = signed_envelope(pub, priv, %{"recipient_did" => "did:yawp:victim"})
+    test "rejects an envelope mutated after the device signed it with 403", %{conn: conn} do
+      {master_pub, master_priv} = user_keypair()
+      {device_pub, device_priv} = device_keypair()
+      device_id = "device-tamper"
+      seed_sender_ppe(master_pub, master_priv, device_pub, device_id)
+
+      envelope =
+        dm_envelope(master_pub, device_priv, device_id, %{"recipient_did" => "did:yawp:victim"})
+
       forged = Map.put(envelope, "body", "forged content")
 
       conn = post_federation(conn, "/federation/inbox/push", forged)
@@ -316,22 +365,48 @@ defmodule YawpWeb.FederationControllerTest do
       assert {:ok, []} = Federation.pull_inbox("did:yawp:victim", 0, 100)
     end
 
-    test "enqueues a PPE refresh when the envelope advertises a newer sender_profile_version",
+    test "rejects an envelope signed by the master key rather than a device subkey with 403",
          %{conn: conn} do
-      {pub, priv} = user_keypair()
-      sender_did = did_for(pub)
-
-      {:ok, :applied} =
-        Identity.apply_ppe_if_newer(%{
-          "did" => sender_did,
-          "public_key" => Base.url_encode64(pub, padding: false),
-          "profile_version" => 2,
-          "anchors" => ["anchor-a.example"],
-          "display_name" => "Sender"
-        })
+      {master_pub, master_priv} = user_keypair()
+      {device_pub, _device_priv} = device_keypair()
+      device_id = "device-master-mismatch"
+      seed_sender_ppe(master_pub, master_priv, device_pub, device_id)
 
       envelope =
-        signed_envelope(pub, priv, %{
+        dm_envelope(master_pub, master_priv, device_id, %{"recipient_did" => "did:yawp:victim2"})
+
+      conn = post_federation(conn, "/federation/inbox/push", envelope)
+      assert json_response(conn, 403) == %{"error" => "invalid_inner_signature"}
+      assert {:ok, []} = Federation.pull_inbox("did:yawp:victim2", 0, 100)
+    end
+
+    test "rejects an envelope whose signing device is not a published subkey with 403",
+         %{conn: conn} do
+      {master_pub, master_priv} = user_keypair()
+      {device_pub, _device_priv} = device_keypair()
+      {_rogue_pub, rogue_priv} = device_keypair()
+      seed_sender_ppe(master_pub, master_priv, device_pub, "device-real")
+
+      envelope =
+        dm_envelope(master_pub, rogue_priv, "device-rogue", %{
+          "recipient_did" => "did:yawp:victim3"
+        })
+
+      conn = post_federation(conn, "/federation/inbox/push", envelope)
+      assert json_response(conn, 403) == %{"error" => "invalid_inner_signature"}
+      assert {:ok, []} = Federation.pull_inbox("did:yawp:victim3", 0, 100)
+    end
+
+    test "enqueues a PPE refresh when the envelope advertises a newer sender_profile_version",
+         %{conn: conn} do
+      {master_pub, master_priv} = user_keypair()
+      {device_pub, device_priv} = device_keypair()
+      device_id = "device-refresh"
+      sender_did = did_for(master_pub)
+      seed_sender_ppe(master_pub, master_priv, device_pub, device_id, version: 2)
+
+      envelope =
+        dm_envelope(master_pub, device_priv, device_id, %{
           "recipient_did" => "did:yawp:inbox-recipient",
           "sender_profile_version" => 9
         })
@@ -347,20 +422,13 @@ defmodule YawpWeb.FederationControllerTest do
 
     test "does not enqueue a refresh when sender_profile_version is not newer than the cache",
          %{conn: conn} do
-      {pub, priv} = user_keypair()
-      sender_did = did_for(pub)
-
-      {:ok, :applied} =
-        Identity.apply_ppe_if_newer(%{
-          "did" => sender_did,
-          "public_key" => Base.url_encode64(pub, padding: false),
-          "profile_version" => 9,
-          "anchors" => ["anchor-a.example"],
-          "display_name" => "Sender"
-        })
+      {master_pub, master_priv} = user_keypair()
+      {device_pub, device_priv} = device_keypair()
+      device_id = "device-stale"
+      seed_sender_ppe(master_pub, master_priv, device_pub, device_id, version: 9)
 
       envelope =
-        signed_envelope(pub, priv, %{
+        dm_envelope(master_pub, device_priv, device_id, %{
           "recipient_did" => "did:yawp:inbox-recipient-stale",
           "sender_profile_version" => 5
         })
@@ -371,13 +439,14 @@ defmodule YawpWeb.FederationControllerTest do
       refute_enqueued(worker: PpeRefreshWorker)
     end
 
-    test "rejects a first-contact envelope whose refresh cannot be driven (no anchors) with 422",
+    test "rejects a first-contact envelope whose sender PPE cannot be resolved with 422",
          %{conn: conn} do
-      {pub, priv} = user_keypair()
+      {master_pub, _master_priv} = user_keypair()
+      {_device_pub, device_priv} = device_keypair()
       recipient = "did:yawp:inbox-firstcontact"
 
       envelope =
-        signed_envelope(pub, priv, %{
+        dm_envelope(master_pub, device_priv, "device-unknown", %{
           "recipient_did" => recipient,
           "sender_profile_version" => 4
         })
@@ -389,14 +458,46 @@ defmodule YawpWeb.FederationControllerTest do
       refute_enqueued(worker: PpeRefreshWorker)
     end
 
-    test "accepts a first-contact envelope that carries sender_anchors to drive the refresh",
+    test "resolves the sender PPE from sender_anchors to verify a first-contact device signature",
          %{conn: conn} do
-      {pub, priv} = user_keypair()
-      sender_did = did_for(pub)
+      {master_pub, master_priv} = user_keypair()
+      {device_pub, device_priv} = device_keypair()
+      device_id = "device-fetched"
+      sender_did = did_for(master_pub)
       recipient = "did:yawp:inbox-firstcontact-ok"
 
+      fetched_ppe =
+        %{
+          "did" => sender_did,
+          "profile_version" => 4,
+          "public_key" => Base.url_encode64(master_pub, padding: false),
+          "anchors" => ["anchor-b.example"],
+          "display_name" => "Fetched Sender",
+          "device_subkeys" => [
+            %{
+              "device_id" => device_id,
+              "pk" => Base.url_encode64(device_pub, padding: false),
+              "signature" => Base.url_encode64(:crypto.strong_rand_bytes(64), padding: false),
+              "issued_at" => "2026-01-01T00:00:00Z"
+            }
+          ]
+        }
+        |> sign_inner("signature", master_priv)
+
+      prev = Application.get_env(:yawp, Federation.Client)
+
+      Application.put_env(:yawp, Federation.Client,
+        req_options: [plug: fn c -> Req.Test.json(c, %{"ppe" => fetched_ppe}) end]
+      )
+
+      on_exit(fn ->
+        if prev,
+          do: Application.put_env(:yawp, Federation.Client, prev),
+          else: Application.delete_env(:yawp, Federation.Client)
+      end)
+
       envelope =
-        signed_envelope(pub, priv, %{
+        dm_envelope(master_pub, device_priv, device_id, %{
           "recipient_did" => recipient,
           "sender_profile_version" => 4,
           "sender_anchors" => ["anchor-b.example"]
@@ -406,11 +507,8 @@ defmodule YawpWeb.FederationControllerTest do
 
       assert json_response(conn, 200) == %{"status" => "appended"}
       assert {:ok, [_entry]} = Federation.pull_inbox(recipient, 0, 100)
-
-      assert_enqueued(
-        worker: PpeRefreshWorker,
-        args: %{"did" => sender_did, "anchors" => ["anchor-b.example"]}
-      )
+      assert {:ok, cached} = Identity.get_ppe_by_did(sender_did)
+      assert cached.display_name == "Fetched Sender"
     end
   end
 
@@ -483,15 +581,44 @@ defmodule YawpWeb.FederationControllerTest do
 
   describe "POST /federation/pull" do
     test "returns envelopes after a cursor serial, oldest first", %{conn: conn} do
-      {pub, priv} = user_keypair()
+      {master_pub, master_priv} = user_keypair()
+      {device_pub, device_priv} = :crypto.generate_key(:eddsa, :ed25519)
+      device_id = "device-pull"
       did = "did:yawp:pull"
 
+      ppe =
+        %{
+          "did" => did_for(master_pub),
+          "profile_version" => 1,
+          "public_key" => Base.url_encode64(master_pub, padding: false),
+          "anchors" => ["anchor-a.example"],
+          "display_name" => "Sender",
+          "device_subkeys" => [
+            %{
+              "device_id" => device_id,
+              "pk" => Base.url_encode64(device_pub, padding: false),
+              "signature" => Base.url_encode64(:crypto.strong_rand_bytes(64), padding: false),
+              "issued_at" => "2026-01-01T00:00:00Z"
+            }
+          ]
+        }
+        |> sign_inner("signature", master_priv)
+
+      {:ok, _} = Identity.apply_ppe_if_newer(ppe)
+
       for n <- 1..3 do
+        envelope =
+          %{
+            "envelope_id" => "p#{n}",
+            "sender_did" => did_for(master_pub),
+            "signed_by" => device_id,
+            "recipient_did" => did,
+            "kind" => "dm"
+          }
+          |> sign_inner("sender_signature", device_priv)
+
         build_conn()
-        |> post_federation(
-          "/federation/inbox/push",
-          signed_envelope(pub, priv, %{"recipient_did" => did, "envelope_id" => "p#{n}"})
-        )
+        |> post_federation("/federation/inbox/push", envelope)
       end
 
       conn =
