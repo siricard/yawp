@@ -181,6 +181,82 @@ defmodule Yawp.Federation.WrapperTest do
       assert {:error, :malformed} = Wrapper.unwrap(%{"wrapper" => "x"}, [])
       assert {:error, :malformed} = Wrapper.unwrap(42, [])
     end
+
+    test "normalizes assorted malformed input to {:error, _} without crashing" do
+      good = Jason.decode!(Wrapper.encode_body(%{"a" => 1}, sender_anchor_id: @host))
+
+      malformed = [
+        nil,
+        [],
+        [1, 2, 3],
+        "",
+        "{",
+        "[1, 2, 3]",
+        Jason.encode!([1, 2, 3]),
+        %{},
+        %{"wrapper" => 1, "signature" => 2, "key_id" => 3, "inner" => 4},
+        %{"wrapper" => "x", "signature" => "y", "key_id" => "z"},
+        %{"signature" => "y", "key_id" => "z", "inner" => %{}},
+        Map.put(good, "wrapper", Jason.encode!([1, 2])),
+        Map.put(good, "wrapper", Jason.encode!("scalar")),
+        Map.put(good, "signature", "!!! not base64 !!!"),
+        Map.put(good, "inner", "not a map")
+      ]
+
+      for body <- malformed do
+        assert {:error, reason} = Wrapper.unwrap(body, [])
+        assert is_atom(reason)
+      end
+    end
+
+    test "rejects a wrapper missing sender_anchor_id with an error tuple" do
+      inner = %{"x" => "y"}
+      {_wrapped, _sig, key_id} = Wrapper.wrap(inner, sender_anchor_id: @host)
+
+      wrapper = %{
+        "delivery_nonce" => "n-no-sender",
+        "delivery_timestamp" => "2024-01-01T00:00:00Z",
+        "inner_payload_hash" => "deadbeef"
+      }
+
+      canonical = CanonicalJson.encode(wrapper)
+      {:ok, sig, _} = Federation.sign(wrapper)
+
+      body = %{
+        "wrapper" => canonical,
+        "signature" => Base.encode64(sig),
+        "key_id" => key_id,
+        "inner" => inner
+      }
+
+      assert {:error, reason} = Wrapper.unwrap(body, [])
+      assert is_atom(reason)
+    end
+
+    test "rejects a wrapper missing delivery_nonce without raising" do
+      inner = %{"x" => "y"}
+      {_wrapped, _sig, key_id} = Wrapper.wrap(inner, sender_anchor_id: @host)
+
+      wrapper = %{
+        "delivery_timestamp" => "2024-01-01T00:00:00Z",
+        "sender_anchor_id" => @host,
+        "inner_payload_hash" =>
+          Base.encode16(:crypto.hash(:sha256, CanonicalJson.encode(inner)), case: :lower)
+      }
+
+      canonical = CanonicalJson.encode(wrapper)
+      {:ok, sig, _} = Federation.sign(wrapper)
+
+      body = %{
+        "wrapper" => canonical,
+        "signature" => Base.encode64(sig),
+        "key_id" => key_id,
+        "inner" => inner
+      }
+
+      assert {:error, reason} = Wrapper.unwrap(body, [])
+      assert is_atom(reason)
+    end
   end
 
   describe "DeliveryNonceCache" do
@@ -203,6 +279,22 @@ defmodule Yawp.Federation.WrapperTest do
       DeliveryNonceCache.sweep()
       assert DeliveryNonceCache.size() == 1
       assert DeliveryNonceCache.seen?("fresh")
+    end
+
+    test "exactly one of many concurrent claims for the same nonce wins" do
+      nonce = "race-nonce"
+      claimants = 200
+
+      results =
+        1..claimants
+        |> Task.async_stream(fn _ -> DeliveryNonceCache.record(nonce) end,
+          max_concurrency: claimants,
+          timeout: :infinity
+        )
+        |> Enum.map(fn {:ok, result} -> result end)
+
+      assert Enum.count(results, &(&1 == :ok)) == 1
+      assert Enum.count(results, &(&1 == {:error, :replay})) == claimants - 1
     end
   end
 end

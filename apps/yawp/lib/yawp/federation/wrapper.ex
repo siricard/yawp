@@ -80,16 +80,23 @@ defmodule Yawp.Federation.Wrapper do
              is_map(inner) do
     with {:ok, signature} <- decode_signature(signature_b64),
          {:ok, wrapper} <- decode_wrapper(wrapped),
-         sender_anchor_id when is_binary(sender_anchor_id) <-
-           Map.get(wrapper, "sender_anchor_id", :missing),
+         {:ok, sender_anchor_id} <- fetch_string(wrapper, "sender_anchor_id"),
+         {:ok, delivery_nonce} <- fetch_string(wrapper, "delivery_nonce"),
          true <- verify_signature(sender_anchor_id, key_id, wrapped, signature),
          :ok <- verify_payload_hash(wrapper, inner),
-         :ok <- DeliveryNonceCache.record(Map.fetch!(wrapper, "delivery_nonce")) do
+         :ok <- DeliveryNonceCache.record(delivery_nonce) do
       {:ok, inner, sender_anchor_id}
     end
   end
 
   def unwrap(_body, _opts), do: {:error, :malformed}
+
+  defp fetch_string(wrapper, key) do
+    case Map.get(wrapper, key) do
+      value when is_binary(value) -> {:ok, value}
+      _ -> {:error, :malformed}
+    end
+  end
 
   defp verify_signature(sender_anchor_id, key_id, wrapped, signature) do
     if KeyDocFetcher.verify_with(sender_anchor_id, key_id, wrapped, signature) do

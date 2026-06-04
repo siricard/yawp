@@ -31,15 +31,22 @@ defmodule Yawp.Federation.DeliveryNonceCache do
     now = System.system_time(:second)
     expires_at = now + ttl_seconds
 
-    case :ets.lookup(@table, nonce) do
-      [{^nonce, existing_expiry}] when existing_expiry > now ->
-        {:error, :replay}
-
-      _ ->
-        :ets.insert(@table, {nonce, expires_at})
+    cond do
+      :ets.insert_new(@table, {nonce, expires_at}) ->
         maybe_enforce_ceiling()
         :ok
+
+      claim_expired(nonce, now, expires_at) ->
+        :ok
+
+      true ->
+        {:error, :replay}
     end
+  end
+
+  defp claim_expired(nonce, now, expires_at) do
+    match = [{{nonce, :"$1"}, [{:"=<", :"$1", now}], [{{nonce, expires_at}}]}]
+    :ets.select_replace(@table, match) == 1
   end
 
   @spec seen?(nonce()) :: boolean()
