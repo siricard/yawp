@@ -1,232 +1,150 @@
 defmodule Yawp.Federation.TwoAnchorTest do
-  @moduledoc """
-  End-to-end federation transport: two in-process Bandit listeners
-  (`:14000` and `:14100`) serve the federation endpoints over real
-  sockets. `Yawp.Federation.Client` wraps and signs a payload on one
-  anchor and POSTs it to the other, which verifies the wrapper against
-  the published key document (stubbed via `Req.Test`) and applies the
-  inner payload. PPE and private-blob updates round-trip; both
-  listeners tear down cleanly via `start_supervised!`.
-  """
-  use Yawp.DataCase, async: false
+  use ExUnit.Case, async: false
 
-  alias Yawp.Federation
-  alias Yawp.Federation.Client
-  alias Yawp.Federation.DeliveryNonceCache
-  alias Yawp.Federation.KeyDocCache
-  alias Yawp.Identity
+  alias Yawp.TestSupport.TwoAnchor
 
-  @anchor_a_port 14_000
-  @anchor_b_port 14_100
-  @sender_anchor "anchor-a.example"
+  @moduletag :two_anchor
 
   setup do
-    KeyDocCache.clear()
-    DeliveryNonceCache.clear()
-    Req.Test.set_req_test_to_shared()
-
-    {:ok, _} = Federation.generate_server_key()
-    {:ok, active} = Federation.get_active_server_key()
-    stub_key_doc(active)
-
-    start_supervised!(
-      Supervisor.child_spec(
-        {Bandit, plug: YawpWeb.Endpoint, scheme: :http, port: @anchor_a_port},
-        id: :anchor_a
-      )
-    )
-
-    start_supervised!(
-      Supervisor.child_spec(
-        {Bandit, plug: YawpWeb.Endpoint, scheme: :http, port: @anchor_b_port},
-        id: :anchor_b
-      )
-    )
-
-    prev = Application.get_env(:yawp, Client)
-    Application.put_env(:yawp, Client, anchor_id: @sender_anchor)
-
-    on_exit(fn ->
-      if prev do
-        Application.put_env(:yawp, Client, prev)
-      else
-        Application.delete_env(:yawp, Client)
-      end
-    end)
-
-    :ok
+    TwoAnchor.start_pair!()
   end
 
-  defp stub_key_doc(active) do
-    encoded_pub = Base.url_encode64(active.public_key, padding: false)
+  defp user_keypair, do: :crypto.generate_key(:eddsa, :ed25519)
 
-    doc = %{
-      "server_id" => @sender_anchor,
-      "keys" => [
-        %{
-          "key_id" => active.key_id,
-          "alg" => "Ed25519",
-          "public_key" => encoded_pub,
-          "not_before" => "2020-01-01T00:00:00Z",
-          "not_after" => "2999-01-01T00:00:00Z"
-        }
-      ],
-      "revoked" => []
-    }
+  defp did_for(pub), do: "did:yawp:" <> Yawp.Identity.did_from_pubkey(pub)
 
-    Req.Test.stub(Yawp.Federation.KeyDocFetcher, fn conn -> Req.Test.json(conn, doc) end)
+  defp sign_inner(payload, sig_field, priv) do
+    canonical = Yawp.CanonicalJson.encode(Map.delete(payload, sig_field))
+    sig = :crypto.sign(:eddsa, :none, canonical, [priv, :ed25519])
+    Map.put(payload, sig_field, Base.url_encode64(sig, padding: false))
   end
 
-  defp peer(port), do: "localhost:#{port}"
+  test "a user-signed PPE signed on A round-trips to B over real sockets", %{a: a, b: b} do
+    {pub, priv} = user_keypair()
+    did = did_for(pub)
 
-  defp fresh_pubkey do
-    {pub, _priv} = :crypto.generate_key(:eddsa, :ed25519)
-    Base.url_encode64(pub, padding: false)
-  end
+    ppe =
+      %{
+        "did" => did,
+        "profile_version" => 4,
+        "public_key" => Base.url_encode64(pub, padding: false),
+        "anchors" => [TwoAnchor.host(a)],
+        "display_name" => "Alice",
+        "bio" => "hello from A"
+      }
+      |> sign_inner("signature", priv)
 
-  test "PPE update round-trips from anchor A to anchor B over real sockets" do
-    did = "did:yawp:two-anchor-ppe"
+    body = TwoAnchor.sign_on(a, ppe)
 
-    encoded_pk = fresh_pubkey()
+    assert {:ok, %Req.Response{status: 200, body: %{"status" => "applied"}}} =
+             TwoAnchor.post(b, "/federation/ppe/push", body)
 
-    ppe = %{
-      "did" => did,
-      "profile_version" => 4,
-      "public_key" => encoded_pk,
-      "anchors" => [@sender_anchor],
-      "display_name" => "Alice",
-      "bio" => "hello from A"
-    }
-
-    assert {:ok, %{"status" => "applied"}} = Client.push_ppe!(peer(@anchor_b_port), ppe)
-
-    assert {:ok, stored} = Identity.get_ppe_by_did(did)
+    assert {:ok, stored} = TwoAnchor.call(b, Yawp.Identity, :get_ppe_by_did, [did])
     assert stored.profile_version == 4
     assert stored.display_name == "Alice"
     assert stored.envelope["bio"] == "hello from A"
+
+    assert {:ok, nil} = TwoAnchor.call(a, Yawp.Identity, :get_ppe_by_did, [did])
   end
 
-  test "private blob ciphertext round-trips byte-identically from A to B" do
-    did = "did:yawp:two-anchor-blob"
+  test "B rejects a PPE whose inner user signature is forged, even from a trusted anchor", %{
+    a: a,
+    b: b
+  } do
+    {pub, priv} = user_keypair()
+    did = did_for(pub)
+
+    ppe =
+      %{
+        "did" => did,
+        "profile_version" => 1,
+        "public_key" => Base.url_encode64(pub, padding: false),
+        "anchors" => [TwoAnchor.host(a)],
+        "display_name" => "Alice"
+      }
+      |> sign_inner("signature", priv)
+      |> Map.put("display_name", "Mallory")
+
+    body = TwoAnchor.sign_on(a, ppe)
+
+    assert {:ok, %Req.Response{status: 403, body: %{"error" => "invalid_inner_signature"}}} =
+             TwoAnchor.post(b, "/federation/ppe/push", body)
+
+    assert {:ok, nil} = TwoAnchor.call(b, Yawp.Identity, :get_ppe_by_did, [did])
+  end
+
+  test "a user-signed private blob round-trips byte-identically from A to B", %{a: a, b: b} do
+    {pub, priv} = user_keypair()
+    did = did_for(pub)
     ciphertext = :crypto.strong_rand_bytes(64)
 
-    blob = %{
-      "did" => did,
-      "ciphertext" => Base.encode64(ciphertext),
-      "blob_version" => 7
-    }
+    blob =
+      %{
+        "did" => did,
+        "ciphertext" => Base.encode64(ciphertext),
+        "blob_version" => 7,
+        "public_key" => Base.url_encode64(pub, padding: false)
+      }
+      |> sign_inner("signature", priv)
 
-    assert {:ok, %{"status" => "applied"}} = Client.push_blob!(peer(@anchor_b_port), blob)
+    body = TwoAnchor.sign_on(a, blob)
 
-    assert {:ok, stored} = Identity.get_private_blob_by_did(did)
+    assert {:ok, %Req.Response{status: 200, body: %{"status" => "applied"}}} =
+             TwoAnchor.post(b, "/federation/blob/push", body)
+
+    assert {:ok, stored} = TwoAnchor.call(b, Yawp.Identity, :get_private_blob_by_did, [did])
     assert stored.blob_version == 7
     assert stored.ciphertext == ciphertext
   end
 
-  test "an inbox envelope pushed to B is retrievable via a pull from A" do
+  test "an inbox envelope pushed to B is retrievable via a pull from B", %{a: a, b: b} do
+    {pub, priv} = user_keypair()
     did = "did:yawp:two-anchor-inbox"
     env_id = "env-#{System.unique_integer([:positive])}"
 
-    envelope = %{
-      "envelope_id" => env_id,
-      "recipient_did" => did,
-      "conversation_id" => "conv-xa",
-      "kind" => "dm",
-      "ciphertext" => "opaque-bytes"
-    }
+    envelope =
+      %{
+        "envelope_id" => env_id,
+        "sender_did" => did_for(pub),
+        "public_key" => Base.url_encode64(pub, padding: false),
+        "recipient_did" => did,
+        "conversation_id" => "conv-xa",
+        "kind" => "dm"
+      }
+      |> sign_inner("sender_signature", priv)
 
-    assert {:ok, %{"status" => "appended"}} = Client.push_inbox!(peer(@anchor_b_port), envelope)
+    body = TwoAnchor.sign_on(a, envelope)
 
-    assert {:ok, %{"envelopes" => [pulled]}} =
-             Client.pull!(peer(@anchor_a_port), %{"recipient_did" => did, "since_serial" => 0})
+    assert {:ok, %Req.Response{status: 200, body: %{"status" => "appended"}}} =
+             TwoAnchor.post(b, "/federation/inbox/push", body)
+
+    pull_body =
+      TwoAnchor.sign_on(a, %{"recipient_did" => did, "since_serial" => 0})
+
+    assert {:ok, %Req.Response{status: 200, body: %{"envelopes" => [pulled]}}} =
+             TwoAnchor.post(b, "/federation/pull", pull_body)
 
     assert pulled["envelope_id"] == env_id
     assert pulled["conversation_id"] == "conv-xa"
   end
 
-  test "a presence change at A reaches B's guest channel presence" do
-    {master_pk, _sk} = :crypto.generate_key(:eddsa, :ed25519)
-    did = "did:yawp:" <> Identity.did_from_pubkey(master_pk)
+  test "a replayed wrapper is rejected by the receiving anchor", %{a: a, b: b} do
+    {pub, priv} = user_keypair()
+    did = did_for(pub)
 
-    identity =
-      Ash.Seed.seed!(Yawp.Identity.Identity, %{did: did, master_public_key: master_pk})
+    ppe =
+      %{
+        "did" => did,
+        "profile_version" => 1,
+        "public_key" => Base.url_encode64(pub, padding: false),
+        "anchors" => [TwoAnchor.host(a)],
+        "display_name" => "Once"
+      }
+      |> sign_inner("signature", priv)
 
-    {:ok, server} = Yawp.Servers.create_server("Guest-#{System.unique_integer([:positive])}")
+    body = TwoAnchor.sign_on(a, ppe)
 
-    {:ok, channel} =
-      Yawp.Servers.create_channel(
-        %{server_id: server.id, name: "general", type: :text},
-        authorize?: false
-      )
-
-    Ash.Seed.seed!(Yawp.Servers.Membership, %{
-      identity_id: identity.id,
-      server_id: server.id,
-      role_ids: [],
-      kind: :guest
-    })
-
-    topic = "server:#{server.id}:channel:#{channel.id}"
-    bare = String.replace_prefix(did, "did:yawp:", "")
-
-    test = self()
-
-    name = :"two_anchor_broker_#{System.unique_integer([:positive])}"
-
-    start_supervised!(
-      {Yawp.Federation.PresenceBroker,
-       name: name,
-       idle_after_ms: 60_000,
-       notifier: fn peer_host, d, state ->
-         {:ok, _} =
-           Client.notify_presence!(peer_host, %{"did" => d, "state" => to_string(state)})
-
-         send(test, {:notified, peer_host, d, state})
-       end}
-    )
-
-    Phoenix.PubSub.subscribe(Yawp.PubSub, "user:#{bare}")
-
-    tracker =
-      spawn(fn ->
-        {:ok, _} =
-          YawpWeb.Presence.track(self(), "user:#{bare}", "device-1", %{
-            online_at: System.system_time(:second)
-          })
-
-        send(test, :tracked)
-        receive(do: (:stop -> :ok))
-      end)
-
-    assert_receive :tracked, 2000
-
-    :ok = Yawp.Federation.PresenceBroker.subscribe(name, did, peer(@anchor_b_port))
-
-    assert_receive {:notified, _, ^did, :online}, 30_000
-    assert Map.has_key?(YawpWeb.Presence.list(topic), bare)
-
-    send(tracker, :stop)
-  end
-
-  test "a replayed wrapper is rejected by the receiving anchor" do
-    did = "did:yawp:two-anchor-replay"
-
-    encoded_pk = fresh_pubkey()
-
-    inner = %{
-      "did" => did,
-      "profile_version" => 1,
-      "public_key" => encoded_pk,
-      "anchors" => [@sender_anchor],
-      "display_name" => "Once"
-    }
-
-    body = Yawp.Federation.Wrapper.encode_body(inner, sender_anchor_id: @sender_anchor)
-    url = "http://#{peer(@anchor_b_port)}/federation/ppe/push"
-
-    headers = [{"content-type", "application/json"}]
-
-    assert {:ok, %Req.Response{status: 200}} = Req.post(url: url, body: body, headers: headers)
-    assert {:ok, %Req.Response{status: 409}} = Req.post(url: url, body: body, headers: headers)
+    assert {:ok, %Req.Response{status: 200}} = TwoAnchor.post(b, "/federation/ppe/push", body)
+    assert {:ok, %Req.Response{status: 409}} = TwoAnchor.post(b, "/federation/ppe/push", body)
   end
 end

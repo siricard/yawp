@@ -1,19 +1,5 @@
 defmodule Yawp.Federation.InboxEntry do
-  @moduledoc """
-  Append-only inbox of envelopes addressed to a user, held at their
-  anchor until a connected device picks them up.
-
-  Each entry is keyed by the sender-chosen `envelope_id` (128-bit
-  random), so the same envelope relayed twice — push plus
-  pull-on-reconnect — deduplicates to a single row. A per-recipient
-  monotonic `inbox_serial` orders the log and serves as the pull
-  cursor: a reconnecting anchor asks for everything after the serial
-  it last saw.
-
-  The envelope itself (a DM envelope or a notification envelope) is
-  stored verbatim in `envelope`; its user-side `sender_signature` is
-  verified at the controller boundary before this row is written.
-  """
+  @moduledoc false
 
   use Ash.Resource,
     otp_app: :yawp,

@@ -1,8 +1,5 @@
 defmodule Yawp.Federation.InboxEntry.Preparations.CapLimit do
-  @moduledoc """
-  Caps the `pull` action's page size at 1000 envelopes regardless of
-  the requested `limit`, per the anchor-sync pagination ceiling.
-  """
+  @moduledoc false
   use Ash.Resource.Preparation
 
   @max_limit 1000

@@ -1,18 +1,5 @@
 defmodule Yawp.Identity.Ppe do
-  @moduledoc """
-  Cached Public Profile Envelope for an identity, keyed by DID.
-
-  An anchor stores the canonical, user-signed PPE for each of its
-  users; a guest server caches the PPEs of users present in its rooms
-  so it can render display names and avatars. Both populate this table
-  via the federation push/pull path.
-
-  Conflict resolution is by `profile_version`: a higher version wins,
-  a lower-or-equal version is a no-op. The full signed envelope is kept
-  in `envelope` so the strict schema validation and signature checks
-  can read every field; the frequently-queried fields (`display_name`,
-  `avatar_ref`, `bio`) are promoted to their own columns.
-  """
+  @moduledoc false
 
   use Ash.Resource,
     otp_app: :yawp,
@@ -91,17 +78,6 @@ defmodule Yawp.Identity.Ppe do
   @display_name_max 100
   @bio_max 1000
 
-  @doc """
-  Validates the strict shape of a user-signed PPE envelope before it
-  is cached. Returns `:ok` for a well-formed envelope, or
-  `{:error, reason}` naming the first field that failed.
-
-  Required: `did` (non-blank string), `public_key` (base64/base64url of
-  a 32-byte Ed25519 key), `profile_version` (non-negative integer),
-  `anchors` (list of valid hosts). Optional: `display_name`
-  (≤ #{@display_name_max} chars), `avatar_ref` (a URL or `yawp://` ref),
-  `bio` (≤ #{@bio_max} chars), `device_subkeys` (list of valid records).
-  """
   @spec validate(map()) :: :ok | {:error, atom()}
   def validate(envelope) when is_map(envelope) do
     with :ok <- validate_did(envelope),

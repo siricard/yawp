@@ -69,15 +69,6 @@ defmodule Yawp.Identity do
     end
   end
 
-  @doc """
-  Adopts a user at this anchor from a signed adoption envelope relayed
-  by one of the user's existing anchors. Verifies the DID derives from
-  the supplied master public key, creates (or upserts) the local
-  Identity row carrying the source anchor in its `anchor_list`, and
-  caches the user's signed PPE so this anchor can render them.
-
-  Returns `{:ok, :adopted}` on success, `{:error, reason}` otherwise.
-  """
   @spec adopt_identity(map()) :: {:ok, :adopted} | {:error, term()}
   def adopt_identity(%{"did" => did, "master_public_key" => pk_b64} = envelope)
       when is_binary(did) and is_binary(pk_b64) do
@@ -135,11 +126,6 @@ defmodule Yawp.Identity do
 
   defp maybe_cache_ppe(_), do: :ok
 
-  @doc """
-  Applies an inbound PPE to the local cache if it is newer than what
-  we hold (higher `profile_version`). Returns `{:ok, :applied}` when
-  written, `{:ok, :stale}` when the inbound version is not newer.
-  """
   @spec apply_ppe_if_newer(map()) :: {:ok, :applied | :stale} | {:error, term()}
   def apply_ppe_if_newer(envelope) when is_map(envelope) do
     case Yawp.Identity.Ppe.validate(envelope) do
@@ -177,13 +163,9 @@ defmodule Yawp.Identity do
     end
   end
 
-  @doc """
-  Applies an inbound private-blob update if it is newer than what we
-  hold (higher `blob_version`). `ciphertext` is the raw opaque bytes.
-  """
-  @spec apply_blob_if_newer(String.t(), binary(), integer()) ::
+  @spec apply_blob_if_newer(String.t(), binary(), integer(), keyword()) ::
           {:ok, :applied | :stale} | {:error, term()}
-  def apply_blob_if_newer(did, ciphertext, blob_version)
+  def apply_blob_if_newer(did, ciphertext, blob_version, opts \\ [])
       when is_binary(did) and is_binary(ciphertext) and is_integer(blob_version) do
     case get_private_blob_by_did(did) do
       {:ok, %Yawp.Identity.PrivateBlob{blob_version: current}} when current >= blob_version ->
@@ -194,7 +176,9 @@ defmodule Yawp.Identity do
         |> Ash.Changeset.for_create(:upsert, %{
           did: did,
           ciphertext: ciphertext,
-          blob_version: blob_version
+          blob_version: blob_version,
+          public_key: Keyword.get(opts, :public_key),
+          signature: Keyword.get(opts, :signature)
         })
         |> Ash.create(authorize?: false)
         |> case do
@@ -204,11 +188,6 @@ defmodule Yawp.Identity do
     end
   end
 
-  @doc """
-  Applies a device-subkey change to an existing identity, replacing
-  its `device_subkeys` map and bumping `profile_version`. Returns
-  `{:error, :not_found}` when no identity matches the DID.
-  """
   @spec apply_device_subkey_change(String.t(), map(), integer() | nil) ::
           {:ok, Yawp.Identity.Identity.t()} | {:error, term()}
   def apply_device_subkey_change(did, device_subkeys, profile_version \\ nil)

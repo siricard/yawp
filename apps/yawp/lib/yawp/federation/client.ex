@@ -1,18 +1,5 @@
 defmodule Yawp.Federation.Client do
-  @moduledoc """
-  Outbound anchor-to-anchor federation client.
-
-  Each helper wraps an inner payload in a signed delivery wrapper
-  (`Yawp.Federation.Wrapper`) using this anchor's active server key,
-  then POSTs it to the peer anchor's matching `/federation/*` endpoint
-  over `Req`. The peer verifies the wrapper signature against this
-  anchor's published key document before applying the payload.
-
-  All helpers take `(peer_host, payload)` and return
-  `{:ok, response_body} | {:error, term()}`. The peer host is a bare
-  hostname (e.g. `"anchor-b.example.com"` or `"localhost:14100"`); the
-  scheme and path are filled in here.
-  """
+  @moduledoc false
 
   alias Yawp.Federation.Wrapper
 

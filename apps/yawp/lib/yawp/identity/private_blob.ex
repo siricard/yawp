@@ -1,14 +1,5 @@
 defmodule Yawp.Identity.PrivateBlob do
-  @moduledoc """
-  The user's client-encrypted private settings blob, stored at the
-  anchor as opaque ciphertext keyed by DID.
-
-  The anchor never reads inside the blob — it holds the ciphertext and
-  the user-signed `blob_version` and replicates both across the user's
-  anchors. Higher `blob_version` wins on conflict, mirroring the PPE
-  rule. The `ciphertext` column is encrypted at rest via the cloak
-  vault so a database dump never reveals even the opaque blob.
-  """
+  @moduledoc false
 
   use Ash.Resource,
     otp_app: :yawp,
@@ -33,7 +24,7 @@ defmodule Yawp.Identity.PrivateBlob do
     create :upsert do
       description "Inserts or overwrites the private blob for a DID. Apply-if-newer is enforced by the caller before invoking this action."
 
-      accept [:did, :ciphertext, :blob_version]
+      accept [:did, :ciphertext, :blob_version, :public_key, :signature]
       upsert? true
       upsert_identity :unique_did
     end
@@ -64,6 +55,18 @@ defmodule Yawp.Identity.PrivateBlob do
       default 0
       public? true
       description "Monotonic version signed by the user; higher wins on conflict."
+    end
+
+    attribute :public_key, :string do
+      allow_nil? true
+      public? true
+      description "Author's master public key (base64url) the blob signature verifies against."
+    end
+
+    attribute :signature, :string do
+      allow_nil? true
+      public? true
+      description "User signature over the canonical blob payload; replicated to peer anchors."
     end
 
     create_timestamp :inserted_at

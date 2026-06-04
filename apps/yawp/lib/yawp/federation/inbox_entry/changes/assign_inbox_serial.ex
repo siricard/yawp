@@ -1,13 +1,5 @@
 defmodule Yawp.Federation.InboxEntry.Changes.AssignInboxSerial do
-  @moduledoc """
-  Assigns the next per-recipient monotonic `inbox_serial`.
-
-  A transaction-scoped advisory lock keyed on the recipient DID
-  serialises concurrent appends to the same inbox so two envelopes
-  never claim the same serial; the lock auto-releases on
-  commit/rollback. On a repeat `envelope_id` the upsert leaves the
-  existing row untouched, so the recomputed serial is discarded.
-  """
+  @moduledoc false
   use Ash.Resource.Change
 
   @impl true

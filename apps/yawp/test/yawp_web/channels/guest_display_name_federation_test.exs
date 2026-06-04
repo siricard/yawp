@@ -87,7 +87,7 @@ defmodule YawpWeb.GuestDisplayNameFederationTest do
   defp peer(port), do: "localhost:#{port}"
 
   defp seed_guest do
-    {master_pk, _master_sk} = :crypto.generate_key(:eddsa, :ed25519)
+    {master_pk, master_sk} = :crypto.generate_key(:eddsa, :ed25519)
     {device_pk, device_sk} = :crypto.generate_key(:eddsa, :ed25519)
 
     did = "did:yawp:" <> Identity.did_from_pubkey(master_pk)
@@ -113,6 +113,7 @@ defmodule YawpWeb.GuestDisplayNameFederationTest do
       identity: identity,
       did: did,
       master_pk: master_pk,
+      master_sk: master_sk,
       device_id: device_id,
       device_sk: device_sk
     }
@@ -150,6 +151,12 @@ defmodule YawpWeb.GuestDisplayNameFederationTest do
     Base.url_encode64(sig, padding: false)
   end
 
+  defp sign_inner(payload, sig_field, priv) do
+    canonical = Yawp.CanonicalJson.encode(Map.delete(payload, sig_field))
+    sig = :crypto.sign(:eddsa, :none, canonical, [priv, :ed25519])
+    Map.put(payload, sig_field, Base.url_encode64(sig, padding: false))
+  end
+
   defp send_payload(channel, actor, body) do
     ts = System.system_time(:millisecond)
 
@@ -176,13 +183,15 @@ defmodule YawpWeb.GuestDisplayNameFederationTest do
 
     encoded_pk = Base.url_encode64(alice.master_pk, padding: false)
 
-    ppe = %{
-      "did" => alice.did,
-      "profile_version" => 7,
-      "public_key" => encoded_pk,
-      "anchors" => [@sender_anchor],
-      "display_name" => "Alice Canonical"
-    }
+    ppe =
+      %{
+        "did" => alice.did,
+        "profile_version" => 7,
+        "public_key" => encoded_pk,
+        "anchors" => [@sender_anchor],
+        "display_name" => "Alice Canonical"
+      }
+      |> sign_inner("signature", alice.master_sk)
 
     assert {:ok, %{"status" => "applied"}} = Client.push_ppe!(peer(@host_b_port), ppe)
 

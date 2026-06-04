@@ -27,11 +27,6 @@ defmodule Yawp.Federation do
     end
   end
 
-  @doc """
-  Idempotently appends an inner envelope (DM or notification) to a
-  recipient's inbox, keyed by `envelope_id`. A repeated `envelope_id`
-  is a no-op that returns the existing row.
-  """
   @spec append_inbox(String.t(), map()) ::
           {:ok, Yawp.Federation.InboxEntry.t()} | {:error, term()}
   def append_inbox(recipient_did, envelope)
@@ -58,10 +53,6 @@ defmodule Yawp.Federation do
     result
   end
 
-  @doc """
-  Returns recent inbox envelopes for a recipient after a cursor
-  serial, oldest first, capped at the pull ceiling.
-  """
   @spec pull_inbox(String.t(), integer(), integer()) ::
           {:ok, [Yawp.Federation.InboxEntry.t()]} | {:error, term()}
   def pull_inbox(recipient_did, since_serial \\ 0, limit \\ 1000)

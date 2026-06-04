@@ -47,11 +47,19 @@ defmodule Yawp.Federation.AnchorAdoptionWorker do
 
   defp replicate_blob(new_anchor, did) do
     case Identity.get_private_blob_by_did(did) do
-      {:ok, %Identity.PrivateBlob{ciphertext: ciphertext, blob_version: version}} ->
+      {:ok,
+       %Identity.PrivateBlob{
+         ciphertext: ciphertext,
+         blob_version: version,
+         public_key: public_key,
+         signature: signature
+       }} ->
         blob = %{
           "did" => did,
           "ciphertext" => Base.encode64(ciphertext),
-          "blob_version" => version
+          "blob_version" => version,
+          "public_key" => public_key,
+          "signature" => signature
         }
 
         case Client.push_blob!(new_anchor, blob) do

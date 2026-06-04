@@ -19,6 +19,23 @@ defmodule Yawp.Federation.TwoAnchorHarnessTest do
     }
   end
 
+  defp signed_ppe(anchor, version, name) do
+    {pub, priv} = :crypto.generate_key(:eddsa, :ed25519)
+    did = "did:yawp:" <> Yawp.Identity.did_from_pubkey(pub)
+
+    payload = %{
+      "did" => did,
+      "profile_version" => version,
+      "public_key" => Base.url_encode64(pub, padding: false),
+      "anchors" => [TwoAnchor.host(anchor)],
+      "display_name" => name
+    }
+
+    canonical = Yawp.CanonicalJson.encode(payload)
+    sig = :crypto.sign(:eddsa, :none, canonical, [priv, :ed25519])
+    {did, Map.put(payload, "signature", Base.url_encode64(sig, padding: false))}
+  end
+
   describe "cross-anchor transport with isolated anchors" do
     setup do
       TwoAnchor.start_pair!()
@@ -43,8 +60,8 @@ defmodule Yawp.Federation.TwoAnchorHarnessTest do
       a: a,
       b: b
     } do
-      did = unique_did("ppe")
-      body = TwoAnchor.sign_on(a, ppe(did, a, 4, "Alice"))
+      {did, payload} = signed_ppe(a, 4, "Alice")
+      body = TwoAnchor.sign_on(a, payload)
 
       assert {:ok, %Req.Response{status: 200, body: %{"status" => "applied"}}} =
                TwoAnchor.post(b, "/federation/ppe/push", body)

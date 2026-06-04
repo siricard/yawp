@@ -1,27 +1,10 @@
 defmodule YawpWeb.FederationController do
-  @moduledoc """
-  Inbound anchor-to-anchor federation endpoints.
-
-  Every request body is a signed delivery wrapper
-  (`Yawp.Federation.Wrapper`): the relaying anchor canonicalises a
-  small wrapper map, signs it with its server key, and carries the
-  inner payload alongside bound by hash. Each action unwraps and
-  verifies the wrapper — rejecting tampered signatures, hash
-  mismatches, and replays — *before* touching the inner payload, then
-  applies the payload to local state via the appropriate domain call.
-
-  - `POST /federation/ppe/push` — apply an inbound PPE if newer.
-  - `POST /federation/blob/push` — persist an inbound private blob if newer.
-  - `POST /federation/inbox/push` — append a DM/notification envelope to the inbox.
-  - `POST /federation/devices/changed` — apply a device-subkey change to an identity.
-  - `POST /federation/presence/subscribe` — register a peer as a subscriber to a user's presence.
-  - `POST /federation/presence/notify` — apply an inbound coarse presence diff for a guest user.
-  - `POST /federation/pull` — return recent inbox envelopes since a cursor.
-  """
+  @moduledoc false
 
   use YawpWeb, :controller
 
   alias Yawp.Federation
+  alias Yawp.Federation.InnerSignature
   alias Yawp.Federation.MessagePipeline
   alias Yawp.Federation.PresenceBroker
   alias Yawp.Federation.RemotePresence
@@ -30,8 +13,11 @@ defmodule YawpWeb.FederationController do
 
   def ppe_push(conn, params) do
     with_inner(conn, params, fn inner, _anchor ->
-      case Identity.apply_ppe_if_newer(inner) do
-        {:ok, status} -> ok(conn, %{"status" => status})
+      with :ok <- InnerSignature.verify(inner, "did", "signature"),
+           {:ok, status} <- Identity.apply_ppe_if_newer(inner) do
+        ok(conn, %{"status" => status})
+      else
+        {:error, :invalid_inner_signature} -> error(conn, 403, "invalid_inner_signature")
         {:error, _} -> error(conn, 422, "invalid_ppe")
       end
     end)
@@ -41,10 +27,16 @@ defmodule YawpWeb.FederationController do
     with_inner(conn, params, fn inner, _anchor ->
       with %{"did" => did, "ciphertext" => ct_b64, "blob_version" => version}
            when is_binary(did) and is_binary(ct_b64) and is_integer(version) <- inner,
+           :ok <- InnerSignature.verify(inner, "did", "signature"),
            {:ok, ciphertext} <- Base.decode64(ct_b64),
-           {:ok, status} <- Identity.apply_blob_if_newer(did, ciphertext, version) do
+           {:ok, status} <-
+             Identity.apply_blob_if_newer(did, ciphertext, version,
+               public_key: Map.get(inner, "public_key"),
+               signature: Map.get(inner, "signature")
+             ) do
         ok(conn, %{"status" => status})
       else
+        {:error, :invalid_inner_signature} -> error(conn, 403, "invalid_inner_signature")
         _ -> error(conn, 422, "invalid_blob")
       end
     end)
@@ -52,13 +44,14 @@ defmodule YawpWeb.FederationController do
 
   def inbox_push(conn, params) do
     with_inner(conn, params, fn inner, _anchor ->
-      case append_envelope(inner) do
-        :ok ->
-          MessagePipeline.maybe_refresh_ppe(inner)
-          ok(conn, %{"status" => "appended"})
-
-        :error ->
-          error(conn, 422, "invalid_envelope")
+      with :ok <- validate_envelope_recipients(inner),
+           :ok <- InnerSignature.verify(inner, "sender_did", "sender_signature"),
+           :ok <- append_envelope(inner) do
+        MessagePipeline.maybe_refresh_ppe(inner)
+        ok(conn, %{"status" => "appended"})
+      else
+        {:error, :invalid_inner_signature} -> error(conn, 403, "invalid_inner_signature")
+        _ -> error(conn, 422, "invalid_envelope")
       end
     end)
   end
@@ -76,10 +69,12 @@ defmodule YawpWeb.FederationController do
     with_inner(conn, params, fn inner, _anchor ->
       with %{"did" => did, "device_subkeys" => subkeys}
            when is_binary(did) and is_map(subkeys) <- inner,
+           :ok <- InnerSignature.verify(inner, "did", "signature"),
            {:ok, _identity} <-
              Identity.apply_device_subkey_change(did, subkeys, Map.get(inner, "profile_version")) do
         ok(conn, %{"status" => "applied"})
       else
+        {:error, :invalid_inner_signature} -> error(conn, 403, "invalid_inner_signature")
         {:error, :not_found} -> error(conn, 404, "unknown_identity")
         _ -> error(conn, 422, "invalid_device_change")
       end
@@ -136,16 +131,31 @@ defmodule YawpWeb.FederationController do
     end)
   end
 
+  defp validate_envelope_recipients(%{"envelope_id" => env_id} = envelope)
+       when is_binary(env_id) do
+    cond do
+      match?(%{"recipient_dids" => list} when is_list(list), envelope) ->
+        %{"recipient_dids" => list} = envelope
+        if list != [] and Enum.all?(list, &is_binary/1), do: :ok, else: :error
+
+      match?(%{"recipient_did" => did} when is_binary(did), envelope) ->
+        :ok
+
+      true ->
+        :error
+    end
+  end
+
+  defp validate_envelope_recipients(_), do: :error
+
   defp append_envelope(%{"recipient_dids" => recipient_dids} = envelope)
-       when is_list(recipient_dids) and recipient_dids != [] do
+       when is_list(recipient_dids) do
     Enum.reduce_while(recipient_dids, :ok, fn did, _acc ->
       case Federation.append_inbox(did, envelope) do
         {:ok, _} -> {:cont, :ok}
         {:error, _} -> {:halt, :error}
       end
     end)
-  rescue
-    KeyError -> :error
   end
 
   defp append_envelope(%{"recipient_did" => did} = envelope) when is_binary(did) do
@@ -153,8 +163,6 @@ defmodule YawpWeb.FederationController do
       {:ok, _} -> :ok
       {:error, _} -> :error
     end
-  rescue
-    KeyError -> :error
   end
 
   defp append_envelope(_), do: :error
