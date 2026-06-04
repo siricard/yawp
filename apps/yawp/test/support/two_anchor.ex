@@ -91,6 +91,13 @@ defmodule Yawp.TestSupport.TwoAnchor do
     %{a: a, b: b}
   end
 
+  @spec start_one!(String.t()) :: anchor()
+  def start_one!(label \\ "a") do
+    anchor = start_anchor!(label)
+    ExUnit.Callbacks.on_exit(fn -> stop_anchor(anchor) end)
+    anchor
+  end
+
   @spec host(anchor()) :: String.t()
   def host(%{host: host}), do: host
 

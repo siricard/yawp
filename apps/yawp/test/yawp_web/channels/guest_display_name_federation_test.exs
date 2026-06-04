@@ -1,90 +1,20 @@
 defmodule YawpWeb.GuestDisplayNameFederationTest do
-  @moduledoc """
-  A guest who anchors elsewhere should render under their canonical
-  display name, not a DID stub, once their profile has reached the
-  hosting server over federation.
-
-  Two in-process Bandit listeners stand in for two separate anchors on
-  real sockets (`:14210` = Alice's anchor A, `:14211` = the server host
-  B). Alice's anchor pushes her signed profile to B over HTTP; B caches
-  it. Alice then joins B's `#general` as a guest and sends a message —
-  the serialized history and the broadcast both carry her cached display
-  name, matching the value her anchor published.
-  """
   use YawpWeb.ChannelCase, async: false
+  use Oban.Testing, repo: Yawp.Repo
 
   import Bitwise
 
-  alias Yawp.Federation
-  alias Yawp.Federation.Client
-  alias Yawp.Federation.DeliveryNonceCache
-  alias Yawp.Federation.KeyDocCache
+  alias Yawp.Federation.MessagePipeline
+  alias Yawp.Federation.PpeRefreshWorker
   alias Yawp.Identity
   alias Yawp.Servers
   alias Yawp.Servers.Permissions
-
-  @anchor_a_port 14_210
-  @host_b_port 14_211
-  @sender_anchor "anchor-a.example"
+  alias Yawp.TestSupport.TwoAnchor
 
   setup do
-    KeyDocCache.clear()
-    DeliveryNonceCache.clear()
-    Req.Test.set_req_test_to_shared()
-
-    {:ok, _} = Federation.generate_server_key()
-    {:ok, active} = Federation.get_active_server_key()
-    stub_key_doc(active)
-
-    start_supervised!(
-      Supervisor.child_spec(
-        {Bandit, plug: YawpWeb.Endpoint, scheme: :http, port: @anchor_a_port},
-        id: :anchor_a
-      )
-    )
-
-    start_supervised!(
-      Supervisor.child_spec(
-        {Bandit, plug: YawpWeb.Endpoint, scheme: :http, port: @host_b_port},
-        id: :host_b
-      )
-    )
-
-    prev = Application.get_env(:yawp, Client)
-    Application.put_env(:yawp, Client, anchor_id: @sender_anchor)
-
-    on_exit(fn ->
-      if prev do
-        Application.put_env(:yawp, Client, prev)
-      else
-        Application.delete_env(:yawp, Client)
-      end
-    end)
-
-    :ok
+    anchor_a = TwoAnchor.start_one!("a")
+    %{anchor_a: anchor_a, host_a: TwoAnchor.host(anchor_a)}
   end
-
-  defp stub_key_doc(active) do
-    encoded_pub = Base.url_encode64(active.public_key, padding: false)
-
-    doc = %{
-      "server_id" => @sender_anchor,
-      "keys" => [
-        %{
-          "key_id" => active.key_id,
-          "alg" => "Ed25519",
-          "public_key" => encoded_pub,
-          "not_before" => "2020-01-01T00:00:00Z",
-          "not_after" => "2999-01-01T00:00:00Z"
-        }
-      ],
-      "revoked" => []
-    }
-
-    Req.Test.stub(Yawp.Federation.KeyDocFetcher, fn conn -> Req.Test.json(conn, doc) end)
-  end
-
-  defp peer(port), do: "localhost:#{port}"
 
   defp seed_guest do
     {master_pk, master_sk} = :crypto.generate_key(:eddsa, :ed25519)
@@ -117,6 +47,23 @@ defmodule YawpWeb.GuestDisplayNameFederationTest do
       device_id: device_id,
       device_sk: device_sk
     }
+  end
+
+  defp publish_ppe_on_anchor(anchor, alice, host_a) do
+    ppe =
+      %{
+        "did" => alice.did,
+        "profile_version" => 7,
+        "public_key" => Base.url_encode64(alice.master_pk, padding: false),
+        "anchors" => [host_a],
+        "display_name" => "Alice Canonical"
+      }
+      |> sign_inner("signature", alice.master_sk)
+
+    assert {:ok, :applied} =
+             TwoAnchor.call(anchor, Identity, :apply_ppe_if_newer, [ppe])
+
+    ppe
   end
 
   defp seed_guest_membership(identity, server) do
@@ -178,25 +125,30 @@ defmodule YawpWeb.GuestDisplayNameFederationTest do
     }
   end
 
-  test "a guest renders under the display name their anchor federated to the host" do
+  test "a guest renders under the display name fetched from their anchor over federation", %{
+    anchor_a: anchor_a,
+    host_a: host_a
+  } do
     alice = seed_guest()
 
-    encoded_pk = Base.url_encode64(alice.master_pk, padding: false)
+    published = publish_ppe_on_anchor(anchor_a, alice, host_a)
 
-    ppe =
-      %{
-        "did" => alice.did,
-        "profile_version" => 7,
-        "public_key" => encoded_pk,
-        "anchors" => [@sender_anchor],
-        "display_name" => "Alice Canonical"
-      }
-      |> sign_inner("signature", alice.master_sk)
+    assert {:ok, on_a} = TwoAnchor.call(anchor_a, Identity, :get_ppe_by_did, [alice.did])
+    assert on_a.display_name == "Alice Canonical"
+    assert {:ok, nil} == Identity.get_ppe_by_did(alice.did)
 
-    assert {:ok, %{"status" => "applied"}} = Client.push_ppe!(peer(@host_b_port), ppe)
+    inbound = %{
+      "sender_did" => alice.did,
+      "sender_profile_version" => published["profile_version"],
+      "sender_anchors" => [host_a]
+    }
 
-    assert {:ok, cached} = Identity.get_ppe_by_did(alice.did)
-    assert cached.display_name == "Alice Canonical"
+    assert {:ok, :enqueued} = MessagePipeline.maybe_refresh_ppe(inbound)
+    assert_enqueued(worker: PpeRefreshWorker, args: %{"did" => alice.did, "anchors" => [host_a]})
+    assert :ok = perform_job(PpeRefreshWorker, %{"did" => alice.did, "anchors" => [host_a]})
+
+    assert {:ok, fetched} = Identity.get_ppe_by_did(alice.did)
+    assert fetched.display_name == "Alice Canonical"
 
     {:ok, server} = Servers.create_server("Host-B-#{System.unique_integer([:positive])}")
 
@@ -223,6 +175,6 @@ defmodule YawpWeb.GuestDisplayNameFederationTest do
     {:ok, _reply, _viewer_socket} = join_channel(alice, server, channel)
     assert_push "history", %{messages: [message]}
     assert message.sender_display_name == "Alice Canonical"
-    assert message.sender_display_name == cached.display_name
+    assert message.sender_display_name == fetched.display_name
   end
 end
