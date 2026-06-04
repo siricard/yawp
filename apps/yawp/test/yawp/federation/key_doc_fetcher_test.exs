@@ -1,13 +1,5 @@
 defmodule Yawp.Federation.KeyDocFetcherTest do
-  @moduledoc """
-  Cache + HTTPS fetch + Ed25519 verification of a peer anchor's
-  server-key document published at
-  `/.well-known/yawp/server-key.json`.
-
-  The `Req` adapter is stubbed via `Req.Test` so no real network
-  traffic occurs; telemetry assertions confirm cache hit / miss /
-  forced-refetch accounting.
-  """
+  @moduledoc false
   use ExUnit.Case, async: false
 
   alias Yawp.Federation.KeyDocCache
@@ -138,6 +130,30 @@ defmodule Yawp.Federation.KeyDocFetcherTest do
 
       KeyDocFetcher.get!("localhost:14100")
       assert_receive {:scheme, :http}
+    end
+
+    test "fetches a localhost.example.com host over https", %{doc: doc} do
+      parent = self()
+
+      Req.Test.stub(@stub, fn conn ->
+        send(parent, {:scheme, conn.scheme})
+        Req.Test.json(conn, doc)
+      end)
+
+      KeyDocFetcher.get!("localhost.example.com")
+      assert_receive {:scheme, :https}
+    end
+
+    test "fetches a localhostfoo host over https", %{doc: doc} do
+      parent = self()
+
+      Req.Test.stub(@stub, fn conn ->
+        send(parent, {:scheme, conn.scheme})
+        Req.Test.json(conn, doc)
+      end)
+
+      KeyDocFetcher.get!("localhostfoo")
+      assert_receive {:scheme, :https}
     end
 
     test "fetches a 127.0.0.1 host over http", %{doc: doc} do

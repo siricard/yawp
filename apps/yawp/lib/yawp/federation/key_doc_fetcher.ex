@@ -1,19 +1,5 @@
 defmodule Yawp.Federation.KeyDocFetcher do
-  @moduledoc """
-  Fetches, caches, and verifies signatures against a peer anchor's
-  server-key document.
-
-  `get!/1` returns the cached document while it is fresh and otherwise
-  fetches `https://<host>/.well-known/yawp/server-key.json` over HTTPS,
-  parses it, and caches it under the default 24h TTL. `verify_with/4`
-  resolves the key referenced by `key_id`, forcing an immediate refetch
-  when that key is absent from the cached document (a freshly-rotated
-  key), and returns the Ed25519 verification result.
-
-  Cache hits, misses, and forced refetches emit telemetry under
-  `[:yawp, :federation, :key_doc, _]` with a `%{count: 1}` measurement
-  and `%{host: host}` metadata.
-  """
+  @moduledoc false
 
   alias Yawp.Federation.KeyDocCache
 
@@ -159,11 +145,21 @@ defmodule Yawp.Federation.KeyDocFetcher do
   end
 
   defp scheme(host) do
-    if String.starts_with?(host, "localhost") or String.starts_with?(host, "127.0.0.1") do
+    if loopback_host?(host) do
       "http"
     else
       "https"
     end
+  end
+
+  defp loopback_host?(host) do
+    parsed_host =
+      case URI.parse("//#{host}") do
+        %URI{host: parsed} when is_binary(parsed) -> parsed
+        _ -> host
+      end
+
+    parsed_host in ["localhost", "127.0.0.1", "::1"]
   end
 
   defp req_options do

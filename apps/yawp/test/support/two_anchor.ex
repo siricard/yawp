@@ -1,69 +1,5 @@
 defmodule Yawp.TestSupport.TwoAnchor do
-  @moduledoc """
-  Isolated two-anchor integration harness for cross-anchor federation tests.
-
-  Two Bandit listeners sharing one app, Repo, PubSub, Presence and server
-  key do NOT prove federation — they share state, so an "A→B" assertion can
-  pass without anything crossing the boundary. This harness instead boots
-  each anchor as a genuinely separate OS process (an Erlang peer node), each
-  with:
-
-    * its own Postgres database (migrated independently),
-    * its own Ed25519 server keypair (distinct `key_id`, published at the
-      anchor's own `/.well-known/yawp/server-key.json`),
-    * its own PubSub, Presence, key-doc cache, and delivery-nonce cache,
-    * its own Bandit HTTP listener on a distinct port.
-
-  A payload signed on anchor A and POSTed to anchor B is therefore verified
-  by B against A's *published* key — fetched over real HTTP — and a row
-  written to A's database is invisible to B except through a federation
-  endpoint. That is the property a cross-anchor test must exercise.
-
-  ## Usage
-
-      defmodule MyFederationTest do
-        use ExUnit.Case, async: false
-        alias Yawp.TestSupport.TwoAnchor
-
-        setup do
-          TwoAnchor.start_pair!()
-        end
-
-        test "PPE signed on A is accepted by B", %{a: a, b: b} do
-          inner = %{
-            "did" => "did:yawp:alice",
-            "profile_version" => 1,
-            "public_key" => some_b64_key,
-            "anchors" => [TwoAnchor.host(a)],
-            "display_name" => "Alice"
-          }
-
-          body = TwoAnchor.sign_on(a, inner)
-          {:ok, resp} = TwoAnchor.post(b, "/federation/ppe/push", body)
-          assert resp.status == 200
-
-          {:ok, stored} = TwoAnchor.call(b, Yawp.Identity, :get_ppe_by_did, ["did:yawp:alice"])
-          assert stored.profile_version == 1
-        end
-      end
-
-  `start_pair!/1` registers an `on_exit` teardown that stops both peers and
-  drops both databases, so no listeners, processes, or schemas leak between
-  tests. Each pair uses fresh random ports and database names, so multiple
-  tests in the same file are independent.
-
-  ## API
-
-    * `start_pair!/1` — boots A and B, returns `%{a: anchor, b: anchor}`.
-    * `host/1` / `base_url/1` — the anchor's `host:port` and `http://host:port`.
-    * `sign_on/2` — builds a signed delivery-wrapper body on that anchor
-      (signed with the anchor's own server key), ready to POST.
-    * `post/3` — POSTs a body to a path on the anchor over real HTTP.
-    * `call/4` — invokes `mod.fun(args)` inside the anchor's BEAM (to seed or
-      inspect that anchor's local state).
-    * `signing_fn/1` — returns `fn payload -> {signature_bytes, key_id} end`
-      that signs with the anchor's active server key.
-  """
+  @moduledoc false
 
   @type anchor :: %{
           peer: pid(),
@@ -81,12 +17,10 @@ defmodule Yawp.TestSupport.TwoAnchor do
   @spec start_pair!(keyword()) :: %{a: anchor(), b: anchor()}
   def start_pair!(_opts \\ []) do
     a = start_anchor!("a")
-    b = start_anchor!("b")
+    ExUnit.Callbacks.on_exit(fn -> stop_anchor(a) end)
 
-    ExUnit.Callbacks.on_exit(fn ->
-      stop_anchor(a)
-      stop_anchor(b)
-    end)
+    b = start_anchor!("b")
+    ExUnit.Callbacks.on_exit(fn -> stop_anchor(b) end)
 
     %{a: a, b: b}
   end
