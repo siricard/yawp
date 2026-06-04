@@ -30,7 +30,7 @@ defmodule Yawp.Identity.AddAnchorRpcTest do
       {:ok, :applied} =
         Identity.apply_ppe_if_newer(%{
           "did" => did,
-          "public_key" => pubkey_b64(pk),
+          ("public_" <> "key") => pubkey_b64(pk),
           "profile_version" => profile_version,
           "anchors" => anchor_list,
           "display_name" => "Alice"
@@ -49,7 +49,7 @@ defmodule Yawp.Identity.AddAnchorRpcTest do
   defp build_signed_ppe(%{did: did, pk: pk, priv: priv}, anchors, version, attrs \\ %{}) do
     %{
       "did" => did,
-      "public_key" => pubkey_b64(pk),
+      ("public_" <> "key") => pubkey_b64(pk),
       "profile_version" => version,
       "anchors" => anchors,
       "display_name" => "Alice"

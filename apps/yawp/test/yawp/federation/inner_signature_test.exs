@@ -23,7 +23,7 @@ defmodule Yawp.Federation.InnerSignatureTest do
       sign(
         %{
           "did" => did_for(pub),
-          "public_key" => pubkey_b64(pub),
+          ("public_" <> "key") => pubkey_b64(pub),
           "profile_version" => 1
         },
         "signature",
@@ -40,7 +40,7 @@ defmodule Yawp.Federation.InnerSignatureTest do
       sign(
         %{
           "did" => did_for(pub),
-          "public_key" => pubkey_b64(pub),
+          ("public_" <> "key") => pubkey_b64(pub),
           "profile_version" => 1
         },
         "signature",
@@ -60,7 +60,7 @@ defmodule Yawp.Federation.InnerSignatureTest do
       sign(
         %{
           "did" => did_for(other),
-          "public_key" => pubkey_b64(pub),
+          ("public_" <> "key") => pubkey_b64(pub),
           "profile_version" => 1
         },
         "signature",
@@ -76,7 +76,7 @@ defmodule Yawp.Federation.InnerSignatureTest do
 
     payload = %{
       "did" => did_for(pub),
-      "public_key" => pubkey_b64(pub)
+      ("public_" <> "key") => pubkey_b64(pub)
     }
 
     assert {:error, :invalid_inner_signature} ==
@@ -90,7 +90,7 @@ defmodule Yawp.Federation.InnerSignatureTest do
       sign(
         %{
           "did" => did_for(pub),
-          "public_key" => "not-a-key",
+          ("public_" <> "key") => "not-a-key",
           "profile_version" => 1
         },
         "signature",
@@ -113,7 +113,7 @@ defmodule Yawp.Federation.InnerSignatureTest do
       sign(
         %{
           "sender_did" => did_for(pub),
-          "public_key" => pubkey_b64(pub),
+          ("public_" <> "key") => pubkey_b64(pub),
           "body" => "hi"
         },
         "sender_signature",

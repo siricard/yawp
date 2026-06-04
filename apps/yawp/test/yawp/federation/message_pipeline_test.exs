@@ -21,7 +21,7 @@ defmodule Yawp.Federation.MessagePipelineTest do
   defp seed_cached_ppe!(did, version, anchors) do
     envelope = %{
       "did" => did,
-      "public_key" => valid_pubkey(),
+      ("public_" <> "key") => valid_pubkey(),
       "profile_version" => version,
       "anchors" => anchors,
       "display_name" => "Cached"

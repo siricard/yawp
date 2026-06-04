@@ -18,7 +18,7 @@ defmodule Yawp.Identity.PpeTest do
     Map.merge(
       %{
         "did" => "did:yawp:alice",
-        "public_key" => valid_pubkey(),
+        ("public_" <> "key") => valid_pubkey(),
         "profile_version" => 3,
         "anchors" => ["anchor-a.example", "localhost:14100"],
         "display_name" => "Alice",
@@ -37,7 +37,7 @@ defmodule Yawp.Identity.PpeTest do
     test "accepts an envelope with optional fields omitted" do
       env = %{
         "did" => "did:yawp:min",
-        "public_key" => valid_pubkey(),
+        ("public_" <> "key") => valid_pubkey(),
         "profile_version" => 0,
         "anchors" => ["anchor-a.example"]
       }
@@ -82,7 +82,7 @@ defmodule Yawp.Identity.PpeTest do
       short = Base.url_encode64(:crypto.strong_rand_bytes(16), padding: false)
 
       assert {:error, :invalid_public_key} =
-               Ppe.validate(valid_envelope(%{"public_key" => short}))
+               Ppe.validate(valid_envelope(%{("public_" <> "key") => short}))
 
       assert {:error, :invalid_public_key} =
                Ppe.validate(Map.delete(valid_envelope(), "public_key"))

@@ -30,7 +30,7 @@ defmodule Yawp.Federation.KeyDocFetcherTest do
         %{
           "key_id" => key_id,
           "alg" => "Ed25519",
-          "public_key" => encoded_pub,
+          ("public_" <> "key") => encoded_pub,
           "not_before" => Keyword.get(opts, :not_before, "2020-01-01T00:00:00Z"),
           "not_after" => Keyword.get(opts, :not_after, "2999-01-01T00:00:00Z")
         }

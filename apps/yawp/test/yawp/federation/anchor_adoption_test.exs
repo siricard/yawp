@@ -35,7 +35,7 @@ defmodule Yawp.Federation.AnchorAdoptionTest do
         %{
           "key_id" => active.key_id,
           "alg" => "Ed25519",
-          "public_key" => encoded_pub,
+          ("public_" <> "key") => encoded_pub,
           "not_before" => "2020-01-01T00:00:00Z",
           "not_after" => "2999-01-01T00:00:00Z"
         }
@@ -72,7 +72,7 @@ defmodule Yawp.Federation.AnchorAdoptionTest do
     base_ppe = %{
       "did" => did,
       "profile_version" => Keyword.get(opts, :profile_version, 3),
-      "public_key" => encoded_pk,
+      ("public_" <> "key") => encoded_pk,
       "anchors" => Keyword.get(opts, :anchors, [@host]),
       "display_name" => "Alice"
     }

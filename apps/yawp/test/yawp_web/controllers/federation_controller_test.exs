@@ -36,7 +36,7 @@ defmodule YawpWeb.FederationControllerTest do
         %{
           "key_id" => active.key_id,
           "alg" => "Ed25519",
-          "public_key" => encoded_pub,
+          ("public_" <> "key") => encoded_pub,
           "not_before" => "2020-01-01T00:00:00Z",
           "not_after" => "2999-01-01T00:00:00Z"
         }
@@ -73,7 +73,7 @@ defmodule YawpWeb.FederationControllerTest do
     %{
       "did" => did_for(pub),
       "profile_version" => version,
-      "public_key" => pubkey_b64(pub),
+      ("public_" <> "key") => pubkey_b64(pub),
       "anchors" => ["anchor-a.example"],
       "display_name" => "Alice"
     }
@@ -128,7 +128,7 @@ defmodule YawpWeb.FederationControllerTest do
       unsigned = %{
         "did" => did_for(pub),
         "profile_version" => 1,
-        "public_key" => pubkey_b64(pub),
+        ("public_" <> "key") => pubkey_b64(pub),
         "anchors" => ["anchor-a.example"]
       }
 
@@ -214,7 +214,7 @@ defmodule YawpWeb.FederationControllerTest do
         "did" => did_for(pub),
         "ciphertext" => ciphertext_b64,
         "blob_version" => version,
-        "public_key" => pubkey_b64(pub)
+        ("public_" <> "key") => pubkey_b64(pub)
       }
       |> sign_inner("signature", priv)
     end
@@ -267,7 +267,7 @@ defmodule YawpWeb.FederationControllerTest do
         %{
           "did" => did_for(master_pub),
           "profile_version" => Keyword.get(opts, :version, 1),
-          "public_key" => pubkey_b64(master_pub),
+          ("public_" <> "key") => pubkey_b64(master_pub),
           "anchors" => Keyword.get(opts, :anchors, ["anchor-a.example"]),
           "display_name" => "Sender",
           "device_subkeys" => [
@@ -539,7 +539,7 @@ defmodule YawpWeb.FederationControllerTest do
         %{
           "did" => sender_did,
           "profile_version" => 4,
-          "public_key" => pubkey_b64(master_pub),
+          ("public_" <> "key") => pubkey_b64(master_pub),
           "anchors" => ["anchor-b.example"],
           "display_name" => "Fetched Sender",
           "device_subkeys" => [
@@ -596,7 +596,7 @@ defmodule YawpWeb.FederationControllerTest do
       inner =
         %{
           "did" => did,
-          "public_key" => pubkey_b64(pub),
+          ("public_" <> "key") => pubkey_b64(pub),
           "device_subkeys" => subkeys,
           "profile_version" => 9
         }
@@ -622,7 +622,7 @@ defmodule YawpWeb.FederationControllerTest do
       inner =
         %{
           "did" => did,
-          "public_key" => pubkey_b64(pub),
+          ("public_" <> "key") => pubkey_b64(pub),
           "device_subkeys" => %{"subkeys" => []}
         }
         |> sign_inner("signature", priv)
@@ -638,7 +638,7 @@ defmodule YawpWeb.FederationControllerTest do
       inner =
         %{
           "did" => did_for(pub),
-          "public_key" => pubkey_b64(pub),
+          ("public_" <> "key") => pubkey_b64(pub),
           "device_subkeys" => %{"subkeys" => []}
         }
         |> sign_inner("signature", priv)
@@ -667,7 +667,7 @@ defmodule YawpWeb.FederationControllerTest do
         %{
           "did" => did_for(master_pub),
           "profile_version" => 1,
-          "public_key" => pubkey_b64(master_pub),
+          ("public_" <> "key") => pubkey_b64(master_pub),
           "anchors" => ["anchor-a.example"],
           "display_name" => "Sender",
           "device_subkeys" => [

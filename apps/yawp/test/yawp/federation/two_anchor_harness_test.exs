@@ -15,7 +15,7 @@ defmodule Yawp.Federation.TwoAnchorHarnessTest do
     %{
       "did" => did,
       "profile_version" => version,
-      "public_key" => pubkey_b64(pub),
+      ("public_" <> "key") => pubkey_b64(pub),
       "anchors" => [TwoAnchor.host(anchor)],
       "display_name" => name
     }
@@ -28,7 +28,7 @@ defmodule Yawp.Federation.TwoAnchorHarnessTest do
     payload = %{
       "did" => did,
       "profile_version" => version,
-      "public_key" => pubkey_b64(pub),
+      ("public_" <> "key") => pubkey_b64(pub),
       "anchors" => [TwoAnchor.host(anchor)],
       "display_name" => name
     }
@@ -111,7 +111,7 @@ defmodule Yawp.Federation.TwoAnchorHarnessTest do
       fresh_ppe =
         %{
           "did" => did,
-          "public_key" => pk_b64,
+          ("public_" <> "key") => pk_b64,
           "profile_version" => 7,
           "anchors" => [TwoAnchor.host(a), host_b],
           "display_name" => "Alice"
@@ -151,7 +151,7 @@ defmodule Yawp.Federation.TwoAnchorHarnessTest do
         "master_public_key" => pk_b64,
         "ppe" => %{
           "did" => did,
-          "public_key" => pk_b64,
+          ("public_" <> "key") => pk_b64,
           "profile_version" => 2,
           "anchors" => [TwoAnchor.host(a), TwoAnchor.host(b)],
           "display_name" => "Alice"

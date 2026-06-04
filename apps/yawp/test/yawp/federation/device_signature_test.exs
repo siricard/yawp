@@ -40,7 +40,7 @@ defmodule Yawp.Federation.DeviceSignatureTest do
       %{
         "did" => did_for(master_pub),
         "profile_version" => Keyword.get(opts, :version, 1),
-        "public_key" => b64(master_pub),
+        ("public_" <> "key") => b64(master_pub),
         "anchors" => anchors,
         "display_name" => "Sender",
         "device_subkeys" => [

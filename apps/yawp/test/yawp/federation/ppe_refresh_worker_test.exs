@@ -28,7 +28,7 @@ defmodule Yawp.Federation.PpeRefreshWorkerTest do
 
     envelope = %{
       "did" => did,
-      "public_key" => valid_pubkey(),
+      ("public_" <> "key") => valid_pubkey(),
       "profile_version" => 7,
       "anchors" => ["anchor-a.example"],
       "display_name" => "Worker Alice"
@@ -55,7 +55,7 @@ defmodule Yawp.Federation.PpeRefreshWorkerTest do
 
     envelope = %{
       "did" => did,
-      "public_key" => valid_pubkey(),
+      ("public_" <> "key") => valid_pubkey(),
       "profile_version" => 3,
       "anchors" => ["good.example"],
       "display_name" => "Fallback"

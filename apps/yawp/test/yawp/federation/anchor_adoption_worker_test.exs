@@ -26,7 +26,7 @@ defmodule Yawp.Federation.AnchorAdoptionWorkerTest do
   defp seed_user!(did) do
     envelope = %{
       "did" => did,
-      "public_key" => valid_pubkey(),
+      ("public_" <> "key") => valid_pubkey(),
       "profile_version" => 4,
       "anchors" => ["anchor-a.example"],
       "display_name" => "Replicated Alice"

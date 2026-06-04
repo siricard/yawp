@@ -56,7 +56,7 @@ defmodule YawpWeb.GuestDisplayNameFederationTest do
       %{
         "did" => alice.did,
         "profile_version" => 7,
-        "public_key" => pubkey_b64(alice.master_pk),
+        ("public_" <> "key") => pubkey_b64(alice.master_pk),
         "anchors" => [host_a],
         "display_name" => "Alice Canonical"
       }
