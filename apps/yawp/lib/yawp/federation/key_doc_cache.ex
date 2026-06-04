@@ -1,13 +1,5 @@
 defmodule Yawp.Federation.KeyDocCache do
-  @moduledoc """
-  Process-owned `:ets` cache of peer anchors' server-key documents,
-  keyed by anchor host. Each entry holds `{key_doc, fetched_at, ttl_seconds}`.
-
-  A peer's key document (published at `/.well-known/yawp/server-key.json`)
-  is cached for a default of 24h. `get/1` reports `:miss` for an unknown
-  host and `:stale` once an entry has lived past its TTL, leaving the
-  refetch decision to the caller.
-  """
+  @moduledoc false
 
   use GenServer
 
