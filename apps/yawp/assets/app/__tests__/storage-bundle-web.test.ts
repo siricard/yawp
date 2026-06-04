@@ -155,6 +155,29 @@ describe('storage-bundle.web (IndexedDB)', () => {
     expect(loaded!.metadata?.secondAnchorNudgeDismissed).toBe(true);
   });
 
+  test('round-trips profile metadata', async () => {
+    const bundle: IdentityBundleV1 = {
+      ...makeBundle(),
+      metadata: {
+        profileVersion: 4,
+        publishedProfile: {
+          display_name: 'Alice',
+          avatar_ref: 'avatar:alice',
+          bio: 'hello',
+          anchors: ['localhost:4000', 'anchor-b.example'],
+        },
+      },
+    };
+    await saveIdentity(bundle);
+    const loaded = await loadIdentity();
+    expect(loaded).toEqual(bundle);
+    expect(loaded!.metadata?.profileVersion).toBe(4);
+    expect(loaded!.metadata?.publishedProfile?.anchors).toEqual([
+      'localhost:4000',
+      'anchor-b.example',
+    ]);
+  });
+
   test('uses the schema: DB `yawp.identity`, store `yawp.identity`, key `v1`', async () => {
     const bundle = makeBundle();
     await saveIdentity(bundle);

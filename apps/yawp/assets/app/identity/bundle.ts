@@ -40,6 +40,13 @@ export type IdentityBundleV1 = {
      * (and so a fresh identity sees a fresh nudge).
      */
     secondAnchorNudgeDismissed?: boolean;
+    profileVersion?: number;
+    publishedProfile?: {
+      display_name?: string;
+      avatar_ref?: string;
+      bio?: string;
+      anchors?: string[];
+    };
   };
 };
 
@@ -111,6 +118,34 @@ export function isIdentityBundleV1(value: unknown): value is IdentityBundleV1 {
       typeof meta.secondAnchorNudgeDismissed !== 'boolean'
     ) {
       return false;
+    }
+    if (
+      'profileVersion' in meta &&
+      meta.profileVersion !== undefined &&
+      (typeof meta.profileVersion !== 'number' ||
+        !Number.isFinite(meta.profileVersion))
+    ) {
+      return false;
+    }
+    if ('publishedProfile' in meta && meta.publishedProfile !== undefined) {
+      if (
+        typeof meta.publishedProfile !== 'object' ||
+        meta.publishedProfile === null
+      ) {
+        return false;
+      }
+      const prof = meta.publishedProfile as Record<string, unknown>;
+      const stringFieldOk = (key: string) =>
+        !(key in prof) ||
+        prof[key] === undefined ||
+        typeof prof[key] === 'string';
+      if (!stringFieldOk('display_name')) return false;
+      if (!stringFieldOk('avatar_ref')) return false;
+      if (!stringFieldOk('bio')) return false;
+      if ('anchors' in prof && prof.anchors !== undefined) {
+        if (!Array.isArray(prof.anchors)) return false;
+        if (!prof.anchors.every(a => typeof a === 'string')) return false;
+      }
     }
     if ('servers' in meta && meta.servers !== undefined) {
       if (!Array.isArray(meta.servers)) return false;

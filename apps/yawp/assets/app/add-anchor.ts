@@ -14,6 +14,7 @@ export type AnchorProfile = {
 export type AddAnchorSuccess = {
   ok: true;
   anchorList: string[];
+  profileVersion: number;
 };
 
 export type AddAnchorFailure = {
@@ -142,8 +143,15 @@ export async function submitAddAnchor(args: {
   }
 
   if (result.success) {
-    const data = result.data as {anchorList?: string[]};
-    return {ok: true, anchorList: data.anchorList ?? [newAnchor]};
+    const data = result.data as {
+      anchorList?: string[];
+      profileVersion?: number;
+    };
+    return {
+      ok: true,
+      anchorList: data.anchorList ?? [newAnchor],
+      profileVersion: data.profileVersion ?? profile.profileVersion + 1,
+    };
   }
 
   const first = result.errors[0];

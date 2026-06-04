@@ -3,6 +3,7 @@ import {Text, View} from 'react-native';
 
 import {submitAddAnchor} from '../add-anchor';
 import {
+  useBundleMetadata,
   useDisplayName,
   useIdentityState,
   useWorkspaceServers,
@@ -18,6 +19,7 @@ export function AddAnchorScreen({onCancel, onAdded}: Props) {
   const identityState = useIdentityState();
   const {servers} = useWorkspaceServers();
   const {effectiveDisplayName} = useDisplayName();
+  const {metadata, mutate} = useBundleMetadata();
 
   const primaryAnchorUrl = servers.length > 0 ? servers[0].url : null;
 
@@ -41,15 +43,21 @@ export function AddAnchorScreen({onCancel, onAdded}: Props) {
     setSuccessMessage(null);
 
     const anchors = servers.map(s => s.url.replace(/^https?:\/\//, '').replace(/\/+$/, ''));
+    const publishedProfile = metadata.publishedProfile;
+    const baseAnchors = publishedProfile?.anchors ?? anchors;
+    const displayName =
+      publishedProfile?.display_name ?? effectiveDisplayName ?? undefined;
 
     const result = await submitAddAnchor({
       primaryAnchorUrl,
       newAnchorHost,
       identity: identityState.identity,
       profile: {
-        profileVersion: 0,
-        anchors,
-        displayName: effectiveDisplayName,
+        profileVersion: metadata.profileVersion ?? 0,
+        anchors: baseAnchors,
+        displayName,
+        avatarRef: publishedProfile?.avatar_ref,
+        bio: publishedProfile?.bio,
       },
     });
 
@@ -59,6 +67,16 @@ export function AddAnchorScreen({onCancel, onAdded}: Props) {
       setErrorMessage(result.message);
       return;
     }
+
+    await mutate(prev => ({
+      ...prev,
+      profileVersion: result.profileVersion,
+      publishedProfile: {
+        ...(prev.publishedProfile ?? {}),
+        display_name: displayName,
+        anchors: result.anchorList,
+      },
+    }));
 
     setSuccessMessage(
       'Anchor added. Your identity is now replicating to the new anchor.',

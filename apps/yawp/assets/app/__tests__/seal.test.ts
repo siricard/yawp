@@ -59,6 +59,19 @@ const SAMPLE_BUNDLE: IdentityBundleV1 = {
   },
 };
 
+const PROFILE_BUNDLE: IdentityBundleV1 = {
+  ...SAMPLE_BUNDLE,
+  metadata: {
+    profileVersion: 12,
+    publishedProfile: {
+      display_name: 'Alice',
+      avatar_ref: 'avatar:alice',
+      bio: 'hello',
+      anchors: ['localhost:4000', 'anchor-b.example'],
+    },
+  },
+};
+
 const PASSPHRASE = 'a strong passphrase';
 const WRONG_PASSPHRASE = 'a different one';
 const FAST = {iters: 1};
@@ -71,6 +84,18 @@ describe('seal', () => {
     expect(b64UrlToBytes(env.salt).length).toBe(SEAL_SALT_BYTES);
     expect(b64UrlToBytes(env.nonce).length).toBe(SEAL_NONCE_BYTES);
     expect(unsealBundle(env, PASSPHRASE, FAST)).toEqual(SAMPLE_BUNDLE);
+  });
+
+  test('profile metadata survives sealing', () => {
+    const env = sealBundle(PROFILE_BUNDLE, PASSPHRASE, FAST);
+    const unsealed = unsealBundle(env, PASSPHRASE, FAST);
+    expect(unsealed.metadata?.profileVersion).toBe(12);
+    expect(unsealed.metadata?.publishedProfile).toEqual({
+      display_name: 'Alice',
+      avatar_ref: 'avatar:alice',
+      bio: 'hello',
+      anchors: ['localhost:4000', 'anchor-b.example'],
+    });
   });
 
   test('fresh randomness per seal — repeated calls produce different envelopes', () => {
