@@ -1,10 +1,5 @@
 defmodule Yawp.Federation.WrapperTest do
-  @moduledoc """
-  Signed delivery wrapper: wrap/2 canonicalises and signs a wrapper map
-  binding the inner envelope by hash; unwrap/2 verifies the sending
-  anchor's server signature against its published key document, rebinds
-  the inner payload by hash, and dedups replays on `delivery_nonce`.
-  """
+  @moduledoc false
   use Yawp.DataCase, async: false
 
   import Bitwise
@@ -50,6 +45,24 @@ defmodule Yawp.Federation.WrapperTest do
 
     Req.Test.stub(@stub, fn conn -> Req.Test.json(conn, doc) end)
     doc
+  end
+
+  defp without_req_test_stub(fun) do
+    previous = Application.get_env(:yawp, @stub)
+
+    Application.put_env(:yawp, @stub,
+      req_options: [
+        connect_options: [timeout: 50],
+        receive_timeout: 50,
+        retry: false
+      ]
+    )
+
+    try do
+      fun.()
+    after
+      Application.put_env(:yawp, @stub, previous)
+    end
   end
 
   defp tamper(<<first, rest::binary>>), do: <<bxor(first, 1), rest::binary>>
@@ -256,6 +269,26 @@ defmodule Yawp.Federation.WrapperTest do
 
       assert {:error, reason} = Wrapper.unwrap(body, [])
       assert is_atom(reason)
+    end
+
+    test "normalizes malformed sender anchor hosts to an error tuple" do
+      without_req_test_stub(fn ->
+        inner = %{"x" => "y"}
+        body = Wrapper.encode_body(inner, sender_anchor_id: "bad host")
+
+        assert {:error, reason} = Wrapper.unwrap(body, [])
+        assert is_atom(reason)
+      end)
+    end
+
+    test "normalizes unreachable sender anchor hosts to an error tuple" do
+      without_req_test_stub(fn ->
+        inner = %{"x" => "y"}
+        body = Wrapper.encode_body(inner, sender_anchor_id: "127.0.0.1:9")
+
+        assert {:error, reason} = Wrapper.unwrap(body, [])
+        assert is_atom(reason)
+      end)
     end
   end
 

@@ -1,26 +1,5 @@
 defmodule Yawp.Federation.Wrapper do
-  @moduledoc """
-  Signed delivery wrapper for anchor-to-anchor federation traffic.
-
-  When an anchor relays an inner envelope (DM envelope, sync message,
-  notification) to a peer anchor, it wraps it in a small map —
-  `delivery_nonce`, `delivery_timestamp`, `sender_anchor_id`,
-  `inner_payload_hash` — canonicalises that map per RFC 8785, and signs
-  the canonical bytes with the anchor's active server key. The inner
-  envelope travels alongside the wrapper and is bound to the signature
-  by its SHA-256 hash.
-
-  `wrap/2` produces `{wrapped_payload_string, signature_bytes, key_id}`.
-  `encode_body/2` packages those plus the inner envelope into the JSON
-  body posted over HTTP. `unwrap/2` reverses it: it verifies the
-  sender anchor's server signature against the published key document
-  (via `Yawp.Federation.KeyDocFetcher`), rebinds the inner payload by
-  hash, and rejects replays on `delivery_nonce`.
-
-  The inner envelope's own `sender_signature` (the user-side signature)
-  is verified separately at the resource layer — this module only
-  authenticates the relaying anchor.
-  """
+  @moduledoc false
 
   alias Yawp.CanonicalJson
   alias Yawp.Federation
@@ -99,11 +78,18 @@ defmodule Yawp.Federation.Wrapper do
   end
 
   defp verify_signature(sender_anchor_id, key_id, wrapped, signature) do
-    if KeyDocFetcher.verify_with(sender_anchor_id, key_id, wrapped, signature) do
-      true
-    else
-      {:error, :invalid_signature}
+    case safe_verify_with(sender_anchor_id, key_id, wrapped, signature) do
+      true -> true
+      _ -> {:error, :invalid_signature}
     end
+  end
+
+  defp safe_verify_with(sender_anchor_id, key_id, wrapped, signature) do
+    KeyDocFetcher.verify_with(sender_anchor_id, key_id, wrapped, signature)
+  rescue
+    _ -> false
+  catch
+    _, _ -> false
   end
 
   defp verify_payload_hash(wrapper, inner) do

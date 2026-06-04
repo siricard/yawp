@@ -1,15 +1,5 @@
 defmodule Yawp.Federation.DeliveryNonceCache do
-  @moduledoc """
-  Replay-protection store for federation delivery wrappers.
-
-  Each accepted wrapper carries a unique `delivery_nonce`; recording it
-  here lets a recipient anchor reject a re-sent wrapper within the
-  24h retention window. Backed by a process-owned `:ets`
-  table holding `{nonce, expires_at}` and swept periodically so the
-  table stays bounded. A hard `max_entries` ceiling guards against
-  unbounded growth between sweeps: once reached, the oldest entries are
-  dropped first.
-  """
+  @moduledoc false
 
   use GenServer
 
