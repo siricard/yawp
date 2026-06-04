@@ -287,6 +287,21 @@ defmodule YawpWeb.FederationControllerTest do
       |> sign_inner("sender_signature", device_priv)
     end
 
+    defp notification_envelope(attrs) do
+      {:ok, active} = Federation.get_active_server_key()
+
+      payload =
+        %{
+          "envelope_id" => "notif-#{System.unique_integer([:positive])}",
+          "kind" => "notification",
+          "signed_by" => active.key_id,
+          "source_server" => @host
+        }
+        |> Map.merge(attrs)
+
+      sign_inner(payload, "sender_signature", active.private_key)
+    end
+
     test "appends a device-signed envelope addressed to a single recipient", %{conn: conn} do
       {master_pub, master_priv} = user_keypair()
       {device_pub, device_priv} = device_keypair()
@@ -308,7 +323,7 @@ defmodule YawpWeb.FederationControllerTest do
       assert entry.envelope_id == envelope["envelope_id"]
     end
 
-    test "fans a device-signed envelope out to multiple recipients", %{conn: conn} do
+    test "fans a device-signed DM envelope out to multiple recipients", %{conn: conn} do
       {master_pub, master_priv} = user_keypair()
       {device_pub, device_priv} = device_keypair()
       device_id = "device-fan"
@@ -317,7 +332,7 @@ defmodule YawpWeb.FederationControllerTest do
       envelope =
         dm_envelope(master_pub, device_priv, device_id, %{
           "recipient_dids" => ["did:yawp:r1", "did:yawp:r2"],
-          "kind" => "notification"
+          "kind" => "dm"
         })
 
       conn = post_federation(conn, "/federation/inbox/push", envelope)
@@ -327,6 +342,41 @@ defmodule YawpWeb.FederationControllerTest do
       assert {:ok, [e2]} = Federation.pull_inbox("did:yawp:r2", 0, 100)
       assert e1.envelope_id == envelope["envelope_id"]
       assert e2.envelope_id == envelope["envelope_id"]
+    end
+
+    test "appends a source-server-signed notification envelope", %{conn: conn} do
+      envelope =
+        notification_envelope(%{
+          "recipient_dids" => ["did:yawp:notify-one", "did:yawp:notify-two"],
+          "conversation_id" => nil,
+          "message_id" => "msg-1"
+        })
+
+      conn = post_federation(conn, "/federation/inbox/push", envelope)
+      assert json_response(conn, 200) == %{"status" => "appended"}
+
+      assert {:ok, [e1]} = Federation.pull_inbox("did:yawp:notify-one", 0, 100)
+      assert {:ok, [e2]} = Federation.pull_inbox("did:yawp:notify-two", 0, 100)
+      assert e1.kind == "notification"
+      assert e2.envelope_id == envelope["envelope_id"]
+    end
+
+    test "rejects a notification envelope signed by a device key", %{conn: conn} do
+      {_master_pub, _master_priv} = user_keypair()
+      {_device_pub, device_priv} = device_keypair()
+
+      envelope =
+        %{
+          "envelope_id" => "notif-#{System.unique_integer([:positive])}",
+          "kind" => "notification",
+          "signed_by" => "device-not-server",
+          "recipient_did" => "did:yawp:notify-forged"
+        }
+        |> sign_inner("sender_signature", device_priv)
+
+      conn = post_federation(conn, "/federation/inbox/push", envelope)
+      assert json_response(conn, 403) == %{"error" => "invalid_inner_signature"}
+      assert {:ok, []} = Federation.pull_inbox("did:yawp:notify-forged", 0, 100)
     end
 
     test "rejects an envelope with no recipient with 422", %{conn: conn} do

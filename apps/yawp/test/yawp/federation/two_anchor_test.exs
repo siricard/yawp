@@ -21,6 +21,19 @@ defmodule Yawp.Federation.TwoAnchorTest do
     Map.put(payload, sig_field, Base.url_encode64(sig, padding: false))
   end
 
+  defp sign_server_inner(anchor, payload) do
+    {:ok, active} = TwoAnchor.call(anchor, Yawp.Federation, :get_active_server_key, [])
+
+    payload = Map.put(payload, "signed_by", active.key_id)
+
+    {:ok, signature, key_id} =
+      TwoAnchor.call(anchor, Yawp.Federation, :sign, [Map.delete(payload, "sender_signature")])
+
+    payload
+    |> Map.put("signed_by", key_id)
+    |> Map.put("sender_signature", Base.url_encode64(signature, padding: false))
+  end
+
   test "a user-signed PPE signed on A round-trips to B over real sockets", %{a: a, b: b} do
     {pub, priv} = user_keypair()
     did = did_for(pub)
@@ -198,6 +211,50 @@ defmodule Yawp.Federation.TwoAnchorTest do
         "conversation_id" => "conv-rogue",
         "kind" => "dm",
         "sender_anchors" => [TwoAnchor.host(a)]
+      }
+      |> sign_inner("sender_signature", rogue_priv)
+
+    body = TwoAnchor.sign_on(a, envelope)
+
+    assert {:ok, %Req.Response{status: 403, body: %{"error" => "invalid_inner_signature"}}} =
+             TwoAnchor.post(b, "/federation/inbox/push", body)
+
+    assert {:ok, []} = TwoAnchor.call(b, Yawp.Federation, :pull_inbox, [recipient, 0, 100])
+  end
+
+  test "a source-server-signed notification envelope round-trips A→B", %{a: a, b: b} do
+    recipient = "did:yawp:two-anchor-notification"
+
+    envelope =
+      sign_server_inner(a, %{
+        "envelope_id" => "notif-#{System.unique_integer([:positive])}",
+        "kind" => "notification",
+        "recipient_did" => recipient,
+        "source_server" => TwoAnchor.host(a),
+        "message_id" => "msg-#{System.unique_integer([:positive])}"
+      })
+
+    body = TwoAnchor.sign_on(a, envelope)
+
+    assert {:ok, %Req.Response{status: 200, body: %{"status" => "appended"}}} =
+             TwoAnchor.post(b, "/federation/inbox/push", body)
+
+    assert {:ok, [entry]} = TwoAnchor.call(b, Yawp.Federation, :pull_inbox, [recipient, 0, 100])
+    assert entry.kind == "notification"
+    assert entry.envelope_id == envelope["envelope_id"]
+  end
+
+  test "B rejects a notification envelope not signed by the source server", %{a: a, b: b} do
+    {_pub, rogue_priv} = user_keypair()
+    recipient = "did:yawp:two-anchor-bad-notification"
+
+    envelope =
+      %{
+        "envelope_id" => "notif-#{System.unique_integer([:positive])}",
+        "kind" => "notification",
+        "signed_by" => a.key_id,
+        "recipient_did" => recipient,
+        "source_server" => TwoAnchor.host(a)
       }
       |> sign_inner("sender_signature", rogue_priv)
 

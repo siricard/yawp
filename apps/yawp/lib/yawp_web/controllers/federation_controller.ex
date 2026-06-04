@@ -7,6 +7,7 @@ defmodule YawpWeb.FederationController do
   alias Yawp.Federation.DeviceSignature
   alias Yawp.Federation.InnerSignature
   alias Yawp.Federation.MessagePipeline
+  alias Yawp.Federation.NotificationSignature
   alias Yawp.Federation.PresenceBroker
   alias Yawp.Federation.RemotePresence
   alias Yawp.Federation.Wrapper
@@ -44,9 +45,9 @@ defmodule YawpWeb.FederationController do
   end
 
   def inbox_push(conn, params) do
-    with_inner(conn, params, fn inner, _anchor ->
+    with_inner(conn, params, fn inner, anchor ->
       with :ok <- validate_envelope_recipients(inner),
-           :ok <- DeviceSignature.verify(inner),
+           :ok <- verify_inbox_envelope(inner, anchor),
            {:ok, _} <- MessagePipeline.maybe_refresh_ppe(inner),
            :ok <- append_envelope(inner) do
         ok(conn, %{"status" => "appended"})
@@ -149,6 +150,18 @@ defmodule YawpWeb.FederationController do
   end
 
   defp validate_envelope_recipients(_), do: :error
+
+  defp verify_inbox_envelope(%{"kind" => "notification"} = envelope, anchor) do
+    NotificationSignature.verify(envelope, anchor)
+  end
+
+  defp verify_inbox_envelope(%{"kind" => "dm"} = envelope, _anchor) do
+    DeviceSignature.verify(envelope)
+  end
+
+  defp verify_inbox_envelope(envelope, _anchor) do
+    DeviceSignature.verify(envelope)
+  end
 
   defp append_envelope(%{"recipient_dids" => recipient_dids} = envelope)
        when is_list(recipient_dids) do

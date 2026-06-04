@@ -1,0 +1,49 @@
+defmodule Yawp.Federation.NotificationSignature do
+  @moduledoc false
+
+  alias Yawp.CanonicalJson
+  alias Yawp.Federation.KeyDocFetcher
+
+  @spec verify(map(), String.t()) :: :ok | {:error, :invalid_inner_signature}
+  def verify(envelope, source_anchor) when is_map(envelope) and is_binary(source_anchor) do
+    with key_id when is_binary(key_id) and key_id != "" <-
+           Map.get(envelope, "signed_by", Map.get(envelope, "key_id", :missing)),
+         sig_b64 when is_binary(sig_b64) <- Map.get(envelope, "sender_signature", :missing),
+         {:ok, sig} <- decode(sig_b64, 64),
+         true <- verify_signature(envelope, source_anchor, key_id, sig) do
+      :ok
+    else
+      _ -> {:error, :invalid_inner_signature}
+    end
+  end
+
+  def verify(_envelope, _source_anchor), do: {:error, :invalid_inner_signature}
+
+  defp verify_signature(envelope, source_anchor, key_id, sig) do
+    canonical =
+      envelope
+      |> Map.delete("sender_signature")
+      |> CanonicalJson.encode()
+
+    KeyDocFetcher.verify_with(source_anchor, key_id, canonical, sig)
+  rescue
+    _ -> false
+  catch
+    _, _ -> false
+  end
+
+  defp decode(value, byte_length) when is_binary(value) do
+    decoded =
+      case Base.url_decode64(value, padding: false) do
+        {:ok, bytes} -> {:ok, bytes}
+        :error -> Base.decode64(value)
+      end
+
+    case decoded do
+      {:ok, bytes} when byte_size(bytes) == byte_length -> {:ok, bytes}
+      _ -> :error
+    end
+  end
+
+  defp decode(_value, _byte_length), do: :error
+end
