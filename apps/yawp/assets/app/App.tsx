@@ -74,7 +74,7 @@ export default function App() {
 function AppShell() {
   const identityState = useIdentityState();
   const {servers, removeServer} = useWorkspaceServers();
-  const primaryAnchorUrl = servers.length > 0 ? servers[0].url : null;
+  const anchorUrls = servers.map(s => s.url);
   const [screen, setScreen] = useState<Screen>({kind: 'home'});
   const [bindingUrl, setBindingUrl] = useState<string | null>(null);
   const [bindError, setBindError] = useState<string | null>(null);
@@ -208,7 +208,7 @@ function AppShell() {
   }
 
   return (
-    <AnchorConnectionProvider primaryAnchorUrl={primaryAnchorUrl}>
+    <AnchorConnectionProvider anchorUrls={anchorUrls}>
       <SafeAreaView
         edges={['top', 'bottom']}
         className="flex-1 bg-bg"
