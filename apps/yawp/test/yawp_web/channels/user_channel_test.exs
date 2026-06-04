@@ -232,13 +232,13 @@ defmodule YawpWeb.UserChannelTest do
 
     test "joining with guest anchors subscribes those peers in the presence broker" do
       actor = seed_identity()
+      did = actor.did
 
       assert {:ok, _reply, _socket} =
                join_user(actor, actor.did, %{"guest_anchors" => ["peer-guest.example"]})
 
       assert_push "presence_state", _
-      assert_receive {:notify_posted, "/federation/presence/notify", did}, 2000
-      assert did == actor.did
+      assert_receive {:notify_posted, "/federation/presence/notify", ^did}, 2000
     end
 
     test "joining with no guest anchors posts no presence notify" do
