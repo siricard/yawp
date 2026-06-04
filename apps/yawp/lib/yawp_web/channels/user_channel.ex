@@ -1,28 +1,5 @@
 defmodule YawpWeb.UserChannel do
-  @moduledoc """
-  Always-on Phoenix channel a client keeps open against the user's anchor.
-
-  Topic: `user:<bare base58 DID>`. Only the identity that owns the DID
-  may join — the socket's `current_identity` must match the topic.
-
-  On join the connecting device is tracked in `YawpWeb.Presence` under
-  the bare DID so a presence roster reflects every connected device, and
-  the channel subscribes to the inbox fan-out for that DID.
-
-  Outbound:
-
-    * `inbox` — a DM/notification envelope appended to this user's inbox
-      at the anchor (pushed live; the client also pulls on reconnect).
-    * `delivery_ack` / `read_marker` — relayed to the user's other
-      connected devices.
-
-  Inbound (signature verification of the inner envelope happens at the
-  resource layer; here we validate shape and fan out):
-
-    * `delivery_ack` — a per-recipient acknowledgement that an envelope
-      reached a device.
-    * `read_marker` — a conversation read cursor advance.
-  """
+  @moduledoc false
 
   use Phoenix.Channel
 
@@ -114,10 +91,6 @@ defmodule YawpWeb.UserChannel do
     end
   end
 
-  @doc """
-  PubSub topic on which inbox appends for `bare_did` are fanned out to
-  every connected device's `user:` channel.
-  """
   @spec inbox_topic(String.t()) :: String.t()
   def inbox_topic(bare_did), do: "user_inbox:#{bare_did}"
 

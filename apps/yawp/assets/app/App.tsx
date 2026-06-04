@@ -77,6 +77,7 @@ function AppShell() {
   const {metadata} = useBundleMetadata();
   const {servers, removeServer} = useWorkspaceServers();
   const anchorUrls = configuredAnchorUrls(metadata.publishedProfile?.anchors);
+  const guestAnchors = guestAnchorHosts(servers, anchorUrls);
   const [screen, setScreen] = useState<Screen>({kind: 'home'});
   const [bindingUrl, setBindingUrl] = useState<string | null>(null);
   const [bindError, setBindError] = useState<string | null>(null);
@@ -210,7 +211,7 @@ function AppShell() {
   }
 
   return (
-    <AnchorConnectionProvider anchorUrls={anchorUrls}>
+    <AnchorConnectionProvider anchorUrls={anchorUrls} guestAnchors={guestAnchors}>
       <SafeAreaView
         edges={['top', 'bottom']}
         className="flex-1 bg-bg"
@@ -243,4 +244,27 @@ export function configuredAnchorUrls(anchors: string[] | undefined): string[] {
         .filter(anchor => anchor.length > 0),
     ),
   );
+}
+
+export function guestAnchorHosts(
+  servers: WorkspaceServer[],
+  anchorUrls: string[],
+): string[] {
+  const anchorHosts = new Set(anchorUrls.map(hostFromUrl).filter(Boolean));
+  return Array.from(
+    new Set(
+      servers
+        .map(server => hostFromUrl(server.url))
+        .filter((host): host is string => Boolean(host) && !anchorHosts.has(host)),
+    ),
+  );
+}
+
+function hostFromUrl(raw: string): string | null {
+  try {
+    return new URL(raw).host;
+  } catch {
+    const trimmed = raw.trim();
+    return trimmed.length > 0 ? trimmed : null;
+  }
 }

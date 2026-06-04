@@ -26,6 +26,7 @@ const GUEST_SERVER: WorkspaceServer = {
 };
 
 let capturedAnchorUrls: string[] | null = null;
+let capturedGuestAnchors: string[] | null = null;
 
 function fakeIdentity(): Identity {
   const stubBytes = new Uint8Array(32);
@@ -68,12 +69,15 @@ jest.mock('../identity-context', () => ({
 jest.mock('../chat/anchor-connection', () => ({
   AnchorConnectionProvider: ({
     anchorUrls,
+    guestAnchors,
     children,
   }: {
     anchorUrls: string[];
+    guestAnchors?: string[];
     children: unknown;
   }) => {
     capturedAnchorUrls = anchorUrls;
+    capturedGuestAnchors = guestAnchors ?? [];
     return children;
   },
   useAnchorStatus: () => ({status: 'connected', degraded: false}),
@@ -133,6 +137,7 @@ describe('App — workspace bar is a top horizontal strip at every width', () =>
       mutate: jest.fn(),
     });
     capturedAnchorUrls = null;
+    capturedGuestAnchors = null;
   });
 
   test('wide window → horizontal top strip, no fixed-width rail', async () => {
@@ -171,6 +176,7 @@ describe('App — workspace bar is a top horizontal strip at every width', () =>
       url('anchor-b.example'),
     ]);
     expect(capturedAnchorUrls).not.toContain(url('guest.example'));
+    expect(capturedGuestAnchors).toEqual(['localhost:4000', 'guest.example']);
     ReactTestRenderer.act(() => root.unmount());
   });
 });

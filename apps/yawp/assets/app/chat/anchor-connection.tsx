@@ -26,10 +26,12 @@ const AnchorContext = createContext<AnchorConnection>({
 export function useAnchorConnection(
   anchorUrls: string[],
   did: string,
+  guestAnchors: string[] = [],
 ): AnchorConnection {
   const [status, setStatus] = useState<AnchorStatus>('connecting');
   const degradedTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const anchorsKey = anchorUrls.join('|');
+  const guestAnchorsKey = guestAnchors.join('|');
 
   useEffect(() => {
     if (anchorUrls.length === 0 || !did) {
@@ -91,7 +93,9 @@ export function useAnchorConnection(
         socketRefs.push(socket.onError(markUnreachable));
         socketRefs.push(socket.onClose(markUnreachable));
 
-        const channel: Channel = socket.channel(`user:${did}`, {});
+        const channel: Channel = socket.channel(`user:${did}`, {
+          guest_anchors: guestAnchors,
+        });
         channel.on('presence_state', () => {
           if (cancelled) return;
           reachable.set(url, true);
@@ -116,21 +120,27 @@ export function useAnchorConnection(
       clearDegradedTimer();
       cleanups.forEach(fn => fn());
     };
-  }, [anchorsKey, did]);
+  }, [anchorsKey, did, guestAnchorsKey]);
 
   return {status, degraded: status === 'degraded'};
 }
 
 export function AnchorConnectionProvider({
   anchorUrls,
+  guestAnchors = [],
   children,
 }: {
   anchorUrls: string[];
+  guestAnchors?: string[];
   children: React.ReactNode;
 }) {
   const state = useIdentityState();
   const did = state.status === 'ready' ? state.identity.did : '';
-  const connection = useAnchorConnection(did ? anchorUrls : [], did);
+  const connection = useAnchorConnection(
+    did ? anchorUrls : [],
+    did,
+    guestAnchors,
+  );
   return (
     <AnchorContext.Provider value={connection}>
       {children}

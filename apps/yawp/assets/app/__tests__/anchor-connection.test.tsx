@@ -6,6 +6,7 @@ type Handler = (payload: unknown) => void;
 
 type FakeChannel = {
   topic: string;
+  params: Record<string, unknown>;
   handlers: Record<string, Handler>;
   join: jest.Mock;
   leave: jest.Mock;
@@ -18,7 +19,7 @@ type FakeSocket = {
   channels: FakeChannel[];
   errorCallbacks: Handler[];
   closeCallbacks: Handler[];
-  channel: (topic: string) => FakeChannel;
+  channel: (topic: string, params?: Record<string, unknown>) => FakeChannel;
   onError: (cb: Handler) => number;
   onClose: (cb: Handler) => number;
   off: jest.Mock;
@@ -33,10 +34,11 @@ function makeSocket(url: string): FakeSocket {
     channels: [],
     errorCallbacks: [],
     closeCallbacks: [],
-    channel(topic: string) {
+    channel(topic: string, params: Record<string, unknown> = {}) {
       const handlers: Record<string, Handler> = {};
       const chan: FakeChannel = {
         topic,
+        params,
         handlers,
         join: jest.fn(() => chan),
         leave: jest.fn(),
@@ -82,8 +84,16 @@ jest.mock('../chat/socket', () => ({
 
 import {useAnchorConnection} from '../chat/anchor-connection';
 
-function Harness({urls, did}: {urls: string[]; did: string}) {
-  const {status, degraded} = useAnchorConnection(urls, did);
+function Harness({
+  urls,
+  did,
+  guestAnchors = [],
+}: {
+  urls: string[];
+  did: string;
+  guestAnchors?: string[];
+}) {
+  const {status, degraded} = useAnchorConnection(urls, did, guestAnchors);
   return <Text testID="state">{`${status}|${degraded}`}</Text>;
 }
 
@@ -124,6 +134,28 @@ describe('useAnchorConnection', () => {
     expect(socket.channels[0].topic).toBe('user:abc123');
     expect(socket.channels[0].join).toHaveBeenCalledTimes(1);
     expect(readState(root)).toBe('connecting|false');
+
+    ReactTestRenderer.act(() => root.unmount());
+  });
+
+  test('sends guest anchors in the production user-channel join params', async () => {
+    let root!: ReactTestRenderer.ReactTestRenderer;
+    await ReactTestRenderer.act(async () => {
+      root = ReactTestRenderer.create(
+        <Harness
+          urls={[A]}
+          did="abc123"
+          guestAnchors={['guest.example', 'localhost:4100']}
+        />,
+      );
+    });
+    await flush();
+
+    const socket = mockSocketFor(A);
+    expect(socket.channels[0].topic).toBe('user:abc123');
+    expect(socket.channels[0].params).toEqual({
+      guest_anchors: ['guest.example', 'localhost:4100'],
+    });
 
     ReactTestRenderer.act(() => root.unmount());
   });
