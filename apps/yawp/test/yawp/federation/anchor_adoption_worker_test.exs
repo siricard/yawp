@@ -1,11 +1,5 @@
 defmodule Yawp.Federation.AnchorAdoptionWorkerTest do
-  @moduledoc """
-  The background worker enqueued by `:add_anchor`. It posts a signed
-  adoption envelope (carrying the user's cached PPE) to the newly added
-  anchor, then asks that anchor to start replicating the user's private
-  blob. The user's PPE and private blob are read from local state on
-  the originating anchor.
-  """
+  @moduledoc false
   use Yawp.DataCase, async: false
 
   alias Yawp.Federation.AnchorAdoptionWorker

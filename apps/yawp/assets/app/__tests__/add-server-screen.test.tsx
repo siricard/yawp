@@ -1,17 +1,10 @@
-/**
- * Render + integration test for the paste-first Add-server screen.
- *
- * The screen is server-state driven: a `/.well-known/yawp/server-info`
- * probe decides whether step 2 expects a claim token (unclaimed server)
- * or an invite token (claimed server). There is no manual kind toggle.
- */
-
 import React from 'react';
 import ReactTestRenderer from 'react-test-renderer';
 
 import {IdentityProvider, useWorkspaceServers} from '../identity-context';
 import {AddServerScreen} from '../screens/AddServerScreen';
 import {clearIdentity, getOrCreateIdentity} from '../identity';
+import {loadIdentity} from '../identity/storage-bundle';
 
 function findByTestId(
   tree: ReactTestRenderer.ReactTestInstance,
@@ -116,7 +109,12 @@ describe('AddServerScreen (paste-first)', () => {
           status: 200,
           json: async () => ({
             success: true,
-            data: {id: 'id-abc', did: 'did:yawp:abc', profileVersion: 1},
+            data: {
+              id: 'id-abc',
+              did: 'did:yawp:abc',
+              anchorList: ['localhost:4000'],
+              profileVersion: 1,
+            },
             metadata: {
               sessionToken: 'sess-' + callIdx,
               refreshToken: 'refresh-' + callIdx,
@@ -178,6 +176,82 @@ describe('AddServerScreen (paste-first)', () => {
 
     const probeCalls = fetchSpy.mock.calls.filter(c => isProbe(c[0]));
     expect(probeCalls.length).toBe(1);
+
+    fetchSpy.mockRestore();
+  });
+
+  test('persists bind profile metadata so add-anchor signs the next profile version', async () => {
+    const fetchSpy = jest
+      .spyOn(global, 'fetch')
+      .mockImplementation(async (input, init) => {
+        if (isProbe(input)) {
+          return probeResponse(false);
+        }
+        const body = JSON.parse((init?.body as string) ?? '{}');
+        if (body.action === 'claim_chat_owner') {
+          return {
+            ok: true,
+            status: 200,
+            json: async () => ({
+              success: true,
+              data: {id: 'id-abc', did: 'did:yawp:abc'},
+            }),
+          } as unknown as Response;
+        }
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({
+            success: true,
+            data: {
+              id: 'id-abc',
+              did: 'did:yawp:abc',
+              anchorList: ['localhost:4000'],
+              profileVersion: 1,
+            },
+            metadata: {
+              sessionToken: 'sess',
+              refreshToken: 'refresh',
+              expiresAt: '2099-01-01T00:00:00.000000Z',
+            },
+          }),
+        } as unknown as Response;
+      });
+
+    let root: ReactTestRenderer.ReactTestRenderer | null = null;
+    await ReactTestRenderer.act(async () => {
+      root = ReactTestRenderer.create(
+        <IdentityProvider>
+          <AddServerScreen onCancel={() => {}} onAdded={() => {}} />
+        </IdentityProvider>,
+      );
+    });
+    await flush();
+
+    const tree = root!.root;
+    await ReactTestRenderer.act(async () => {
+      findByTestId(tree, 'server-url-input').props.onChangeText(
+        'http://localhost:4000',
+      );
+    });
+    await ReactTestRenderer.act(async () => {
+      findByTestId(tree, 'add-server-next').props.onPress();
+    });
+    await flush();
+
+    await ReactTestRenderer.act(async () => {
+      findByTestId(tree, 'claim-token-input').props.onChangeText('TOKEN123');
+    });
+    await ReactTestRenderer.act(async () => {
+      findByTestId(tree, 'add-server-submit').props.onPress();
+    });
+    await flush();
+
+    const bundle = await loadIdentity();
+    expect(bundle?.metadata?.profileVersion).toBe(1);
+    expect(bundle?.metadata?.publishedProfile?.anchors).toEqual([
+      'localhost:4000',
+    ]);
 
     fetchSpy.mockRestore();
   });

@@ -1,16 +1,3 @@
-/**
- * fix3 — `submitBindDevice` passes two distinct timestamps:
- *
- * - `deviceIssuedAt` is `identity.deviceIssuedAt` verbatim (the
- * stable, master-signed device-delegation timestamp).
- * - `requestIssuedAt` is derived from `Date.now` at call time
- * (fresh per-call freshness anchor).
- *
- * Both travel as opaque ISO-8601 strings; the canonical-JSON contract
- * requires the exact same bytes on both ends, so the client MUST NOT
- * reformat (no DateTime parse/format round-trip).
- */
-
 import type {Identity} from '../identity-context';
 
 jest.mock('../ash_generated', () => ({
@@ -55,7 +42,12 @@ describe('submitBindDevice — split issued_at', () => {
   test('sends identity.deviceIssuedAt verbatim into input.deviceIssuedAt', async () => {
     bindDeviceMock.mockResolvedValue({
       success: true,
-      data: {id: 'x', did: 'did:yawp:zZZZZZZ', profileVersion: 1},
+      data: {
+        id: 'x',
+        did: 'did:yawp:zZZZZZZ',
+        anchorList: ['localhost:4000'],
+        profileVersion: 1,
+      },
       metadata: {
         sessionToken: 's',
         refreshToken: 'r',
@@ -70,6 +62,10 @@ describe('submitBindDevice — split issued_at', () => {
     });
 
     expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.profileVersion).toBe(1);
+      expect(result.publishedProfile.anchors).toEqual(['localhost:4000']);
+    }
     expect(bindDeviceMock).toHaveBeenCalledTimes(1);
     const call = bindDeviceMock.mock.calls[0][0];
     expect(call.input.deviceIssuedAt).toBe('2026-05-25T20:34:12.967Z');

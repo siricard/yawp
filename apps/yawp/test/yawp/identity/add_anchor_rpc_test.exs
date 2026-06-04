@@ -1,13 +1,5 @@
 defmodule Yawp.Identity.AddAnchorRpcTest do
-  @moduledoc """
-  `:add_anchor` RPC action on `Yawp.Identity.Identity`. An
-  authenticated user adds a second anchor host: the host is appended to
-  `anchor_list`, `profile_version` increments, the user's freshly
-  re-signed PPE (carrying the new anchor in its own `anchors` list and
-  the bumped `profile_version`) is cached, and a background job is
-  enqueued to adopt the new anchor and replicate to it. Only the
-  identity itself (matching actor) may add an anchor.
-  """
+  @moduledoc false
   use Yawp.DataCase, async: false
 
   import Yawp.TestSupport.PubKey

@@ -14,6 +14,8 @@ import {
 } from '../onboarding/useServerInfoProbe';
 import {
   useIdentityState,
+  useBundleMetadata,
+  useDisplayName,
   useWorkspaceServers,
   type WorkspaceServer,
 } from '../identity-context';
@@ -22,12 +24,6 @@ import {Banner, Button, Field, Input} from '../ui';
 type Props = {
   onCancel: () => void;
   onAdded: (server: WorkspaceServer) => void;
-  /**
-   * invoked after a successful invite-token redeem + bind to navigate the
-   * newly-joined user straight into the server's `#general` channel. The
-   * claim (operator) branch still uses `onAdded` (lands on home with the
-   * new tile selected).
-   */
   onNavigateToServer?: (server: WorkspaceServer) => void;
 };
 
@@ -46,6 +42,8 @@ export function AddServerScreen({onCancel, onAdded, onNavigateToServer}: Props) 
   const identityState = useIdentityState();
   const {addServer} = useWorkspaceServers();
   const {recordFirstBound} = useRecordFirstBoundAt();
+  const {mutate} = useBundleMetadata();
+  const {effectiveDisplayName} = useDisplayName();
 
   const [step, setStep] = useState<Step>('connect');
   const [pasteValue, setPasteValue] = useState('http://localhost:4000');
@@ -161,6 +159,7 @@ export function AddServerScreen({onCancel, onAdded, onNavigateToServer}: Props) 
       return;
     }
 
+    await recordBoundProfile(bind);
     await recordFirstBound();
 
     const server: WorkspaceServer = {
@@ -215,6 +214,7 @@ export function AddServerScreen({onCancel, onAdded, onNavigateToServer}: Props) 
         return false;
       }
 
+      await recordBoundProfile(bind);
       await recordFirstBound();
 
       const server: WorkspaceServer = {
@@ -251,6 +251,7 @@ export function AddServerScreen({onCancel, onAdded, onNavigateToServer}: Props) 
         return false;
       }
 
+      await recordBoundProfile(bind);
       await recordFirstBound();
 
       const server: WorkspaceServer = {
@@ -267,6 +268,19 @@ export function AddServerScreen({onCancel, onAdded, onNavigateToServer}: Props) 
     setSubmitting(false);
     setErrorMessage(result.message);
     return false;
+  }
+
+  async function recordBoundProfile(bind: Extract<Awaited<ReturnType<typeof submitBindDevice>>, {ok: true}>) {
+    await mutate(prev => ({
+      ...prev,
+      profileVersion: bind.profileVersion,
+      publishedProfile: {
+        ...(prev.publishedProfile ?? {}),
+        display_name:
+          prev.publishedProfile?.display_name ?? effectiveDisplayName ?? undefined,
+        anchors: bind.publishedProfile.anchors,
+      },
+    }));
   }
 
   async function handleSubmitCode() {

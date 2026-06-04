@@ -1,16 +1,5 @@
 defmodule Yawp.Identity.Identity do
-  @moduledoc """
-  The DID-bearing chat identity row, stored at the user's home anchor.
-
-   adds a deliberately minimal stub: just the primary key, the DID,
-  and the master Ed25519 public key. Onboarding populates the
-  row when the client completes the BIP-39 mnemonic flow; subsequent
-  milestones extend this resource with device subkeys, the PPE
-  bundle, the anchor list, recovery methods, etc.
-
-  See (identity model) (anchor architecture)
-  (identity recovery).
-  """
+  @moduledoc false
 
   use Ash.Resource,
     otp_app: :yawp,

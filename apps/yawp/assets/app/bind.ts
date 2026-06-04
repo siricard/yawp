@@ -8,6 +8,10 @@ import type {Identity} from './identity-context';
 export type BindSuccess = {
   ok: true;
   session: StoredSession;
+  profileVersion: number;
+  publishedProfile: {
+    anchors: string[];
+  };
 };
 
 export type BindFailure = {
@@ -37,11 +41,6 @@ function normalizeServerUrl(raw: string): string {
   return raw.trim().replace(/\/+$/, '');
 }
 
-/**
- * Bind the current device subkey to the chat-owner identity on
- * `serverUrl`. On success persists the issued session+refresh tokens
- * keyed by `serverUrl` and returns them.
- */
 export async function submitBindDevice(args: {
   serverUrl: string;
   identity: Identity;
@@ -89,7 +88,7 @@ export async function submitBindDevice(args: {
         deviceIssuedAt,
         requestIssuedAt,
       },
-      fields: ['id', 'did', 'profileVersion'],
+      fields: ['id', 'did', 'anchorList', 'profileVersion'],
       metadataFields: ['sessionToken', 'refreshToken', 'expiresAt'],
       customFetch,
     });
@@ -119,8 +118,21 @@ export async function submitBindDevice(args: {
       refreshToken: meta.refreshToken,
       expiresAt: meta.expiresAt,
     };
+    const data = result.data as {
+      anchorList?: string[];
+      profileVersion?: number;
+    };
     await saveSession(base, session);
-    return {ok: true, session};
+    return {
+      ok: true,
+      session,
+      profileVersion: data.profileVersion ?? 0,
+      publishedProfile: {
+        anchors:
+          data.anchorList ??
+          [base.replace(/^https?:\/\//, '').replace(/\/+$/, '')],
+      },
+    };
   }
 
   const first = result.errors[0];

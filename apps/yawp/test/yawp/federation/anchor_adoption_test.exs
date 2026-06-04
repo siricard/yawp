@@ -1,16 +1,5 @@
 defmodule Yawp.Federation.AnchorAdoptionTest do
-  @moduledoc """
-  Inbound `POST /federation/anchors/adopt` and the
-  `AnchorAdoptionWorker` that drives it.
-
-  When a user adds a second anchor (B), their existing anchor (A)
-  POSTs a signed adoption envelope to B. The envelope rides inside the
-  standard signed delivery wrapper, so B authenticates A's server
-  signature against A's published key document before creating the
-  local Identity row. The adoption envelope carries the user's signed
-  PPE (which proves the user exists and lists A as a source anchor); B
-  then pulls the private blob from A.
-  """
+  @moduledoc false
   use YawpWeb.ConnCase, async: false
 
   import Yawp.TestSupport.PubKey
