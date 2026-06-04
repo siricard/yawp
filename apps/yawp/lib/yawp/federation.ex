@@ -40,7 +40,7 @@ defmodule Yawp.Federation do
         envelope: envelope
       })
 
-    with {:ok, entry} <- result do
+    with {:ok, %{__metadata__: %{inbox_created?: true}} = entry} <- result do
       bare = String.replace_prefix(recipient_did, "did:yawp:", "")
 
       Phoenix.PubSub.broadcast(

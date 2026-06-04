@@ -344,6 +344,74 @@ defmodule YawpWeb.FederationControllerTest do
         args: %{"did" => sender_did, "anchors" => ["anchor-a.example"]}
       )
     end
+
+    test "does not enqueue a refresh when sender_profile_version is not newer than the cache",
+         %{conn: conn} do
+      {pub, priv} = user_keypair()
+      sender_did = did_for(pub)
+
+      {:ok, :applied} =
+        Identity.apply_ppe_if_newer(%{
+          "did" => sender_did,
+          "public_key" => Base.url_encode64(pub, padding: false),
+          "profile_version" => 9,
+          "anchors" => ["anchor-a.example"],
+          "display_name" => "Sender"
+        })
+
+      envelope =
+        signed_envelope(pub, priv, %{
+          "recipient_did" => "did:yawp:inbox-recipient-stale",
+          "sender_profile_version" => 5
+        })
+
+      conn = post_federation(conn, "/federation/inbox/push", envelope)
+      assert json_response(conn, 200) == %{"status" => "appended"}
+
+      refute_enqueued(worker: PpeRefreshWorker)
+    end
+
+    test "rejects a first-contact envelope whose refresh cannot be driven (no anchors) with 422",
+         %{conn: conn} do
+      {pub, priv} = user_keypair()
+      recipient = "did:yawp:inbox-firstcontact"
+
+      envelope =
+        signed_envelope(pub, priv, %{
+          "recipient_did" => recipient,
+          "sender_profile_version" => 4
+        })
+
+      conn = post_federation(conn, "/federation/inbox/push", envelope)
+
+      assert json_response(conn, 422) == %{"error" => "unresolvable_sender"}
+      assert {:ok, []} = Federation.pull_inbox(recipient, 0, 100)
+      refute_enqueued(worker: PpeRefreshWorker)
+    end
+
+    test "accepts a first-contact envelope that carries sender_anchors to drive the refresh",
+         %{conn: conn} do
+      {pub, priv} = user_keypair()
+      sender_did = did_for(pub)
+      recipient = "did:yawp:inbox-firstcontact-ok"
+
+      envelope =
+        signed_envelope(pub, priv, %{
+          "recipient_did" => recipient,
+          "sender_profile_version" => 4,
+          "sender_anchors" => ["anchor-b.example"]
+        })
+
+      conn = post_federation(conn, "/federation/inbox/push", envelope)
+
+      assert json_response(conn, 200) == %{"status" => "appended"}
+      assert {:ok, [_entry]} = Federation.pull_inbox(recipient, 0, 100)
+
+      assert_enqueued(
+        worker: PpeRefreshWorker,
+        args: %{"did" => sender_did, "anchors" => ["anchor-b.example"]}
+      )
+    end
   end
 
   describe "POST /federation/devices/changed" do

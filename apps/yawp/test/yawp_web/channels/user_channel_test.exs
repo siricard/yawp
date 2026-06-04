@@ -112,6 +112,26 @@ defmodule YawpWeb.UserChannelTest do
 
       refute_push "inbox", _
     end
+
+    test "replaying the same envelope_id does not push a second inbox event" do
+      actor = seed_identity()
+      assert {:ok, _reply, _socket} = join_user(actor, actor.did)
+      assert_push "presence_state", _
+
+      envelope = %{
+        "envelope_id" => Ecto.UUID.generate(),
+        "conversation_id" => "conv-replay",
+        "kind" => "dm",
+        "recipient_did" => actor.did,
+        "body" => "hello"
+      }
+
+      {:ok, _entry} = Federation.append_inbox(actor.did, envelope)
+      assert_push "inbox", _
+
+      {:ok, _entry} = Federation.append_inbox(actor.did, envelope)
+      refute_push "inbox", _
+    end
   end
 
   describe "delivery_ack" do

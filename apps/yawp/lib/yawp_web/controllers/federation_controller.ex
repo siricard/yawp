@@ -46,14 +46,23 @@ defmodule YawpWeb.FederationController do
     with_inner(conn, params, fn inner, _anchor ->
       with :ok <- validate_envelope_recipients(inner),
            :ok <- InnerSignature.verify(inner, "sender_did", "sender_signature"),
+           :ok <- ensure_refreshable_sender(inner),
            :ok <- append_envelope(inner) do
-        MessagePipeline.maybe_refresh_ppe(inner)
         ok(conn, %{"status" => "appended"})
       else
         {:error, :invalid_inner_signature} -> error(conn, 403, "invalid_inner_signature")
+        {:error, :unresolvable_sender} -> error(conn, 422, "unresolvable_sender")
         _ -> error(conn, 422, "invalid_envelope")
       end
     end)
+  end
+
+  defp ensure_refreshable_sender(inner) do
+    case MessagePipeline.maybe_refresh_ppe(inner) do
+      {:ok, :no_anchors} -> {:error, :unresolvable_sender}
+      {:ok, _} -> :ok
+      {:error, _} = err -> err
+    end
   end
 
   def adopt(conn, params) do
