@@ -115,6 +115,42 @@ defmodule Yawp.Federation.KeyDocFetcherTest do
       assert ^doc = KeyDocFetcher.get!(@host)
       assert_receive {:telemetry, ^ref, %{count: 1}, %{host: @host}}
     end
+
+    test "fetches a remote host over https", %{doc: doc} do
+      parent = self()
+
+      Req.Test.stub(@stub, fn conn ->
+        send(parent, {:scheme, conn.scheme})
+        Req.Test.json(conn, doc)
+      end)
+
+      KeyDocFetcher.get!("peer.example.com")
+      assert_receive {:scheme, :https}
+    end
+
+    test "fetches a localhost host over http", %{doc: doc} do
+      parent = self()
+
+      Req.Test.stub(@stub, fn conn ->
+        send(parent, {:scheme, conn.scheme})
+        Req.Test.json(conn, doc)
+      end)
+
+      KeyDocFetcher.get!("localhost:14100")
+      assert_receive {:scheme, :http}
+    end
+
+    test "fetches a 127.0.0.1 host over http", %{doc: doc} do
+      parent = self()
+
+      Req.Test.stub(@stub, fn conn ->
+        send(parent, {:scheme, conn.scheme})
+        Req.Test.json(conn, doc)
+      end)
+
+      KeyDocFetcher.get!("127.0.0.1:14100")
+      assert_receive {:scheme, :http}
+    end
   end
 
   describe "verify_with/4" do

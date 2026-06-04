@@ -62,7 +62,7 @@ defmodule Yawp.Federation.KeyDocFetcher do
   end
 
   defp fetch_and_cache!(host) do
-    url = "https://#{host}#{@well_known_path}"
+    url = "#{scheme(host)}://#{host}#{@well_known_path}"
     response = Req.get!([url: url] ++ req_options())
     doc = response.body
     ttl = ttl_from(response, doc)
@@ -128,6 +128,14 @@ defmodule Yawp.Federation.KeyDocFetcher do
 
   defp emit(event, host) do
     :telemetry.execute([:yawp, :federation, :key_doc, event], %{count: 1}, %{host: host})
+  end
+
+  defp scheme(host) do
+    if String.starts_with?(host, "localhost") or String.starts_with?(host, "127.0.0.1") do
+      "http"
+    else
+      "https"
+    end
   end
 
   defp req_options do
