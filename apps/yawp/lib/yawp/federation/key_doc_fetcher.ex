@@ -71,12 +71,14 @@ defmodule Yawp.Federation.KeyDocFetcher do
   end
 
   defp ttl_from(response, _doc) do
+    cap = KeyDocCache.default_ttl_seconds()
+
     with [value | _] <- Req.Response.get_header(response, "cache-control"),
-         %{"max-age" => max_age} <- Regex.named_captures(~r/max-age=(?<max_age>\d+)/, value),
+         %{"max_age" => max_age} <- Regex.named_captures(~r/max-age=(?<max_age>\d+)/, value),
          {seconds, ""} when seconds > 0 <- Integer.parse(max_age) do
-      seconds
+      min(seconds, cap)
     else
-      _ -> KeyDocCache.default_ttl_seconds()
+      _ -> cap
     end
   end
 
@@ -92,11 +94,37 @@ defmodule Yawp.Federation.KeyDocFetcher do
         entry = Enum.find(keys, fn k -> Map.get(k, "key_id") == key_id end)
 
         with %{} = entry <- entry,
+             true <- within_validity_window?(entry),
              {:ok, public_key} <- decode_public_key(Map.get(entry, "public_key")) do
           {:ok, public_key}
         else
           _ -> :not_found
         end
+    end
+  end
+
+  defp within_validity_window?(entry) do
+    now = DateTime.utc_now()
+
+    after_not_before?(Map.get(entry, "not_before"), now) and
+      before_not_after?(Map.get(entry, "not_after"), now)
+  end
+
+  defp after_not_before?(nil, _now), do: true
+
+  defp after_not_before?(value, now) do
+    case DateTime.from_iso8601(value) do
+      {:ok, not_before, _} -> DateTime.compare(now, not_before) != :lt
+      _ -> false
+    end
+  end
+
+  defp before_not_after?(nil, _now), do: true
+
+  defp before_not_after?(value, now) do
+    case DateTime.from_iso8601(value) do
+      {:ok, not_after, _} -> DateTime.compare(now, not_after) != :gt
+      _ -> false
     end
   end
 

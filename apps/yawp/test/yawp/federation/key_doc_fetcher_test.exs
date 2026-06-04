@@ -39,8 +39,8 @@ defmodule Yawp.Federation.KeyDocFetcherTest do
           "key_id" => key_id,
           "alg" => "Ed25519",
           "public_key" => encoded_pub,
-          "not_before" => "2020-01-01T00:00:00Z",
-          "not_after" => "2999-01-01T00:00:00Z"
+          "not_before" => Keyword.get(opts, :not_before, "2020-01-01T00:00:00Z"),
+          "not_after" => Keyword.get(opts, :not_after, "2999-01-01T00:00:00Z")
         }
       ],
       "revoked" => Keyword.get(opts, :revoked, [])
@@ -151,6 +151,28 @@ defmodule Yawp.Federation.KeyDocFetcherTest do
       KeyDocFetcher.get!("127.0.0.1:14100")
       assert_receive {:scheme, :http}
     end
+
+    test "honours a Cache-Control max-age below the 24h cap", %{doc: doc} do
+      Req.Test.stub(@stub, fn conn ->
+        conn
+        |> Plug.Conn.put_resp_header("cache-control", "max-age=3600")
+        |> Req.Test.json(doc)
+      end)
+
+      KeyDocFetcher.get!(@host)
+      assert {:ok, {^doc, _, 3600}} = KeyDocCache.get(@host)
+    end
+
+    test "caps a Cache-Control max-age above the 24h cap at 86_400", %{doc: doc} do
+      Req.Test.stub(@stub, fn conn ->
+        conn
+        |> Plug.Conn.put_resp_header("cache-control", "max-age=604800")
+        |> Req.Test.json(doc)
+      end)
+
+      KeyDocFetcher.get!(@host)
+      assert {:ok, {^doc, _, 86_400}} = KeyDocCache.get(@host)
+    end
   end
 
   describe "verify_with/4" do
@@ -200,6 +222,38 @@ defmodule Yawp.Federation.KeyDocFetcherTest do
       sig = :crypto.sign(:eddsa, :none, message, [ctx.priv, :ed25519])
 
       refute KeyDocFetcher.verify_with(@host, ctx.key_id, message, sig)
+    end
+
+    test "rejects a key whose not_before is still in the future", ctx do
+      not_yet_doc = build_doc(ctx.key_id, ctx.pub, not_before: "2999-01-01T00:00:00Z")
+      stub_doc(not_yet_doc)
+      message = "wrapped-payload-bytes"
+      sig = :crypto.sign(:eddsa, :none, message, [ctx.priv, :ed25519])
+
+      refute KeyDocFetcher.verify_with(@host, ctx.key_id, message, sig)
+    end
+
+    test "rejects a key whose not_after is already in the past", ctx do
+      expired_doc = build_doc(ctx.key_id, ctx.pub, not_after: "2020-01-02T00:00:00Z")
+      stub_doc(expired_doc)
+      message = "wrapped-payload-bytes"
+      sig = :crypto.sign(:eddsa, :none, message, [ctx.priv, :ed25519])
+
+      refute KeyDocFetcher.verify_with(@host, ctx.key_id, message, sig)
+    end
+
+    test "accepts a key inside its validity window", ctx do
+      windowed_doc =
+        build_doc(ctx.key_id, ctx.pub,
+          not_before: "2020-01-01T00:00:00Z",
+          not_after: "2999-01-01T00:00:00Z"
+        )
+
+      stub_doc(windowed_doc)
+      message = "wrapped-payload-bytes"
+      sig = :crypto.sign(:eddsa, :none, message, [ctx.priv, :ed25519])
+
+      assert KeyDocFetcher.verify_with(@host, ctx.key_id, message, sig)
     end
   end
 end
