@@ -1,6 +1,8 @@
 defmodule Yawp.Federation.TwoAnchorTest do
   use ExUnit.Case, async: false
 
+  import Yawp.TestSupport.PubKey
+
   alias Yawp.TestSupport.TwoAnchor
 
   @moduletag :two_anchor
@@ -27,7 +29,7 @@ defmodule Yawp.Federation.TwoAnchorTest do
       %{
         "did" => did,
         "profile_version" => 4,
-        "public_key" => Base.url_encode64(pub, padding: false),
+        "public_key" => pubkey_b64(pub),
         "anchors" => [TwoAnchor.host(a)],
         "display_name" => "Alice",
         "bio" => "hello from A"
@@ -58,7 +60,7 @@ defmodule Yawp.Federation.TwoAnchorTest do
       %{
         "did" => did,
         "profile_version" => 1,
-        "public_key" => Base.url_encode64(pub, padding: false),
+        "public_key" => pubkey_b64(pub),
         "anchors" => [TwoAnchor.host(a)],
         "display_name" => "Alice"
       }
@@ -83,7 +85,7 @@ defmodule Yawp.Federation.TwoAnchorTest do
         "did" => did,
         "ciphertext" => Base.encode64(ciphertext),
         "blob_version" => 7,
-        "public_key" => Base.url_encode64(pub, padding: false)
+        "public_key" => pubkey_b64(pub)
       }
       |> sign_inner("signature", priv)
 
@@ -110,7 +112,7 @@ defmodule Yawp.Federation.TwoAnchorTest do
       %{
         "did" => sender_did,
         "profile_version" => 2,
-        "public_key" => Base.url_encode64(master_pub, padding: false),
+        "public_key" => pubkey_b64(master_pub),
         "anchors" => [TwoAnchor.host(a)],
         "display_name" => "Alice",
         "device_subkeys" => [
@@ -171,7 +173,7 @@ defmodule Yawp.Federation.TwoAnchorTest do
       %{
         "did" => sender_did,
         "profile_version" => 1,
-        "public_key" => Base.url_encode64(master_pub, padding: false),
+        "public_key" => pubkey_b64(master_pub),
         "anchors" => [TwoAnchor.host(a)],
         "display_name" => "Alice",
         "device_subkeys" => [
@@ -215,7 +217,7 @@ defmodule Yawp.Federation.TwoAnchorTest do
       %{
         "did" => did,
         "profile_version" => 1,
-        "public_key" => Base.url_encode64(pub, padding: false),
+        "public_key" => pubkey_b64(pub),
         "anchors" => [TwoAnchor.host(a)],
         "display_name" => "Once"
       }

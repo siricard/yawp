@@ -13,6 +13,8 @@ defmodule Yawp.Federation.AnchorAdoptionTest do
   """
   use YawpWeb.ConnCase, async: false
 
+  import Yawp.TestSupport.PubKey
+
   import Bitwise
 
   alias Yawp.Federation
@@ -36,7 +38,7 @@ defmodule Yawp.Federation.AnchorAdoptionTest do
   end
 
   defp stub_key_doc(active) do
-    encoded_pub = Base.url_encode64(active.public_key, padding: false)
+    encoded_pub = pubkey_b64(active.public_key)
 
     doc = %{
       "server_id" => @host,

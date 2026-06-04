@@ -1,6 +1,8 @@
 defmodule Yawp.Federation.TwoAnchorHarnessTest do
   use ExUnit.Case, async: false
 
+  import Yawp.TestSupport.PubKey
+
   alias Yawp.TestSupport.TwoAnchor
 
   @moduletag :two_anchor
@@ -13,7 +15,7 @@ defmodule Yawp.Federation.TwoAnchorHarnessTest do
     %{
       "did" => did,
       "profile_version" => version,
-      "public_key" => Base.url_encode64(pub, padding: false),
+      "public_key" => pubkey_b64(pub),
       "anchors" => [TwoAnchor.host(anchor)],
       "display_name" => name
     }
@@ -26,7 +28,7 @@ defmodule Yawp.Federation.TwoAnchorHarnessTest do
     payload = %{
       "did" => did,
       "profile_version" => version,
-      "public_key" => Base.url_encode64(pub, padding: false),
+      "public_key" => pubkey_b64(pub),
       "anchors" => [TwoAnchor.host(anchor)],
       "display_name" => name
     }

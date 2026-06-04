@@ -1,5 +1,7 @@
 defmodule YawpWeb.GuestDisplayNameFederationTest do
   use YawpWeb.ChannelCase, async: false
+
+  import Yawp.TestSupport.PubKey
   use Oban.Testing, repo: Yawp.Repo
 
   import Bitwise
@@ -54,7 +56,7 @@ defmodule YawpWeb.GuestDisplayNameFederationTest do
       %{
         "did" => alice.did,
         "profile_version" => 7,
-        "public_key" => Base.url_encode64(alice.master_pk, padding: false),
+        "public_key" => pubkey_b64(alice.master_pk),
         "anchors" => [host_a],
         "display_name" => "Alice Canonical"
       }

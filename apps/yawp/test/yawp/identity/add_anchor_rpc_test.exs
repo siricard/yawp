@@ -9,6 +9,8 @@ defmodule Yawp.Identity.AddAnchorRpcTest do
   identity itself (matching actor) may add an anchor.
   """
   use Yawp.DataCase, async: false
+
+  import Yawp.TestSupport.PubKey
   use Oban.Testing, repo: Yawp.Repo
 
   alias Yawp.Federation.AnchorAdoptionWorker
@@ -36,7 +38,7 @@ defmodule Yawp.Identity.AddAnchorRpcTest do
       {:ok, :applied} =
         Identity.apply_ppe_if_newer(%{
           "did" => did,
-          "public_key" => Base.url_encode64(pk, padding: false),
+          "public_key" => pubkey_b64(pk),
           "profile_version" => profile_version,
           "anchors" => anchor_list,
           "display_name" => "Alice"
@@ -55,7 +57,7 @@ defmodule Yawp.Identity.AddAnchorRpcTest do
   defp build_signed_ppe(%{did: did, pk: pk, priv: priv}, anchors, version, attrs \\ %{}) do
     %{
       "did" => did,
-      "public_key" => Base.url_encode64(pk, padding: false),
+      "public_key" => pubkey_b64(pk),
       "profile_version" => version,
       "anchors" => anchors,
       "display_name" => "Alice"

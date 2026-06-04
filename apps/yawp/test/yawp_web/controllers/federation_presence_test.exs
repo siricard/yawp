@@ -10,6 +10,8 @@ defmodule YawpWeb.FederationPresenceTest do
   """
   use YawpWeb.ConnCase, async: false
 
+  import Yawp.TestSupport.PubKey
+
   alias Yawp.Federation
   alias Yawp.Federation.DeliveryNonceCache
   alias Yawp.Federation.KeyDocCache
@@ -34,7 +36,7 @@ defmodule YawpWeb.FederationPresenceTest do
   end
 
   defp stub_key_doc(active) do
-    encoded_pub = Base.url_encode64(active.public_key, padding: false)
+    encoded_pub = pubkey_b64(active.public_key)
 
     doc = %{
       "server_id" => @host,

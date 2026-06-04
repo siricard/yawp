@@ -1,5 +1,7 @@
 defmodule YawpWeb.FederationControllerTest do
   use YawpWeb.ConnCase, async: false
+
+  import Yawp.TestSupport.PubKey
   use Oban.Testing, repo: Yawp.Repo
 
   import Bitwise
@@ -26,7 +28,7 @@ defmodule YawpWeb.FederationControllerTest do
   end
 
   defp stub_key_doc(active) do
-    encoded_pub = Base.url_encode64(active.public_key, padding: false)
+    encoded_pub = pubkey_b64(active.public_key)
 
     doc = %{
       "server_id" => @host,
@@ -71,7 +73,7 @@ defmodule YawpWeb.FederationControllerTest do
     %{
       "did" => did_for(pub),
       "profile_version" => version,
-      "public_key" => Base.url_encode64(pub, padding: false),
+      "public_key" => pubkey_b64(pub),
       "anchors" => ["anchor-a.example"],
       "display_name" => "Alice"
     }
@@ -126,7 +128,7 @@ defmodule YawpWeb.FederationControllerTest do
       unsigned = %{
         "did" => did_for(pub),
         "profile_version" => 1,
-        "public_key" => Base.url_encode64(pub, padding: false),
+        "public_key" => pubkey_b64(pub),
         "anchors" => ["anchor-a.example"]
       }
 
@@ -212,7 +214,7 @@ defmodule YawpWeb.FederationControllerTest do
         "did" => did_for(pub),
         "ciphertext" => ciphertext_b64,
         "blob_version" => version,
-        "public_key" => Base.url_encode64(pub, padding: false)
+        "public_key" => pubkey_b64(pub)
       }
       |> sign_inner("signature", priv)
     end
@@ -256,7 +258,7 @@ defmodule YawpWeb.FederationControllerTest do
         %{
           "did" => did_for(master_pub),
           "profile_version" => Keyword.get(opts, :version, 1),
-          "public_key" => Base.url_encode64(master_pub, padding: false),
+          "public_key" => pubkey_b64(master_pub),
           "anchors" => Keyword.get(opts, :anchors, ["anchor-a.example"]),
           "display_name" => "Sender",
           "device_subkeys" => [
@@ -470,7 +472,7 @@ defmodule YawpWeb.FederationControllerTest do
         %{
           "did" => sender_did,
           "profile_version" => 4,
-          "public_key" => Base.url_encode64(master_pub, padding: false),
+          "public_key" => pubkey_b64(master_pub),
           "anchors" => ["anchor-b.example"],
           "display_name" => "Fetched Sender",
           "device_subkeys" => [
@@ -527,7 +529,7 @@ defmodule YawpWeb.FederationControllerTest do
       inner =
         %{
           "did" => did,
-          "public_key" => Base.url_encode64(pub, padding: false),
+          "public_key" => pubkey_b64(pub),
           "device_subkeys" => subkeys,
           "profile_version" => 9
         }
@@ -553,7 +555,7 @@ defmodule YawpWeb.FederationControllerTest do
       inner =
         %{
           "did" => did,
-          "public_key" => Base.url_encode64(pub, padding: false),
+          "public_key" => pubkey_b64(pub),
           "device_subkeys" => %{"subkeys" => []}
         }
         |> sign_inner("signature", priv)
@@ -569,7 +571,7 @@ defmodule YawpWeb.FederationControllerTest do
       inner =
         %{
           "did" => did_for(pub),
-          "public_key" => Base.url_encode64(pub, padding: false),
+          "public_key" => pubkey_b64(pub),
           "device_subkeys" => %{"subkeys" => []}
         }
         |> sign_inner("signature", priv)
@@ -590,7 +592,7 @@ defmodule YawpWeb.FederationControllerTest do
         %{
           "did" => did_for(master_pub),
           "profile_version" => 1,
-          "public_key" => Base.url_encode64(master_pub, padding: false),
+          "public_key" => pubkey_b64(master_pub),
           "anchors" => ["anchor-a.example"],
           "display_name" => "Sender",
           "device_subkeys" => [
