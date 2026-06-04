@@ -70,20 +70,30 @@ defmodule Yawp.Identity do
   end
 
   @spec adopt_identity(map()) :: {:ok, :adopted} | {:error, term()}
-  def adopt_identity(%{"did" => did, "master_public_key" => pk_b64} = envelope)
-      when is_binary(did) and is_binary(pk_b64) do
-    ppe = Map.get(envelope, "ppe", %{})
+  def adopt_identity(%{"did" => did, "master_public_key" => pk_b64, "ppe" => ppe} = envelope)
+      when is_binary(did) and is_binary(pk_b64) and is_map(ppe) do
     source_anchor = Map.get(envelope, "source_anchor")
 
     with {:ok, pk} <- decode_master_key(pk_b64),
          :ok <- verify_did_derivation(did, pk),
-         {:ok, _identity} <- upsert_adopted_identity(did, pk, source_anchor),
-         :ok <- maybe_cache_ppe(ppe) do
+         :ok <- verify_ppe_belongs_to(ppe, did),
+         {:ok, status} when status in [:applied, :stale] <- apply_ppe_if_newer(ppe),
+         {:ok, _identity} <- upsert_adopted_identity(did, pk, source_anchor) do
       {:ok, :adopted}
+    else
+      _ -> {:error, :invalid_adoption}
     end
   end
 
   def adopt_identity(_), do: {:error, :invalid_adoption}
+
+  defp verify_ppe_belongs_to(ppe, did) do
+    if ppe["did"] == did do
+      Yawp.Federation.InnerSignature.verify(ppe, "did", "signature")
+    else
+      {:error, :invalid_adoption}
+    end
+  end
 
   defp decode_master_key(pk_b64) do
     raw = String.replace_prefix(pk_b64, "ed25519:", "")
@@ -116,15 +126,6 @@ defmodule Yawp.Identity do
     })
     |> Ash.create(authorize?: false)
   end
-
-  defp maybe_cache_ppe(ppe) when is_map(ppe) and map_size(ppe) > 0 do
-    case apply_ppe_if_newer(ppe) do
-      {:ok, _} -> :ok
-      {:error, _} -> :ok
-    end
-  end
-
-  defp maybe_cache_ppe(_), do: :ok
 
   @spec apply_ppe_if_newer(map()) :: {:ok, :applied | :stale} | {:error, term()}
   def apply_ppe_if_newer(envelope) when is_map(envelope) do

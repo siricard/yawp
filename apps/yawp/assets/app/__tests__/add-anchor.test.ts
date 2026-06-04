@@ -1,11 +1,5 @@
-/**
- * `submitAddAnchor` registers a second anchor host with the user's
- * primary anchor. It resolves a Bearer token for the primary anchor,
- * normalizes the new host (strips scheme/trailing slash), and calls
- * the generated `addAnchor` RPC binding with the target identity.
- */
-
 import type {Identity} from '../identity-context';
+import type {AnchorProfile} from '../add-anchor';
 
 jest.mock('../ash_generated', () => ({
   addAnchor: jest.fn(),
@@ -39,6 +33,15 @@ function fakeIdentity(): Identity {
   };
 }
 
+function fakeProfile(overrides: Partial<AnchorProfile> = {}): AnchorProfile {
+  return {
+    profileVersion: 1,
+    anchors: ['localhost:4000'],
+    displayName: 'Alice',
+    ...overrides,
+  };
+}
+
 describe('submitAddAnchor', () => {
   beforeEach(() => {
     addAnchorMock.mockReset();
@@ -61,6 +64,7 @@ describe('submitAddAnchor', () => {
       primaryAnchorUrl: 'http://localhost:4000',
       newAnchorHost: 'anchor-b.example',
       identity: fakeIdentity(),
+      profile: fakeProfile(),
     });
 
     expect(result.ok).toBe(true);
@@ -74,6 +78,28 @@ describe('submitAddAnchor', () => {
     }
   });
 
+  test('sends a signed PPE carrying the new anchor and a bumped profile_version', async () => {
+    addAnchorMock.mockResolvedValue({
+      success: true,
+      data: {id: 'x', did: 'did:yawp:zZZZZZZ', anchorList: [], profileVersion: 3},
+    });
+
+    await submitAddAnchor({
+      primaryAnchorUrl: 'http://localhost:4000',
+      newAnchorHost: 'anchor-b.example',
+      identity: fakeIdentity(),
+      profile: fakeProfile({profileVersion: 2, anchors: ['localhost:4000']}),
+    });
+
+    const call = addAnchorMock.mock.calls[0][0];
+    const ppe = call.input.signedPpe as Record<string, unknown>;
+    expect(ppe.did).toBe('did:yawp:zZZZZZZ');
+    expect(ppe.profile_version).toBe(3);
+    expect(ppe.anchors).toContain('anchor-b.example');
+    expect(ppe.anchors).toContain('localhost:4000');
+    expect(typeof ppe.signature).toBe('string');
+  });
+
   test('strips a scheme and trailing slash from the new anchor host', async () => {
     addAnchorMock.mockResolvedValue({
       success: true,
@@ -84,6 +110,7 @@ describe('submitAddAnchor', () => {
       primaryAnchorUrl: 'http://localhost:4000',
       newAnchorHost: 'https://anchor-b.example/',
       identity: fakeIdentity(),
+      profile: fakeProfile(),
     });
 
     const call = addAnchorMock.mock.calls[0][0];
@@ -95,6 +122,7 @@ describe('submitAddAnchor', () => {
       primaryAnchorUrl: 'http://localhost:4000',
       newAnchorHost: '   ',
       identity: fakeIdentity(),
+      profile: fakeProfile(),
     });
 
     expect(result.ok).toBe(false);
@@ -109,6 +137,7 @@ describe('submitAddAnchor', () => {
       primaryAnchorUrl: 'http://localhost:4000',
       newAnchorHost: 'anchor-b.example',
       identity: fakeIdentity(),
+      profile: fakeProfile(),
     });
 
     expect(result.ok).toBe(false);
@@ -126,6 +155,7 @@ describe('submitAddAnchor', () => {
       primaryAnchorUrl: 'http://localhost:4000',
       newAnchorHost: 'anchor-b.example',
       identity: fakeIdentity(),
+      profile: fakeProfile(),
     });
 
     expect(result.ok).toBe(false);

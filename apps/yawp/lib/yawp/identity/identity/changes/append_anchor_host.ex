@@ -1,16 +1,4 @@
 defmodule Yawp.Identity.Identity.Changes.AppendAnchorHost do
-  @moduledoc """
-  Authorizes the actor against the target Identity row and appends a
-  caller-supplied anchor host to `anchor_list`. Unlike
-  `AppendAnchorUrl` (which trusts only the server's own URL during a
-  bind), this change accepts the host the user is adopting as a second
-  anchor — the user is the authority over their own anchor list.
-
-  The actor MUST equal the Identity being modified. Failure →
-  `Yawp.RpcError type: "unauthorized"`. Stashes `:anchor_appended?` on
-  the context so `EnqueueAnchorAdoption` only enqueues when the host
-  was newly added.
-  """
   use Ash.Resource.Change
 
   alias Yawp.RpcError
@@ -44,11 +32,8 @@ defmodule Yawp.Identity.Identity.Changes.AppendAnchorHost do
     if new_anchor in anchors do
       Ash.Changeset.put_context(changeset, :anchor_appended?, false)
     else
-      current_version = Ash.Changeset.get_attribute(changeset, :profile_version) || 0
-
       changeset
       |> Ash.Changeset.force_change_attribute(:anchor_list, anchors ++ [new_anchor])
-      |> Ash.Changeset.force_change_attribute(:profile_version, current_version + 1)
       |> Ash.Changeset.put_context(:anchor_appended?, true)
     end
   end

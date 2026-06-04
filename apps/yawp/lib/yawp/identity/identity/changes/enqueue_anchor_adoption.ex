@@ -1,11 +1,4 @@
 defmodule Yawp.Identity.Identity.Changes.EnqueueAnchorAdoption do
-  @moduledoc """
-  After a new anchor host has been appended to the identity's
-  `anchor_list`, enqueues a `Yawp.Federation.AnchorAdoptionWorker` job
-  that drives the adoption handshake with the new anchor and starts
-  private-blob replication. No-op when the host was already present
-  (read from `:anchor_appended?` stashed by `AppendAnchorHost`).
-  """
   use Ash.Resource.Change
 
   alias Yawp.Federation.AnchorAdoptionWorker

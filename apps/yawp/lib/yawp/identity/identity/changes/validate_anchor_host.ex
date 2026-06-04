@@ -1,10 +1,4 @@
 defmodule Yawp.Identity.Identity.Changes.ValidateAnchorHost do
-  @moduledoc """
-  Validates that the `new_anchor` argument is a bare host (optionally
-  with a port), rejecting schemes, paths, and obviously malformed
-  input before the host reaches `anchor_list`. Failure →
-  `Yawp.RpcError type: "invalid_anchor"`.
-  """
   use Ash.Resource.Change
 
   alias Yawp.RpcError

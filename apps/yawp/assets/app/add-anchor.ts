@@ -1,6 +1,15 @@
 import {addAnchor} from './ash_generated';
+import {canonicalJson} from './canonical-json';
 import {getValidSessionToken} from './session';
 import type {Identity} from './identity-context';
+
+export type AnchorProfile = {
+  profileVersion: number;
+  anchors: string[];
+  displayName?: string | null;
+  avatarRef?: string | null;
+  bio?: string | null;
+};
 
 export type AddAnchorSuccess = {
   ok: true;
@@ -18,6 +27,7 @@ export type AddAnchorResult = AddAnchorSuccess | AddAnchorFailure;
 const SLUG_MESSAGES: Record<string, string> = {
   unauthorized: 'You can only add an anchor to your own identity.',
   invalid_anchor: 'That does not look like a valid anchor host.',
+  invalid_ppe: 'Could not update your profile for the new anchor. Try again.',
   no_session: 'No active session on your primary anchor. Re-add it first.',
   rotation_failed: 'Your session expired. Re-add your primary anchor.',
   internal_error: 'The server hit an internal error. Try again later.',
@@ -39,21 +49,50 @@ function normalizeHost(raw: string): string {
     .replace(/\/+$/, '');
 }
 
-/**
- * Register `newAnchorHost` as a second anchor for the current
- * identity. The request is sent to the user's `primaryAnchorUrl`
- * (where they hold a session); that anchor appends the host to the
- * signed anchor list, bumps `profile_version`, and kicks off the
- * adoption handshake that replicates the user's data to the new
- * anchor.
- */
+function bytesToBase64Url(bytes: Uint8Array): string {
+  let bin = '';
+  for (let i = 0; i < bytes.length; i++) {
+    bin += String.fromCharCode(bytes[i]);
+  }
+  const b64 =
+    typeof btoa === 'function' ? btoa(bin) : Buffer.from(bytes).toString('base64');
+  return b64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+
+function buildSignedPpe(args: {
+  identity: Identity;
+  did: string;
+  profile: AnchorProfile;
+  newAnchor: string;
+}): Record<string, unknown> {
+  const {identity, did, profile, newAnchor} = args;
+  const anchors = profile.anchors.includes(newAnchor)
+    ? profile.anchors
+    : [...profile.anchors, newAnchor];
+
+  const ppe: Record<string, unknown> = {
+    did,
+    public_key: bytesToBase64Url(identity.masterPk),
+    profile_version: profile.profileVersion + 1,
+    anchors,
+  };
+  if (profile.displayName) ppe.display_name = profile.displayName;
+  if (profile.avatarRef) ppe.avatar_ref = profile.avatarRef;
+  if (profile.bio) ppe.bio = profile.bio;
+
+  const canonical = new TextEncoder().encode(canonicalJson(ppe));
+  ppe.signature = bytesToBase64Url(identity.sign(canonical));
+  return ppe;
+}
+
 export async function submitAddAnchor(args: {
   primaryAnchorUrl: string;
   newAnchorHost: string;
   identity: Identity;
+  profile: AnchorProfile;
   fetchImpl?: typeof fetch;
 }): Promise<AddAnchorResult> {
-  const {identity} = args;
+  const {identity, profile} = args;
   const baseFetch = args.fetchImpl ?? fetch;
   const base = normalizeServerUrl(args.primaryAnchorUrl);
   const newAnchor = normalizeHost(args.newAnchorHost);
@@ -75,6 +114,9 @@ export async function submitAddAnchor(args: {
     };
   }
 
+  const did = identity.didFull;
+  const signedPpe = buildSignedPpe({identity, did, profile, newAnchor});
+
   const customFetch: typeof fetch = (input, init) => {
     if (typeof input === 'string' && input.startsWith('/rpc/')) {
       return baseFetch(`${base}${input}`, init);
@@ -85,8 +127,8 @@ export async function submitAddAnchor(args: {
   let result;
   try {
     result = await addAnchor({
-      identity: {did: identity.didFull},
-      input: {newAnchor},
+      identity: {did},
+      input: {newAnchor, signedPpe},
       fields: ['id', 'did', 'anchorList', 'profileVersion'],
       headers: {Authorization: `Bearer ${session.sessionToken}`},
       customFetch,

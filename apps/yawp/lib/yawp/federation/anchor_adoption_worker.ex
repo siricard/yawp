@@ -1,18 +1,5 @@
 defmodule Yawp.Federation.AnchorAdoptionWorker do
-  @moduledoc """
-  Drives the second-anchor adoption handshake.
-
-  Enqueued by the `:add_anchor` action when a user adds a new anchor
-  host. The worker reads the user's canonical PPE from local state,
-  posts a signed adoption envelope to the new anchor (proving the user
-  already exists at this anchor and handing over the signed PPE), then
-  replicates the user's private blob ciphertext to the new anchor so
-  it holds a full copy of the user's data.
-
-  Each POST rides inside the standard signed delivery wrapper
-  (`Yawp.Federation.Client`), so the receiving anchor authenticates
-  this anchor's server signature before applying anything.
-  """
+  @moduledoc false
 
   use Oban.Worker, queue: :default, max_attempts: 5
 

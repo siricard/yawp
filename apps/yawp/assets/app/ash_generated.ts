@@ -203,6 +203,7 @@ export async function executeValidationRpcRequest<T>(
 
 export type AddAnchorInput = {
   newAnchor: string;
+  signedPpe?: Record<string, any> | null;
 };
 
 export type AddAnchorFields = UnifiedFieldSelection<IdentityResourceSchema>[];

@@ -2,7 +2,11 @@ import React, {useState} from 'react';
 import {Text, View} from 'react-native';
 
 import {submitAddAnchor} from '../add-anchor';
-import {useIdentityState, useWorkspaceServers} from '../identity-context';
+import {
+  useDisplayName,
+  useIdentityState,
+  useWorkspaceServers,
+} from '../identity-context';
 import {Banner, Button, Field, Input} from '../ui';
 
 type Props = {
@@ -13,6 +17,7 @@ type Props = {
 export function AddAnchorScreen({onCancel, onAdded}: Props) {
   const identityState = useIdentityState();
   const {servers} = useWorkspaceServers();
+  const {effectiveDisplayName} = useDisplayName();
 
   const primaryAnchorUrl = servers.length > 0 ? servers[0].url : null;
 
@@ -35,10 +40,17 @@ export function AddAnchorScreen({onCancel, onAdded}: Props) {
     setErrorMessage(null);
     setSuccessMessage(null);
 
+    const anchors = servers.map(s => s.url.replace(/^https?:\/\//, '').replace(/\/+$/, ''));
+
     const result = await submitAddAnchor({
       primaryAnchorUrl,
       newAnchorHost,
       identity: identityState.identity,
+      profile: {
+        profileVersion: 0,
+        anchors,
+        displayName: effectiveDisplayName,
+      },
     });
 
     setSubmitting(false);

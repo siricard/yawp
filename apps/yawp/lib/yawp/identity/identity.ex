@@ -142,21 +142,27 @@ defmodule Yawp.Identity.Identity do
 
     update :add_anchor do
       description """
-      Adds a second anchor host to the identity's `anchor_list`,
-      increments `profile_version`, and enqueues the adoption handshake
-      with the new anchor (which starts private-blob replication from
-      the existing anchors). Authenticated: the actor MUST be the
-      Identity being modified. Adding a host that is already present is
-      an idempotent no-op (no version bump, no re-enqueue).
+      Adds a second anchor host to the identity's `anchor_list`, caches
+      the user's freshly re-signed Public Profile Envelope (carrying the
+      new anchor in its own `anchors` list and the bumped
+      `profile_version`), mirrors that version onto the row, and
+      enqueues the adoption handshake with the new anchor (which starts
+      private-blob replication from the existing anchors). Authenticated:
+      the actor MUST be the Identity being modified. Adding a host that
+      is already present is an idempotent no-op (no PPE update, no
+      version bump, no re-enqueue).
       """
 
       require_atomic? false
+      transaction? true
       accept []
 
       argument :new_anchor, :string, allow_nil?: false
+      argument :signed_ppe, :map, allow_nil?: true
 
       change Yawp.Identity.Identity.Changes.ValidateAnchorHost
       change Yawp.Identity.Identity.Changes.AppendAnchorHost
+      change Yawp.Identity.Identity.Changes.CacheUpdatedPpe
       change Yawp.Identity.Identity.Changes.EnqueueAnchorAdoption
     end
 

@@ -95,6 +95,77 @@ defmodule Yawp.Federation.TwoAnchorHarnessTest do
     end
   end
 
+  describe "second-anchor adoption carries the fresh PPE across the boundary" do
+    setup do
+      TwoAnchor.start_pair!()
+    end
+
+    test "B caches a PPE listing B (not a stale one) after A relays an adoption", %{a: a, b: b} do
+      {pub, priv} = :crypto.generate_key(:eddsa, :ed25519)
+      did = "did:yawp:" <> Yawp.Identity.did_from_pubkey(pub)
+      pk_b64 = Base.url_encode64(pub, padding: false)
+      host_b = TwoAnchor.host(b)
+
+      fresh_ppe =
+        %{
+          "did" => did,
+          "public_key" => pk_b64,
+          "profile_version" => 7,
+          "anchors" => [TwoAnchor.host(a), host_b],
+          "display_name" => "Alice"
+        }
+
+      canonical = Yawp.CanonicalJson.encode(fresh_ppe)
+      sig = :crypto.sign(:eddsa, :none, canonical, [priv, :ed25519])
+      signed_ppe = Map.put(fresh_ppe, "signature", Base.url_encode64(sig, padding: false))
+
+      adoption = %{
+        "did" => did,
+        "master_public_key" => pk_b64,
+        "ppe" => signed_ppe,
+        "source_anchor" => TwoAnchor.host(a)
+      }
+
+      body = TwoAnchor.sign_on(a, adoption)
+
+      assert {:ok, %Req.Response{status: 200, body: %{"status" => "adopted"}}} =
+               TwoAnchor.post(b, "/federation/anchors/adopt", body)
+
+      assert {:ok, identity} = TwoAnchor.call(b, Yawp.Identity, :get_identity_by_did, [did])
+      assert TwoAnchor.host(a) in identity.anchor_list
+
+      assert {:ok, stored} = TwoAnchor.call(b, Yawp.Identity, :get_ppe_by_did, [did])
+      assert stored.profile_version == 7
+      assert host_b in stored.envelope["anchors"]
+    end
+
+    test "B refuses the adoption when the relayed PPE is unsigned/invalid", %{a: a, b: b} do
+      {pub, _priv} = :crypto.generate_key(:eddsa, :ed25519)
+      did = "did:yawp:" <> Yawp.Identity.did_from_pubkey(pub)
+      pk_b64 = Base.url_encode64(pub, padding: false)
+
+      adoption = %{
+        "did" => did,
+        "master_public_key" => pk_b64,
+        "ppe" => %{
+          "did" => did,
+          "public_key" => pk_b64,
+          "profile_version" => 2,
+          "anchors" => [TwoAnchor.host(a), TwoAnchor.host(b)],
+          "display_name" => "Alice"
+        },
+        "source_anchor" => TwoAnchor.host(a)
+      }
+
+      body = TwoAnchor.sign_on(a, adoption)
+
+      assert {:ok, %Req.Response{status: 422, body: %{"error" => "invalid_adoption"}}} =
+               TwoAnchor.post(b, "/federation/anchors/adopt", body)
+
+      assert {:ok, nil} = TwoAnchor.call(b, Yawp.Identity, :get_ppe_by_did, [did])
+    end
+  end
+
   describe "B rejects a payload whose signing key is no longer valid on A" do
     setup do
       TwoAnchor.start_pair!()

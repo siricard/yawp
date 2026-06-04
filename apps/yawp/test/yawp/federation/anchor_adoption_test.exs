@@ -67,18 +67,31 @@ defmodule Yawp.Federation.AnchorAdoptionTest do
 
   defp tamper(<<first, rest::binary>>), do: <<bxor(first, 1), rest::binary>>
 
+  defp sign_ppe(payload, priv) do
+    canonical = Yawp.CanonicalJson.encode(Map.delete(payload, "signature"))
+    sig = :crypto.sign(:eddsa, :none, canonical, [priv, :ed25519])
+    Map.put(payload, "signature", Base.url_encode64(sig, padding: false))
+  end
+
   defp adoption_inner(opts \\ []) do
-    {pub, _priv} = :crypto.generate_key(:eddsa, :ed25519)
+    {pub, priv} = :crypto.generate_key(:eddsa, :ed25519)
     did = "did:yawp:" <> Identity.did_from_pubkey(pub)
     encoded_pk = Base.url_encode64(pub, padding: false)
 
-    ppe = %{
+    base_ppe = %{
       "did" => did,
       "profile_version" => Keyword.get(opts, :profile_version, 3),
       "public_key" => encoded_pk,
       "anchors" => Keyword.get(opts, :anchors, [@host]),
       "display_name" => "Alice"
     }
+
+    ppe =
+      if Keyword.get(opts, :sign_ppe?, true) do
+        sign_ppe(base_ppe, priv)
+      else
+        base_ppe
+      end
 
     %{
       did: did,
@@ -149,6 +162,16 @@ defmodule Yawp.Federation.AnchorAdoptionTest do
 
       assert json_response(conn, 200) == %{"status" => "adopted"}
       assert {:ok, _identity} = Identity.get_identity_by_did(did)
+    end
+
+    test "rejects an adoption whose PPE cannot be cached (no identity row written)", %{conn: conn} do
+      %{did: did, inner: inner} = adoption_inner(sign_ppe?: false)
+
+      conn = post_federation(conn, "/federation/anchors/adopt", inner)
+      assert json_response(conn, 422) == %{"error" => "invalid_adoption"}
+
+      assert {:ok, nil} = Identity.get_ppe_by_did(did)
+      assert {:error, %Ash.Error.Invalid{}} = Identity.get_identity_by_did(did)
     end
   end
 end
