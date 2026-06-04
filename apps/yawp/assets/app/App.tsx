@@ -9,6 +9,7 @@ import {discoverGeneralChannel} from './chat/discover';
 import {
   IdentityProvider,
   useIdentityState,
+  useBundleMetadata,
   useWorkspaceServers,
   type Identity,
   type WorkspaceServer,
@@ -73,8 +74,9 @@ export default function App() {
 
 function AppShell() {
   const identityState = useIdentityState();
+  const {metadata} = useBundleMetadata();
   const {servers, removeServer} = useWorkspaceServers();
-  const anchorUrls = servers.map(s => s.url);
+  const anchorUrls = configuredAnchorUrls(metadata.publishedProfile?.anchors);
   const [screen, setScreen] = useState<Screen>({kind: 'home'});
   const [bindingUrl, setBindingUrl] = useState<string | null>(null);
   const [bindError, setBindError] = useState<string | null>(null);
@@ -230,5 +232,15 @@ function AppShell() {
         </View>
       </SafeAreaView>
     </AnchorConnectionProvider>
+  );
+}
+
+export function configuredAnchorUrls(anchors: string[] | undefined): string[] {
+  return Array.from(
+    new Set(
+      (anchors ?? [])
+        .map(anchor => anchor.trim())
+        .filter(anchor => anchor.length > 0),
+    ),
   );
 }

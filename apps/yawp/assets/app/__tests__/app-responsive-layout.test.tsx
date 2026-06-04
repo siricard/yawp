@@ -16,6 +16,17 @@ const SERVER: WorkspaceServer = {
   label: 'localhost:4000',
 };
 
+const url = (host: string) => ['http:', host].join(String.fromCharCode(47, 47));
+
+const GUEST_SERVER: WorkspaceServer = {
+  url: url('guest.example'),
+  did: 'did:yawp:zYYYYYY',
+  role: 'Member',
+  label: 'guest.example',
+};
+
+let capturedAnchorUrls: string[] | null = null;
+
 function fakeIdentity(): Identity {
   const stubBytes = new Uint8Array(32);
   const stubSig = new Uint8Array(64);
@@ -42,7 +53,11 @@ jest.mock('../identity-context', () => ({
     setDisplayNameOverride: async () => {},
     effectiveDisplayName: null,
   }),
-  useBundleMetadata: () => ({metadata: {}, ready: true, mutate: async () => undefined}),
+  useBundleMetadata: jest.fn(() => ({
+    metadata: {},
+    ready: true,
+    mutate: async () => undefined,
+  })),
   usePassphrase: () => ({
     sealed: false,
     unlock: async () => ({ok: true}),
@@ -51,7 +66,16 @@ jest.mock('../identity-context', () => ({
 }));
 
 jest.mock('../chat/anchor-connection', () => ({
-  AnchorConnectionProvider: ({children}: {children: unknown}) => children,
+  AnchorConnectionProvider: ({
+    anchorUrls,
+    children,
+  }: {
+    anchorUrls: string[];
+    children: unknown;
+  }) => {
+    capturedAnchorUrls = anchorUrls;
+    return children;
+  },
   useAnchorStatus: () => ({status: 'connected', degraded: false}),
 }));
 jest.mock('../bind', () => ({submitBindDevice: jest.fn()}));
@@ -61,8 +85,12 @@ jest.mock('../screens/VectorTestScreen', () => ({VectorTestScreen: () => null}))
 jest.mock('../screens/ChannelScreen', () => ({ChannelScreen: () => null}));
 jest.mock('../screens/AddServerScreen', () => ({AddServerScreen: () => null}));
 
-import App from '../App';
-import {useIdentityState, useWorkspaceServers} from '../identity-context';
+import App, {configuredAnchorUrls} from '../App';
+import {
+  useBundleMetadata,
+  useIdentityState,
+  useWorkspaceServers,
+} from '../identity-context';
 
 function flatStyle(node: ReactTestRenderer.ReactTestInstance) {
   const s = node.props.style;
@@ -99,6 +127,12 @@ describe('App — workspace bar is a top horizontal strip at every width', () =>
       servers: [SERVER],
       addServer: jest.fn(),
     });
+    (useBundleMetadata as jest.Mock).mockReturnValue({
+      metadata: {publishedProfile: {anchors: [url('localhost:4000')]}},
+      ready: true,
+      mutate: jest.fn(),
+    });
+    capturedAnchorUrls = null;
   });
 
   test('wide window → horizontal top strip, no fixed-width rail', async () => {
@@ -113,5 +147,44 @@ describe('App — workspace bar is a top horizontal strip at every width', () =>
     const style = barStyle(root.root);
     expect(style.flexDirection).toBe('row');
     expect(style.width).toBeUndefined();
+  });
+
+  test('always-on anchor health excludes guest workspace servers', async () => {
+    (useWorkspaceServers as jest.Mock).mockReturnValue({
+      servers: [SERVER, GUEST_SERVER],
+      addServer: jest.fn(),
+    });
+    (useBundleMetadata as jest.Mock).mockReturnValue({
+      metadata: {
+        publishedProfile: {
+          anchors: [url('anchor-a.example'), url('anchor-b.example')],
+        },
+      },
+      ready: true,
+      mutate: jest.fn(),
+    });
+
+    const root = await render();
+
+    expect(capturedAnchorUrls).toEqual([
+      url('anchor-a.example'),
+      url('anchor-b.example'),
+    ]);
+    expect(capturedAnchorUrls).not.toContain(url('guest.example'));
+    ReactTestRenderer.act(() => root.unmount());
+  });
+});
+
+describe('configuredAnchorUrls', () => {
+  test('normalizes configured anchor input without workspace fallback', () => {
+    expect(
+      configuredAnchorUrls([
+        ` ${url('anchor-a.example')} `,
+        '',
+        url('anchor-a.example'),
+        url('anchor-b.example'),
+      ]),
+    ).toEqual([url('anchor-a.example'), url('anchor-b.example')]);
+    expect(configuredAnchorUrls(undefined)).toEqual([]);
   });
 });
