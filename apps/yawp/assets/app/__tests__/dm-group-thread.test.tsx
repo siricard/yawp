@@ -2,9 +2,18 @@ import React from 'react';
 import ReactTestRenderer from 'react-test-renderer';
 
 const mockStatus = {value: {status: 'connected', degraded: false}};
+const mockMutate = jest.fn(async mut => mut({}));
 
 jest.mock('../chat/anchor-connection', () => ({
   useAnchorStatus: () => mockStatus.value,
+}));
+
+jest.mock('../identity-context', () => ({
+  useOptionalBundleMetadata: () => ({
+    metadata: {pinnedPeers: ['conv-alice']},
+    ready: true,
+    mutate: mockMutate,
+  }),
 }));
 
 import {DmListScreen} from '../screens/DmListScreen';
@@ -110,6 +119,79 @@ describe('DmListScreen group thread', () => {
     });
 
     expect(submitted).toEqual([['did:yawp:bob', 'did:yawp:carol']]);
+
+    ReactTestRenderer.act(() => root.unmount());
+  });
+
+  test('reply preview uses display name and grouped sender headers collapse', () => {
+    let root!: ReactTestRenderer.ReactTestRenderer;
+    ReactTestRenderer.act(() => {
+      root = ReactTestRenderer.create(
+        <DmListScreen
+          onBack={() => {}}
+          conversation={{
+            participants: [
+              {did: 'did:yawp:alice', label: 'Alice'},
+              {did: 'did:yawp:bob', label: 'Bob'},
+            ],
+            messages: [
+              {id: 'm1', senderDid: 'did:yawp:alice', body: 'hello', delivery: 'sent'},
+              {id: 'm2', senderDid: 'did:yawp:alice', body: 'follow-up', delivery: 'sent'},
+              {id: 'm3', senderDid: 'did:yawp:bob', replyToId: 'm1', body: 'replying', delivery: 'sent'},
+            ],
+          }}
+        />,
+      );
+    });
+
+    expect(root.root.findAllByProps({testID: 'dm-message-sender-m1'}).length).toBeGreaterThan(0);
+    expect(root.root.findAllByProps({testID: 'dm-message-sender-m2'})).toHaveLength(0);
+    const quote = root.root.findByProps({testID: 'dm-reply-quote-m3'});
+    const text = root.root
+      .findAllByType(require('react-native').Text)
+      .map(n => n.props.children)
+      .flat(Infinity)
+      .join(' ');
+    expect(text).toContain('Alice');
+    expect(text).not.toContain('did:yawp:alice');
+
+    ReactTestRenderer.act(() => root.unmount());
+  });
+
+  test('dedicated page renders pinned, recent, and all sections keyed by conversation id', async () => {
+    let root!: ReactTestRenderer.ReactTestRenderer;
+    await ReactTestRenderer.act(async () => {
+      root = ReactTestRenderer.create(
+        <DmListScreen
+          onBack={() => {}}
+          conversations={[
+            {
+              conversationId: 'conv-bob',
+              pinnedPosition: 2,
+              lastActivityAt: '2026-01-01T12:00:00.000Z',
+              participants: [{did: 'did:yawp:bob', label: 'Bob'}],
+              messages: [],
+            },
+            {
+              conversationId: 'conv-alice',
+              pinnedPosition: 1,
+              lastActivityAt: '2026-01-01T13:00:00.000Z',
+              participants: [{did: 'did:yawp:alice', label: 'Alice'}],
+              messages: [],
+            },
+          ]}
+        />,
+      );
+    });
+
+    expect(root.root.findByProps({testID: 'dm-section-pinned'})).toBeTruthy();
+    expect(root.root.findByProps({testID: 'dm-section-recent'})).toBeTruthy();
+    expect(root.root.findByProps({testID: 'dm-section-all'})).toBeTruthy();
+    expect(root.root.findAllByProps({testID: 'dm-conversation-conv-bob'}).length).toBeGreaterThan(0);
+
+    ReactTestRenderer.act(() => {
+      root.root.findAllByProps({testID: 'dm-pin-conv-bob'})[0].props.onPress();
+    });
 
     ReactTestRenderer.act(() => root.unmount());
   });

@@ -1,5 +1,5 @@
 import React, {useEffect, useRef, useState} from 'react';
-import {Platform, Pressable, Text, View} from 'react-native';
+import {Platform, Pressable, ScrollView, Text, View} from 'react-native';
 
 import {useAnchorStatus} from '../chat/anchor-connection';
 import {
@@ -31,11 +31,15 @@ type DmThreadMessage = DmOutboxItem & {
   senderDid?: string;
   recipientDids?: string[];
   deliveryStates?: PerRecipientDelivery[];
+  replyToId?: string | null;
 };
 
 type DmConversation = {
+  conversationId?: string;
   participants: DmParticipant[];
   messages: DmThreadMessage[];
+  lastActivityAt?: string;
+  pinnedPosition?: number | null;
   isRequest?: boolean;
 };
 
@@ -43,15 +47,17 @@ export function DmListScreen({
   onBack,
   availablePeers = [],
   conversation,
+  conversations,
   onStartConversation,
 }: {
   onBack: () => void;
   availablePeers?: DmParticipant[];
   conversation?: DmConversation;
+  conversations?: DmConversation[];
   onStartConversation?: (recipientDids: string[]) => void;
 }) {
   const {degraded} = useAnchorStatus();
-  const {mutate} = useOptionalBundleMetadata();
+  const {metadata, mutate} = useOptionalBundleMetadata();
   const [draft, setDraft] = useState('');
   const [items, setItems] = useState<DmThreadMessage[]>(conversation?.messages ?? []);
   const [accepted, setAccepted] = useState(false);
@@ -91,6 +97,8 @@ export function DmListScreen({
 
   const isRequest = Boolean(conversation?.isRequest && !accepted);
   const requestSender = conversation?.participants[0];
+  const visibleConversations = conversations ?? (conversation ? [conversation] : []);
+  const pinnedIds = new Set(metadataPinnedPeers(metadata));
 
   async function acceptRequest() {
     if (!requestSender) return;
@@ -101,25 +109,48 @@ export function DmListScreen({
     setAccepted(true);
   }
 
+  async function togglePin(target: DmConversation) {
+    const key = target.conversationId ?? target.participants.map(p => p.did).sort().join('|');
+    await mutate(prev => {
+      const existing = metadataPinnedPeers(prev);
+      const pinned = existing.includes(key)
+        ? existing.filter(id => id !== key)
+        : [...existing, key];
+      return {...prev, pinnedPeers: pinned} as typeof prev;
+    });
+  }
+
+  if (!conversation && visibleConversations.length > 0) {
+    return (
+      <View testID="dm-list-screen" className="flex-1 bg-bg">
+        <DmHeader onBack={onBack} />
+        <ScrollView className="flex-1 px-6 py-4">
+          <DmSection
+            title="Pinned"
+            conversations={sortPinned(visibleConversations)}
+            pinnedIds={pinnedIds}
+            onTogglePin={togglePin}
+          />
+          <DmSection
+            title="Recent"
+            conversations={sortRecent(visibleConversations)}
+            pinnedIds={pinnedIds}
+            onTogglePin={togglePin}
+          />
+          <DmSection
+            title="All"
+            conversations={sortAll(visibleConversations)}
+            pinnedIds={pinnedIds}
+            onTogglePin={togglePin}
+          />
+        </ScrollView>
+      </View>
+    );
+  }
+
   return (
     <View testID="dm-list-screen" className="flex-1 bg-bg">
-      <View className="px-6 py-3 border-b border-border-soft flex-row items-center bg-surface">
-        <Pressable
-          testID="dm-back-button"
-          accessibilityRole="button"
-          accessibilityLabel="back"
-          onPress={onBack}
-          style={pointerCursor}
-          className="mr-3 w-8 h-8 rounded-pill bg-surface-2 active:bg-surface-3 items-center justify-center">
-          <Text className="text-text-secondary text-sm">‹</Text>
-        </Pressable>
-        <Text className="text-base font-bold text-text">
-          <Text className="text-primary" style={{fontFamily: monospace}}>
-            @
-          </Text>{' '}
-          Direct messages
-        </Text>
-      </View>
+      <DmHeader onBack={onBack} />
 
       <View className="flex-1 px-6 py-4">
         {isRequest ? (
@@ -179,12 +210,30 @@ export function DmListScreen({
           </View>
         ) : (
           <View testID="dm-message-list" style={{gap: 8}}>
-            {items.map(item => (
+            {items.map((item, index) => {
+              const previous = items[index - 1];
+              const showHeader =
+                !previous ||
+                previous.senderDid !== item.senderDid ||
+                item.senderDid === undefined;
+              const replyTo = item.replyToId
+                ? items.find(existing => existing.id === item.replyToId) ?? null
+                : null;
+              return (
               <View
                 key={item.id}
                 testID={`dm-message-${item.id}`}
                 className="bg-surface-2 rounded-md px-3 py-2">
-                {item.senderDid ? (
+                {replyTo ? (
+                  <View
+                    testID={`dm-reply-quote-${item.id}`}
+                    className="mb-1 pl-3 border-l-2 border-border-soft">
+                    <Text className="text-xs text-text-secondary" numberOfLines={1}>
+                      ↳ {replyTo.senderDid ? participantLabels.get(replyTo.senderDid) ?? 'Unknown' : 'Unknown'}
+                    </Text>
+                  </View>
+                ) : null}
+                {item.senderDid && showHeader ? (
                   <Text
                     testID={`dm-message-sender-${item.id}`}
                     className="text-xs font-bold text-text-secondary mb-1">
@@ -202,7 +251,8 @@ export function DmListScreen({
                   <DeliveryIndicator item={item} />
                 )}
               </View>
-            ))}
+              );
+            })}
           </View>
         )}
       </View>
@@ -247,6 +297,105 @@ export function DmListScreen({
     </View>
   );
 }
+
+function DmHeader({onBack}: {onBack: () => void}) {
+  return (
+    <View className="px-6 py-3 border-b border-border-soft flex-row items-center bg-surface">
+      <Pressable
+        testID="dm-back-button"
+        accessibilityRole="button"
+        accessibilityLabel="back"
+        onPress={onBack}
+        style={pointerCursor}
+        className="mr-3 w-8 h-8 rounded-pill bg-surface-2 active:bg-surface-3 items-center justify-center">
+        <Text className="text-text-secondary text-sm">‹</Text>
+      </Pressable>
+      <Text className="text-base font-bold text-text">
+        <Text className="text-primary" style={{fontFamily: monospace}}>
+          @
+        </Text>{' '}
+        Direct messages
+      </Text>
+    </View>
+  );
+}
+
+function DmSection({
+  title,
+  conversations,
+  pinnedIds,
+  onTogglePin,
+}: {
+  title: string;
+  conversations: DmConversation[];
+  pinnedIds: Set<string>;
+  onTogglePin: (conversation: DmConversation) => void;
+}) {
+  return (
+    <View testID={`dm-section-${title.toLowerCase()}`} className="mb-5">
+      <Text className="text-xs uppercase text-text-tertiary mb-2" style={{fontFamily: monospace}}>
+        {title}
+      </Text>
+      <View style={{gap: 8}}>
+        {conversations.map(conversation => {
+          const id = conversation.conversationId ?? conversation.participants.map(p => p.did).sort().join('|');
+          const label = conversation.participants.map(p => p.label).join(', ');
+          return (
+            <View
+              key={id}
+              testID={`dm-conversation-${id}`}
+              className="rounded-lg border border-border-soft bg-surface px-4 py-3 flex-row items-center justify-between">
+              <View className="flex-1">
+                <Text className="text-sm font-bold text-text">{label}</Text>
+                <Text className="text-xs text-text-tertiary" style={{fontFamily: monospace}}>
+                  {id}
+                </Text>
+              </View>
+              <Pressable
+                testID={`dm-pin-${id}`}
+                accessibilityRole="button"
+                accessibilityLabel={pinnedIds.has(id) ? 'unpin peer' : 'pin peer'}
+                onPress={() => onTogglePin(conversation)}
+                style={pointerCursor}
+                className="px-3 py-1 rounded-pill bg-surface-2">
+                <Text className="text-xs text-text-secondary">
+                  {pinnedIds.has(id) ? 'Unpin' : 'Pin'}
+                </Text>
+              </Pressable>
+            </View>
+          );
+        })}
+      </View>
+    </View>
+  );
+}
+
+function sortPinned(conversations: DmConversation[]): DmConversation[] {
+  return conversations
+    .filter(c => typeof c.pinnedPosition === 'number')
+    .sort((a, b) => (a.pinnedPosition ?? 0) - (b.pinnedPosition ?? 0));
+}
+
+function sortRecent(conversations: DmConversation[]): DmConversation[] {
+  return [...conversations].sort(
+    (a, b) =>
+      new Date(b.lastActivityAt ?? 0).getTime() -
+      new Date(a.lastActivityAt ?? 0).getTime(),
+  );
+}
+
+function sortAll(conversations: DmConversation[]): DmConversation[] {
+  return [...conversations].sort((a, b) =>
+    a.participants.map(p => p.label).join(', ').localeCompare(b.participants.map(p => p.label).join(', ')),
+  );
+}
+
+function metadataPinnedPeers(meta: unknown): string[] {
+  if (!meta || typeof meta !== 'object') return [];
+  const peers = (meta as {pinnedPeers?: unknown}).pinnedPeers;
+  return Array.isArray(peers) ? peers.filter((peer): peer is string => typeof peer === 'string') : [];
+}
+
 
 function DeliveryIndicator({item}: {item: DmThreadMessage}) {
   const recipients = item.recipientDids ?? [];

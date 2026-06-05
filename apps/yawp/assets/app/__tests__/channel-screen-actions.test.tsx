@@ -1,4 +1,5 @@
 import React from 'react';
+import {Platform} from 'react-native';
 import ReactTestRenderer from 'react-test-renderer';
 
 import type {ChannelMessage} from '../chat/channel-store';
@@ -187,12 +188,40 @@ describe('ChannelScreen message actions', () => {
 
   test('a reply renders a quote card above the message', () => {
     mockMessages = [
-      msg({id: 'parent', body: 'original', server_serial: 1}),
+      msg({id: 'parent', body: 'original', sender_did: 'zOther', sender_display_name: 'Alice', server_serial: 1}),
       msg({id: 'child', reply_to_message_id: 'parent', server_serial: 2}),
     ];
     const root = render();
     expect(
       root.root.findAllByProps({testID: 'reply-quote-child'}).length,
     ).toBeGreaterThan(0);
+    const text = root.root
+      .findAllByType(require('react-native').Text)
+      .map(n => n.props.children)
+      .flat(Infinity)
+      .join(' ');
+    expect(text).toContain('Alice');
+    expect(text).not.toContain('did:yawp');
+  });
+
+  test('message actions are hover-gated on web', () => {
+    Object.defineProperty(Platform, 'OS', {value: 'web'});
+    const root = render();
+    expect(root.root.findByProps({testID: 'message-actions-m-1'}).props.className).toContain(
+      'group-hover:opacity-100',
+    );
+    Object.defineProperty(Platform, 'OS', {value: 'ios'});
+  });
+
+  test('successive same-author messages render one author header', () => {
+    mockMessages = [
+      msg({id: 'run-1', sender_did: 'zOther', sender_display_name: 'Alice', server_inserted_at: '2026-01-01T12:00:00.000Z'}),
+      msg({id: 'run-2', sender_did: 'zOther', sender_display_name: 'Alice', server_inserted_at: '2026-01-01T12:01:00.000Z'}),
+      msg({id: 'run-3', sender_did: 'zOther', sender_display_name: 'Alice', server_inserted_at: '2026-01-01T12:02:00.000Z'}),
+    ];
+    const root = render();
+    expect(root.root.findAllByProps({testID: 'message-author-header-run-1'}).length).toBeGreaterThan(0);
+    expect(root.root.findAllByProps({testID: 'message-author-header-run-2'})).toHaveLength(0);
+    expect(root.root.findAllByProps({testID: 'message-author-header-run-3'})).toHaveLength(0);
   });
 });

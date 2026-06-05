@@ -70,6 +70,7 @@ function MessageRow({
   selfDid,
   selfDisplayName,
   replyTo,
+  showHeader,
   canManageMessages,
   isEditing,
   editDraft,
@@ -84,6 +85,7 @@ function MessageRow({
   selfDid: string | null;
   selfDisplayName: string | null;
   replyTo: ChannelMessage | null;
+  showHeader: boolean;
   canManageMessages: boolean;
   isEditing: boolean;
   editDraft: string;
@@ -118,18 +120,21 @@ function MessageRow({
           </Text>
         </View>
       ) : null}
-      <View className="flex-row items-baseline" style={{gap: 8}}>
-        <Text
-          className="text-sm font-bold text-text"
-          style={{fontFamily: monospace}}>
-          {label}
-        </Text>
-        <Text
-          className="text-xs text-text-tertiary"
-          style={{fontFamily: monospace}}>
-          {formatTimestamp(message.server_inserted_at)}
-        </Text>
-      </View>
+      {showHeader ? (
+        <View className="flex-row items-baseline" style={{gap: 8}}>
+          <Text
+            testID={`message-author-header-${message.id}`}
+            className="text-sm font-bold text-text"
+            style={{fontFamily: monospace}}>
+            {label}
+          </Text>
+          <Text
+            className="text-xs text-text-tertiary"
+            style={{fontFamily: monospace}}>
+            {formatTimestamp(message.server_inserted_at)}
+          </Text>
+        </View>
+      ) : null}
 
       {isEditing ? (
         <View style={{marginTop: 4}}>
@@ -175,7 +180,10 @@ function MessageRow({
       {!isEditing && !deleted ? (
         <View
           testID={`message-actions-${message.id}`}
-          className="flex-row mt-1"
+          className={[
+            'flex-row mt-1',
+            Platform.OS === 'web' ? 'opacity-0 group-hover:opacity-100' : '',
+          ].join(' ')}
           style={{gap: 10}}>
           <Pressable
             testID={`message-reply-${message.id}`}
@@ -370,12 +378,16 @@ export function ChannelScreen({
     null,
   );
   const [showMembers, setShowMembers] = useState(false);
-  const listRef = useRef<FlatList<ChannelMessage> | null>(null);
+  const listRef = useRef<FlatList<{message: ChannelMessage; showHeader: boolean}> | null>(null);
 
   const members = Array.from(new Set(messages.map(m => m.sender_did)));
 
   const messagesById = useRef<Map<string, ChannelMessage>>(new Map());
   messagesById.current = new Map(messages.map(m => [m.id, m]));
+  const groupedMessages = messages.map((message, index) => ({
+    message,
+    showHeader: shouldShowAuthorHeader(messages[index - 1], message),
+  }));
 
   useEffect(() => {
     requestAnimationFrame(() => {
@@ -495,12 +507,12 @@ export function ChannelScreen({
         </View>
       ) : null}
 
-      <FlatList
+      <FlatList<{message: ChannelMessage; showHeader: boolean}>
         testID="channel-message-list"
         ref={listRef}
         className="flex-1"
-        data={messages}
-        keyExtractor={message => message.id}
+        data={groupedMessages}
+        keyExtractor={item => item.message.id}
         contentContainerStyle={{paddingVertical: 12}}
         initialNumToRender={20}
         maxToRenderPerBatch={20}
@@ -509,11 +521,14 @@ export function ChannelScreen({
         onContentSizeChange={() =>
           listRef.current?.scrollToEnd({animated: false})
         }
-        renderItem={({item: message}) => (
+        renderItem={({item}) => {
+          const message = item.message;
+          return (
           <MessageRow
             message={message}
             selfDid={selfDid}
             selfDisplayName={effectiveDisplayName}
+            showHeader={item.showHeader}
             replyTo={
               message.reply_to_message_id
                 ? messagesById.current.get(message.reply_to_message_id) ?? null
@@ -529,7 +544,8 @@ export function ChannelScreen({
             onReply={() => setReplyTo(message)}
             onDelete={() => setPendingDelete(message)}
           />
-        )}
+          );
+        }}
       />
 
       {pendingDelete ? (
@@ -630,4 +646,17 @@ export function ChannelScreen({
       ) : null}
     </KeyboardAvoidingView>
   );
+}
+
+function shouldShowAuthorHeader(
+  previous: ChannelMessage | undefined,
+  current: ChannelMessage,
+): boolean {
+  if (!previous) return true;
+  if (previous.sender_did !== current.sender_did) return true;
+  const prevTime = new Date(previous.server_inserted_at).getTime();
+  const currentTime = new Date(current.server_inserted_at).getTime();
+  if (!Number.isFinite(prevTime) || !Number.isFinite(currentTime)) return true;
+  const groupingWindowMs = 300000;
+  return currentTime - prevTime > groupingWindowMs;
 }

@@ -25,6 +25,7 @@ type Props = {
   onSelectChannel: (channel: TreeChannel) => void;
   recentDms?: RecentDm[];
   onOpenDmList?: () => void;
+  onSelectRecentDm?: (dm: RecentDm) => void;
   editMode?: boolean;
   editAvailable?: boolean;
   onToggleEdit?: () => void;
@@ -39,7 +40,7 @@ type Props = {
 function Divider() {
   return (
     <View
-      style={{width: 1, height: 22, marginHorizontal: 4}}
+      style={{width: 1, height: 26, marginHorizontal: 8}}
       className="bg-border-soft"
     />
   );
@@ -123,10 +124,10 @@ function ChannelTab({
         accessibilityRole="button"
         accessibilityLabel={`channel ${channel.name}`}
         onPress={onSelect}
-        style={[{paddingVertical: 6, paddingHorizontal: 12}, pointerCursor]}
+        style={[{paddingVertical: 8, paddingHorizontal: 12}, pointerCursor]}
         className={[
-          'rounded-pill flex-row items-center',
-          active ? 'bg-surface-2 border border-border-soft' : '',
+          'rounded-pill flex-row items-center border',
+          active ? 'bg-surface-2 border-border-soft' : 'border-transparent',
           dragging ? 'opacity-40' : '',
         ].join(' ')}>
         <Text
@@ -172,6 +173,7 @@ export function TabRow({
   onSelectChannel,
   recentDms = [],
   onOpenDmList,
+  onSelectRecentDm,
   editMode = false,
   editAvailable = false,
   onToggleEdit,
@@ -253,17 +255,17 @@ export function TabRow({
       testID="tab-row"
       accessibilityLabel="channel tab row"
       className="bg-bg border-b border-border"
-      style={{flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 8}}>
+      style={{flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 10}}>
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
-        contentContainerStyle={{flexDirection: 'row', alignItems: 'center', gap: 4}}>
+        contentContainerStyle={{flexDirection: 'row', alignItems: 'center', gap: 6}}>
         <View
           testID="recent-dm-section"
-          style={{flexDirection: 'row', alignItems: 'center', gap: 4}}>
+          style={{flexDirection: 'row', alignItems: 'center', gap: 6}}>
           <Text
             className="text-text-tertiary uppercase"
-            style={{fontFamily: monospace, fontSize: 10, fontWeight: '600', letterSpacing: 1, paddingHorizontal: 4}}>
+            style={{fontFamily: monospace, fontSize: 10, fontWeight: '700', letterSpacing: 1, paddingHorizontal: 4}}>
             Recent
           </Text>
           {recentDms.map(dm => (
@@ -272,9 +274,14 @@ export function TabRow({
               testID={`dm-tab-${dm.id}`}
               accessibilityRole="button"
               accessibilityLabel={`direct message ${dm.label}`}
-              onPress={onOpenDmList}
-              style={[{paddingVertical: 6, paddingHorizontal: 12}, pointerCursor]}
-              className="rounded-pill flex-row items-center">
+              onPress={() => (onSelectRecentDm ? onSelectRecentDm(dm) : onOpenDmList?.())}
+              style={[{paddingVertical: 6, paddingHorizontal: 8}, pointerCursor]}
+              className="rounded-pill flex-row items-center bg-surface-2 border border-border-soft">
+              <View className="w-5 h-5 rounded-pill bg-surface-3 items-center justify-center mr-2">
+                <Text className="text-[10px] font-bold text-text">
+                  {dm.label.slice(0, 1).toUpperCase()}
+                </Text>
+              </View>
               <Text className="text-xs font-semibold text-text-secondary">
                 {dm.label}
               </Text>
@@ -291,7 +298,7 @@ export function TabRow({
             accessibilityLabel="more direct messages"
             onPress={onOpenDmList}
             style={[{paddingVertical: 6, paddingHorizontal: 12}, pointerCursor]}
-            className="rounded-pill flex-row items-center">
+            className="rounded-pill flex-row items-center bg-surface border border-border-soft">
             <Text className="text-xs font-semibold text-text-tertiary">
               More →
             </Text>
