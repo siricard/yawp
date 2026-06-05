@@ -3,6 +3,7 @@ import {
   IdentityProvider,
   useOnboarding,
   usePassphrase,
+  useDisplayName,
 } from '../identity-context';
 import {loadStoredEntry} from '../identity/storage-bundle';
 import {
@@ -52,6 +53,7 @@ function installPasskeyAuthenticator(prf: Uint8Array) {
       isUserVerifyingPlatformAuthenticatorAvailable: jest
         .fn()
         .mockResolvedValue(true),
+      getClientCapabilities: jest.fn().mockResolvedValue({prf: true}),
     },
   });
   Object.defineProperty(globalThis, 'navigator', {
@@ -90,6 +92,10 @@ type Handles = {
   finish: ReturnType<typeof useOnboarding>['finish'];
   enrollPasskey: ReturnType<typeof usePassphrase>['enrollPasskey'];
   unlockWithPasskey: ReturnType<typeof usePassphrase>['unlockWithPasskey'];
+  unlock: ReturnType<typeof usePassphrase>['unlock'];
+  changePassphrase: ReturnType<typeof usePassphrase>['changePassphrase'];
+  setDisplayNameOverride: ReturnType<typeof useDisplayName>['setDisplayNameOverride'];
+  displayName: string | null;
   passkeyEnrolled: boolean;
 };
 
@@ -97,8 +103,25 @@ function makeHarness() {
   const handles: {current: Handles | null} = {current: null};
   function Probe() {
     const {complete, finish} = useOnboarding();
-    const {enrollPasskey, unlockWithPasskey, passkeyEnrolled} = usePassphrase();
-    handles.current = {complete, finish, enrollPasskey, unlockWithPasskey, passkeyEnrolled};
+    const {
+      enrollPasskey,
+      unlockWithPasskey,
+      unlock,
+      changePassphrase,
+      passkeyEnrolled,
+    } = usePassphrase();
+    const {setDisplayNameOverride, displayName} = useDisplayName();
+    handles.current = {
+      complete,
+      finish,
+      enrollPasskey,
+      unlockWithPasskey,
+      unlock,
+      changePassphrase,
+      setDisplayNameOverride,
+      displayName,
+      passkeyEnrolled,
+    };
     return null;
   }
   return {handles, Probe};
@@ -134,6 +157,7 @@ describe('web passkey identity seal', () => {
     const bundle = makeBundle();
     const passkey = await enrollPasskeySeal(bundle);
     expect(passkey.credentialId).toBeTruthy();
+    expect(passkey.envelope).toBeDefined();
     const unsealed = await unlockPasskeySeal(passkey);
     expect(unsealed.bundle).toEqual(bundle);
     expect(JSON.stringify(passkey)).not.toContain(bundle.master.sk);
@@ -167,6 +191,8 @@ describe('web passkey identity seal', () => {
     expect(entry!.kind).toBe('sealed');
     if (entry!.kind !== 'sealed') throw new Error('expected sealed');
     expect(entry!.envelope.passkey).toBeDefined();
+    expect(entry!.envelope.passkey!.wrappedSealKey).toBeDefined();
+    expect(entry!.envelope.passkey!.envelope).toBeUndefined();
 
     await ReactTestRenderer.act(async () => {
       root!.unmount();
@@ -187,8 +213,69 @@ describe('web passkey identity seal', () => {
       expect(result).toEqual({ok: true});
     });
     await ReactTestRenderer.act(async () => {
+      const result = await remount.handles.current!.changePassphrase({
+        current: PASSPHRASE,
+        next: 'next correct horse',
+      });
+      expect(result).toEqual({ok: true});
+    });
+    await ReactTestRenderer.act(async () => {
       root!.unmount();
     });
+  });
+
+  test('passkey unlock reads the current passphrase envelope after metadata changes', async () => {
+    const {handles, Probe} = makeHarness();
+    let root: ReactTestRenderer.ReactTestRenderer | null = null;
+    await ReactTestRenderer.act(async () => {
+      root = ReactTestRenderer.create(
+        <IdentityProvider>
+          <Probe />
+        </IdentityProvider>,
+      );
+    });
+    await settle();
+
+    await ReactTestRenderer.act(async () => {
+      await handles.current!.complete({passphrase: PASSPHRASE, displayName: null});
+      handles.current!.finish();
+    });
+    await settle();
+
+    await ReactTestRenderer.act(async () => {
+      expect(await handles.current!.enrollPasskey()).toEqual({ok: true});
+      await handles.current!.setDisplayNameOverride('Fresh Passkey Name');
+    });
+
+    await ReactTestRenderer.act(async () => {
+      root!.unmount();
+    });
+
+    const remount = makeHarness();
+    const RemountProbe = remount.Probe;
+    await ReactTestRenderer.act(async () => {
+      root = ReactTestRenderer.create(
+        <IdentityProvider>
+          <RemountProbe />
+        </IdentityProvider>,
+      );
+    });
+    await settle();
+    await ReactTestRenderer.act(async () => {
+      expect(await remount.handles.current!.unlockWithPasskey()).toEqual({ok: true});
+    });
+    expect(remount.handles.current!.displayName).toBe('Fresh Passkey Name');
+    await ReactTestRenderer.act(async () => {
+      root!.unmount();
+    });
+  });
+
+  test('detects missing PRF support before enrollment prompts', async () => {
+    (globalThis as any).PublicKeyCredential.getClientCapabilities = jest
+      .fn()
+      .mockResolvedValue({prf: false});
+    await expect(canUsePasskeyPrf()).resolves.toBe(false);
+    expect((globalThis.navigator as any).credentials.create).not.toHaveBeenCalled();
   });
 
   test('reports unavailable when browser credential APIs are missing', async () => {

@@ -31,7 +31,12 @@ export type SealedEnvelopeV2 = {
     credentialId: string;
     label: string;
     salt: string;
-    envelope: SealedEnvelopeV2;
+    wrappedSealKey?: {
+      version: 1;
+      nonce: string;
+      ciphertext: string;
+    };
+    envelope?: SealedEnvelopeV2;
     enrolledAt: string;
   };
 };

@@ -872,11 +872,14 @@ export function IdentityProvider({children}: {children: React.ReactNode}) {
       return {ok: false, reason: 'unavailable'};
     }
     try {
-      const passkey = await enrollPasskeySeal(current.unlockedBundle);
+      if (!current.sealKey || !current.sealSalt) {
+        return {ok: false, reason: 'unavailable'};
+      }
+      const passkey = await enrollPasskeySeal(current.sealKey, current.sealSalt);
       const envelope = sealBundleWithKey(
         current.unlockedBundle,
-        current.sealKey!,
-        current.sealSalt!,
+        current.sealKey,
+        current.sealSalt,
       );
       envelope.passkey = passkey;
       await saveSealedEnvelope(envelope, didPrefix(current.identity.didFull));
@@ -896,8 +899,9 @@ export function IdentityProvider({children}: {children: React.ReactNode}) {
       return {ok: false, reason: 'unavailable'};
     }
     try {
-      const {bundle} = await unlockPasskeySeal(
+      const {bundle, sealKey, salt} = await unlockPasskeySeal(
         current.sealedEnvelope.passkey,
+        current.sealedEnvelope,
       );
       setDisplayNameState(bundle.metadata?.displayNameOverride ?? null);
       setServersState(serversFromBundle(bundle));
@@ -906,8 +910,8 @@ export function IdentityProvider({children}: {children: React.ReactNode}) {
         identity: buildIdentityFromBundle(bundle),
         sealed: true,
         unlockedBundle: bundle,
-        sealKey: null,
-        sealSalt: null,
+        sealKey,
+        sealSalt: salt,
         passkey: current.sealedEnvelope.passkey,
         error: null,
       });
