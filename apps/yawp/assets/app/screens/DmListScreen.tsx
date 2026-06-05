@@ -19,12 +19,40 @@ const monospace = Platform.select({
   default: 'monospace',
 });
 
-export function DmListScreen({onBack}: {onBack: () => void}) {
+type DmParticipant = {
+  did: string;
+  label: string;
+};
+
+type DmThreadMessage = DmOutboxItem & {
+  senderDid?: string;
+};
+
+type DmConversation = {
+  participants: DmParticipant[];
+  messages: DmThreadMessage[];
+};
+
+export function DmListScreen({
+  onBack,
+  availablePeers = [],
+  conversation,
+  onStartConversation,
+}: {
+  onBack: () => void;
+  availablePeers?: DmParticipant[];
+  conversation?: DmConversation;
+  onStartConversation?: (recipientDids: string[]) => void;
+}) {
   const {degraded} = useAnchorStatus();
   const [draft, setDraft] = useState('');
-  const [items, setItems] = useState<DmOutboxItem[]>([]);
+  const [items, setItems] = useState<DmThreadMessage[]>(conversation?.messages ?? []);
+  const [selectedPeers, setSelectedPeers] = useState<string[]>([]);
   const seq = useRef(0);
   const wasDegraded = useRef(degraded);
+  const participantLabels = new Map(
+    (conversation?.participants ?? []).map(participant => [participant.did, participant.label]),
+  );
 
   useEffect(() => {
     if (wasDegraded.current && !degraded) {
@@ -36,14 +64,21 @@ export function DmListScreen({onBack}: {onBack: () => void}) {
   function handleSend() {
     const decision = decideDmSend(draft, degraded);
     if (!decision.accepted && decision.reason === 'empty') return;
+    onStartConversation?.(selectedPeers);
     seq.current += 1;
-    const item: DmOutboxItem = {
+    const item: DmThreadMessage = {
       id: `dm-${seq.current}`,
       body: draft.trim(),
       delivery: decision.accepted ? 'sent' : 'queued',
     };
     setItems(prev => appendDmItem(prev, item));
     setDraft('');
+  }
+
+  function togglePeer(did: string) {
+    setSelectedPeers(prev =>
+      prev.includes(did) ? prev.filter(existing => existing !== did) : [...prev, did],
+    );
   }
 
   return (
@@ -67,6 +102,39 @@ export function DmListScreen({onBack}: {onBack: () => void}) {
       </View>
 
       <View className="flex-1 px-6 py-4">
+        {conversation ? (
+          <View testID="dm-participant-list" className="mb-4 flex-row flex-wrap" style={{gap: 6}}>
+            {conversation.participants.map(participant => (
+              <View
+                key={participant.did}
+                testID={`dm-participant-${participant.did}`}
+                className="rounded-pill border border-border-soft bg-surface-2 px-2 py-1">
+                <Text className="text-xs text-text">{participant.label}</Text>
+              </View>
+            ))}
+          </View>
+        ) : null}
+        {!conversation && availablePeers.length > 0 ? (
+          <View testID="dm-peer-picker" className="mb-4 flex-row flex-wrap" style={{gap: 6}}>
+            {availablePeers.map(peer => {
+              const selected = selectedPeers.includes(peer.did);
+              return (
+                <Pressable
+                  key={peer.did}
+                  testID={`dm-peer-toggle-${peer.did}`}
+                  accessibilityRole="button"
+                  accessibilityState={{selected}}
+                  onPress={() => togglePeer(peer.did)}
+                  style={pointerCursor}
+                  className={`rounded-pill border px-3 py-1 ${
+                    selected ? 'border-primary bg-primary-soft' : 'border-border-soft bg-surface-2'
+                  }`}>
+                  <Text className="text-xs text-text">{peer.label}</Text>
+                </Pressable>
+              );
+            })}
+          </View>
+        ) : null}
         {items.length === 0 ? (
           <View className="flex-1 items-center justify-center">
             <Text className="text-text-secondary text-sm text-center">
@@ -83,6 +151,13 @@ export function DmListScreen({onBack}: {onBack: () => void}) {
                 key={item.id}
                 testID={`dm-message-${item.id}`}
                 className="bg-surface-2 rounded-md px-3 py-2">
+                {item.senderDid ? (
+                  <Text
+                    testID={`dm-message-sender-${item.id}`}
+                    className="text-xs font-bold text-text-secondary mb-1">
+                    {participantLabels.get(item.senderDid) ?? item.senderDid}
+                  </Text>
+                ) : null}
                 <Text className="text-sm text-text">{item.body}</Text>
                 {item.delivery === 'queued' ? (
                   <Text

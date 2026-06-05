@@ -49,6 +49,11 @@ defmodule YawpWeb.Router do
 
     get "/version", VersionController, :show
     post "/api/dm/submit", DmController, :submit
+    post "/api/dm/conversations/:conversation_id/participants", DmController, :immutable_roster
+
+    delete "/api/dm/conversations/:conversation_id/participants/:recipient_did",
+           DmController,
+           :immutable_roster
   end
 
   pipeline :well_known do

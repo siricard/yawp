@@ -91,6 +91,53 @@ defmodule YawpWeb.DmControllerTest do
     assert {:ok, []} = Federation.pull_inbox(recipient_did, 0, 10)
   end
 
+  test "group DM accepts multiple recipients and derives one conversation id", %{conn: conn} do
+    {sender_pub, sender_priv} = user_keypair()
+    {device_pub, device_priv} = user_keypair()
+    sender_did = did_for(sender_pub)
+    device_id = "sender-device"
+    issued_at = "2026-06-05T00:00:00Z"
+
+    seed_ppe!(sender_did, sender_pub, sender_priv, "Alice", ["local.test"],
+      device: {device_id, device_pub, sender_priv, issued_at}
+    )
+
+    recipients =
+      for name <- ["Bob", "Carol", "Dave"] do
+        {pub, priv} = user_keypair()
+        did = did_for(pub)
+        seed_ppe!(did, pub, priv, name, ["local.test"])
+        did
+      end
+
+    envelope =
+      dm_envelope(sender_did, device_id, device_priv, recipients, %{
+        "envelope_id" => "group-envelope"
+      })
+
+    conn = post(conn, ~p"/api/dm/submit", envelope)
+
+    assert %{"status" => "accepted", "deliveries" => [%{"recipients" => delivered}]} =
+             json_response(conn, 200)
+
+    assert Enum.sort(delivered) == Enum.sort(recipients)
+    expected_conversation_id = Yawp.Federation.DmEnvelope.conversation_id(sender_did, recipients)
+
+    for recipient <- recipients do
+      assert {:ok, [entry]} = Federation.pull_inbox(recipient, 0, 10)
+      assert entry.conversation_id == expected_conversation_id
+    end
+  end
+
+  test "conversation participant mutation endpoints reject immutable rosters", %{conn: conn} do
+    conn =
+      post(conn, ~p"/api/dm/conversations/conv-immutable/participants", %{
+        "recipient_did" => "did:yawp:new"
+      })
+
+    assert %{"error" => "conversation_roster_immutable"} = json_response(conn, 409)
+  end
+
   defp user_keypair, do: :crypto.generate_key(:eddsa, :ed25519)
 
   defp did_for(pub), do: "did:yawp:" <> Yawp.Identity.did_from_pubkey(pub)

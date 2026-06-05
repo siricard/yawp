@@ -5,6 +5,12 @@ defmodule YawpWeb.DmController do
 
   alias Yawp.Federation
 
+  def immutable_roster(conn, _params) do
+    conn
+    |> put_status(409)
+    |> json(%{"error" => "conversation_roster_immutable"})
+  end
+
   def submit(conn, params) do
     envelope = Map.get(params, "envelope", params)
 
