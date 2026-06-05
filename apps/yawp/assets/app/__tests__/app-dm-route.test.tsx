@@ -20,7 +20,7 @@ function mockFakeIdentity(): Identity {
   };
 }
 
-const metadata = {
+let mockMetadata = {
   acceptedPeers: ["did:yawp:bob", "did:yawp:carol"],
   publishedProfile: { anchors: ["localhost:4000"] },
 };
@@ -67,12 +67,12 @@ jest.mock("../identity-context", () => ({
     effectiveDisplayName: "Alice",
   }),
   useBundleMetadata: () => ({
-    metadata,
+    metadata: mockMetadata,
     ready: true,
     mutate: async () => undefined,
   }),
   useOptionalBundleMetadata: () => ({
-    metadata,
+    metadata: mockMetadata,
     ready: true,
     mutate: async () => undefined,
   }),
@@ -149,6 +149,10 @@ async function flush() {
 
 describe("App direct-message route", () => {
   beforeEach(() => {
+    mockMetadata = {
+      acceptedPeers: ["did:yawp:bob", "did:yawp:carol"],
+      publishedProfile: { anchors: ["localhost:4000"] },
+    };
     anchorInbox = undefined;
     serverScreenProps = undefined;
     mockAcceptPeerRequest.mockClear();
@@ -189,6 +193,79 @@ describe("App direct-message route", () => {
     expect(
       root.root.findByProps({ testID: "dm-send-button" }).props.disabled
     ).toBe(false);
+
+    ReactTestRenderer.act(() => root.unmount());
+  });
+
+  test("rejects sending a new direct message when no peers are available", async () => {
+    mockMetadata = {
+      acceptedPeers: [],
+      publishedProfile: { anchors: ["localhost:4000"] },
+    };
+    let root!: ReactTestRenderer.ReactTestRenderer;
+    await ReactTestRenderer.act(async () => {
+      root = ReactTestRenderer.create(<App />);
+    });
+    await flush();
+
+    await ReactTestRenderer.act(async () => {
+      root.root.findByProps({ testID: "workspace-dm-tile" }).props.onPress();
+    });
+
+    await ReactTestRenderer.act(async () => {
+      root.root
+        .findByProps({ testID: "dm-composer-input" })
+        .props.onChangeText("hello nobody");
+    });
+
+    expect(
+      root.root.findByProps({ testID: "dm-send-button" }).props.disabled
+    ).toBe(true);
+
+    await ReactTestRenderer.act(async () => {
+      root.root.findByProps({ testID: "dm-send-button" }).props.onPress();
+    });
+
+    expect(root.root.findAllByProps({ testID: "dm-message-list" })).toHaveLength(0);
+
+    ReactTestRenderer.act(() => root.unmount());
+  });
+
+  test("starts a group direct message and keeps the first message visible", async () => {
+    let root!: ReactTestRenderer.ReactTestRenderer;
+    await ReactTestRenderer.act(async () => {
+      root = ReactTestRenderer.create(<App />);
+    });
+    await flush();
+
+    await ReactTestRenderer.act(async () => {
+      root.root.findByProps({ testID: "workspace-dm-tile" }).props.onPress();
+    });
+
+    await ReactTestRenderer.act(async () => {
+      root.root
+        .findByProps({ testID: "dm-peer-toggle-did:yawp:bob" })
+        .props.onPress();
+      root.root
+        .findByProps({ testID: "dm-peer-toggle-did:yawp:carol" })
+        .props.onPress();
+      root.root
+        .findByProps({ testID: "dm-composer-input" })
+        .props.onChangeText("hello group");
+    });
+
+    await ReactTestRenderer.act(async () => {
+      root.root.findByProps({ testID: "dm-send-button" }).props.onPress();
+    });
+
+    expect(root.root.findByProps({ testID: "dm-participant-did:yawp:bob" })).toBeTruthy();
+    expect(root.root.findByProps({ testID: "dm-participant-did:yawp:carol" })).toBeTruthy();
+    const bodyText = root.root
+      .findAllByType(require("react-native").Text)
+      .map(node => node.props.children)
+      .flat(Infinity)
+      .join(" ");
+    expect(bodyText).toContain("hello group");
 
     ReactTestRenderer.act(() => root.unmount());
   });

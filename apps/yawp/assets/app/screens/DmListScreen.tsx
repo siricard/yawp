@@ -57,7 +57,7 @@ export function DmListScreen({
   availablePeers?: DmParticipant[];
   conversation?: DmConversation;
   conversations?: DmConversation[];
-  onStartConversation?: (recipientDids: string[]) => void;
+  onStartConversation?: (recipientDids: string[], body: string) => void;
   onAcceptRequest?: (senderDid: string) => Promise<boolean>;
   onOpenConversation?: (conversation: DmConversation) => void;
 }) {
@@ -87,8 +87,8 @@ export function DmListScreen({
   function handleSend() {
     const decision = decideDmSend(draft, degraded);
     if (!decision.accepted && decision.reason === 'empty') return;
-    if (!conversation && availablePeers.length > 0 && selectedPeers.length === 0) return;
-    onStartConversation?.(selectedPeers);
+    if (!conversation && onStartConversation && selectedPeers.length === 0) return;
+    onStartConversation?.(selectedPeers, draft.trim());
     seq.current += 1;
     const item: DmThreadMessage = {
       id: `dm-${seq.current}`,
@@ -106,7 +106,7 @@ export function DmListScreen({
   }
 
   const isRequest = Boolean(conversation?.isRequest && !accepted);
-  const needsRecipient = !conversation && availablePeers.length > 0;
+  const needsRecipient = !conversation && Boolean(onStartConversation);
   const requestSender = conversation?.participants[0];
   const visibleConversations = conversations ?? (conversation ? [conversation] : []);
   const pinnedIds = new Set(metadataPinnedPeers(metadata));

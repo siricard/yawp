@@ -126,11 +126,27 @@ function AppShell() {
     }
   }
 
-  function handleStartDmConversation(recipientDids: string[]) {
+  function handleStartDmConversation(recipientDids: string[], body: string) {
     if (recipientDids.length < 1) return;
+    const trimmedBody = body.trim();
+    if (trimmedBody.length < 1) return;
     const participants = dmPeers.filter(peer => recipientDids.includes(peer.did));
     if (participants.length < 1) return;
-    setDmConversation({participants, messages: []});
+    const createdAt = new Date().toISOString();
+    setDmConversation({
+      participants,
+      lastActivityAt: createdAt,
+      messages: [
+        {
+          id: `local-${createdAt}`,
+          body: trimmedBody,
+          delivery: 'sent',
+          senderDid: identityState.status === 'ready' ? identityState.identity.didFull : undefined,
+          recipientDids,
+          createdAt,
+        },
+      ],
+    });
   }
 
   function handleSelectRecentDm(dm: RecentDm) {
