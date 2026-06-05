@@ -9,6 +9,8 @@ import {masterFromMnemonicSeed, masterPkFromSk, signWithMaster} from './identity
 import {
   loadIdentity,
   loadStoredEntry,
+  loadStoredEntryWithBiometrics,
+  loadStoredEntryWithDevicePasscode,
   saveIdentity,
   saveSealedEnvelope,
 } from './identity/storage-bundle';
@@ -137,6 +139,11 @@ type State =
       error: null;
     }
   | {
+      status: 'locked_native';
+      identity: null;
+      error: null;
+    }
+  | {
       status: 'ready';
       identity: Identity;
       sealed: boolean;
@@ -251,6 +258,9 @@ type Ctx = {
   passkeyEnrolled: boolean;
   enrollPasskey: () => Promise<PasskeyResult>;
   unlockWithPasskey: () => Promise<PasskeyResult>;
+  unlockNative: (
+    method: 'biometric' | 'device_passcode',
+  ) => Promise<PasskeyResult>;
 };
 
 const IdentityContext = createContext<Ctx | null>(null);
@@ -453,6 +463,15 @@ export function IdentityProvider({children}: {children: React.ReactNode}) {
         });
       } catch (e: unknown) {
         if (!mounted) return;
+        if (
+          e &&
+          typeof e === 'object' &&
+          'name' in e &&
+          (e as {name?: unknown}).name === 'KeychainReadError'
+        ) {
+          applyState({status: 'locked_native', identity: null, error: null});
+          return;
+        }
         const msg =
           e && typeof e === 'object' && 'message' in e
             ? String((e as {message: unknown}).message)
@@ -793,6 +812,60 @@ export function IdentityProvider({children}: {children: React.ReactNode}) {
 
   const canUsePasskey = useCallback(() => canUsePasskeyPrf(), []);
 
+  const applyUnlockedEntry = useCallback(
+    (entry: Awaited<ReturnType<typeof loadStoredEntry>>) => {
+      if (!entry) return {ok: false as const, reason: 'unavailable' as const};
+      if (entry.kind === 'sealed') {
+        applyState({
+          status: 'locked',
+          sealedEnvelope: entry.envelope,
+          didPrefix: entry.didPrefix ?? null,
+          identity: null,
+          error: null,
+        });
+        return {ok: false as const, reason: 'unavailable' as const};
+      }
+      setDisplayNameState(entry.bundle.metadata?.displayNameOverride ?? null);
+      setServersState(serversFromBundle(entry.bundle));
+      applyState({
+        status: 'ready',
+        identity: buildIdentityFromBundle(entry.bundle),
+        sealed: false,
+        unlockedBundle: entry.bundle,
+        sealKey: null,
+        sealSalt: null,
+        passkey: null,
+        error: null,
+      });
+      return {ok: true as const};
+    },
+    [applyState, setServersState],
+  );
+
+  const unlockNative = useCallback(
+    async (
+      method: 'biometric' | 'device_passcode',
+    ): Promise<PasskeyResult> => {
+      const current = stateRef.current;
+      if (current.status !== 'locked_native' && current.status !== 'locked') {
+        return {ok: false, reason: 'unavailable'};
+      }
+      try {
+        const entry =
+          method === 'biometric'
+            ? await loadStoredEntryWithBiometrics()
+            : await loadStoredEntryWithDevicePasscode();
+        return applyUnlockedEntry(entry);
+      } catch (e) {
+        const msg = e instanceof Error ? e.message.toLowerCase() : '';
+        if (msg.includes('cancel')) return {ok: false, reason: 'cancelled'};
+        if (msg.includes('available')) return {ok: false, reason: 'unavailable'};
+        return {ok: false, reason: 'unknown'};
+      }
+    },
+    [applyUnlockedEntry],
+  );
+
   const enrollPasskey = useCallback(async (): Promise<PasskeyResult> => {
     const current = stateRef.current;
     if (current.status !== 'ready' || !current.sealed) {
@@ -937,6 +1010,7 @@ export function IdentityProvider({children}: {children: React.ReactNode}) {
               : false,
         enrollPasskey,
         unlockWithPasskey,
+        unlockNative,
       }}>
       {children}
     </IdentityContext.Provider>
@@ -1028,6 +1102,9 @@ export function usePassphrase(): {
   passkeyEnrolled: boolean;
   enrollPasskey: () => Promise<PasskeyResult>;
   unlockWithPasskey: () => Promise<PasskeyResult>;
+  unlockNative: (
+    method: 'biometric' | 'device_passcode',
+  ) => Promise<PasskeyResult>;
 } {
   const ctx = useContext(IdentityContext);
   if (!ctx) {
@@ -1036,7 +1113,7 @@ export function usePassphrase(): {
   const sealed =
     ctx.state.status === 'ready'
       ? ctx.state.sealed
-      : ctx.state.status === 'locked';
+      : ctx.state.status === 'locked' || ctx.state.status === 'locked_native';
   return {
     sealed,
     lockedDidPrefix:
@@ -1048,6 +1125,7 @@ export function usePassphrase(): {
     passkeyEnrolled: ctx.passkeyEnrolled,
     enrollPasskey: ctx.enrollPasskey,
     unlockWithPasskey: ctx.unlockWithPasskey,
+    unlockNative: ctx.unlockNative,
   };
 }
 

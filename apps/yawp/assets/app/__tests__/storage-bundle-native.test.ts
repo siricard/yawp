@@ -1,6 +1,10 @@
 import * as Keychain from 'react-native-keychain';
 
-import {saveIdentity} from '../identity/storage-bundle.native';
+import {
+  loadStoredEntryWithBiometrics,
+  loadStoredEntryWithDevicePasscode,
+  saveIdentity,
+} from '../identity/storage-bundle.native';
 import type {IdentityBundleV1} from '../identity/bundle';
 
 function bundle(): IdentityBundleV1 {
@@ -22,14 +26,15 @@ describe('native identity keychain policy', () => {
     jest.clearAllMocks();
   });
 
-  test('stores the identity behind biometric-current-set access control and passcode-bound accessibility', async () => {
+  test('stores the identity behind biometric-or-passcode access control and passcode-bound accessibility', async () => {
     await saveIdentity(bundle());
 
     expect(Keychain.setGenericPassword).toHaveBeenCalledWith(
       expect.any(String),
       expect.any(String),
       expect.objectContaining({
-        accessControl: Keychain.ACCESS_CONTROL.BIOMETRY_CURRENT_SET,
+        accessControl:
+          Keychain.ACCESS_CONTROL.BIOMETRY_CURRENT_SET_OR_DEVICE_PASSCODE,
         accessible: Keychain.ACCESSIBLE.WHEN_PASSCODE_SET_THIS_DEVICE_ONLY,
         authenticationType:
           Keychain.AUTHENTICATION_TYPE.DEVICE_PASSCODE_OR_BIOMETRICS,
@@ -37,6 +42,32 @@ describe('native identity keychain policy', () => {
           title: 'Unlock Yawp',
           cancel: 'Use another method',
         }),
+      }),
+    );
+  });
+
+  test('uses biometric-only options when explicitly retrying biometric unlock', async () => {
+    await saveIdentity(bundle());
+    await loadStoredEntryWithBiometrics();
+
+    expect(Keychain.getGenericPassword).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        accessControl: Keychain.ACCESS_CONTROL.BIOMETRY_CURRENT_SET,
+        authenticationType: Keychain.AUTHENTICATION_TYPE.BIOMETRICS,
+      }),
+    );
+  });
+
+  test('uses passcode-capable options when explicitly retrying passcode unlock', async () => {
+    await saveIdentity(bundle());
+    await loadStoredEntryWithDevicePasscode();
+
+    expect(Keychain.getGenericPassword).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        accessControl:
+          Keychain.ACCESS_CONTROL.BIOMETRY_CURRENT_SET_OR_DEVICE_PASSCODE,
+        authenticationType:
+          Keychain.AUTHENTICATION_TYPE.DEVICE_PASSCODE_OR_BIOMETRICS,
       }),
     );
   });

@@ -189,7 +189,7 @@ function AppShell() {
     );
   }
 
-  if (identityState.status === 'locked') {
+  if (identityState.status === 'locked' || identityState.status === 'locked_native') {
     return (
       <SafeAreaView
         edges={['top', 'bottom']}

@@ -189,6 +189,14 @@ export async function loadStoredEntry(): Promise<StoredIdentityEntry | null> {
   }
 }
 
+export async function loadStoredEntryWithBiometrics(): Promise<StoredIdentityEntry | null> {
+  return null;
+}
+
+export async function loadStoredEntryWithDevicePasscode(): Promise<StoredIdentityEntry | null> {
+  return null;
+}
+
 export async function saveStoredEntry(entry: StoredIdentityEntry): Promise<void> {
   const payload =
     entry.kind === 'unsealed'

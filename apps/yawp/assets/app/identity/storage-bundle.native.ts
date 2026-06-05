@@ -27,7 +27,9 @@ const keychainAccessible =
 
 const keychainOptions = {
   service: STORAGE_KEY_V1,
-  accessControl: keychainAccessControl,
+  accessControl:
+    Keychain.ACCESS_CONTROL?.BIOMETRY_CURRENT_SET_OR_DEVICE_PASSCODE ??
+    keychainAccessControl,
   accessible: keychainAccessible,
   authenticationType:
     Keychain.AUTHENTICATION_TYPE?.DEVICE_PASSCODE_OR_BIOMETRICS,
@@ -39,20 +41,23 @@ const keychainOptions = {
   },
 };
 
-export async function loadStoredEntry(): Promise<StoredIdentityEntry | null> {
-  let creds: Awaited<ReturnType<typeof Keychain.getGenericPassword>>;
-  try {
-    creds = await Keychain.getGenericPassword(keychainOptions);
-  } catch (e) {
-    throw new KeychainReadError(
-      `Failed to read identity from keychain: ${(e as Error)?.message ?? e}`,
-      e,
-    );
-  }
-  if (!creds) return null;
+const biometricOnlyOptions = {
+  ...keychainOptions,
+  accessControl: keychainAccessControl,
+  authenticationType: Keychain.AUTHENTICATION_TYPE?.BIOMETRICS,
+};
+
+const devicePasscodeOptions = {
+  ...keychainOptions,
+  accessControl:
+    Keychain.ACCESS_CONTROL?.BIOMETRY_CURRENT_SET_OR_DEVICE_PASSCODE ??
+    keychainOptions.accessControl,
+};
+
+function parseStoredEntry(password: string): StoredIdentityEntry {
   let parsed: unknown;
   try {
-    parsed = JSON.parse(creds.password);
+    parsed = JSON.parse(password);
   } catch (e) {
     throw new KeychainReadError(
       `Stored identity bundle is not valid JSON: ${(e as Error)?.message ?? e}`,
@@ -73,6 +78,34 @@ export async function loadStoredEntry(): Promise<StoredIdentityEntry | null> {
     return {kind: 'unsealed', bundle: parsed};
   }
   throw new KeychainReadError('Stored identity payload failed shape validation');
+}
+
+async function readStoredEntry(
+  options: Parameters<typeof Keychain.getGenericPassword>[0],
+): Promise<StoredIdentityEntry | null> {
+  let creds: Awaited<ReturnType<typeof Keychain.getGenericPassword>>;
+  try {
+    creds = await Keychain.getGenericPassword(options);
+  } catch (e) {
+    throw new KeychainReadError(
+      `Failed to read identity from keychain: ${(e as Error)?.message ?? e}`,
+      e,
+    );
+  }
+  if (!creds) return null;
+  return parseStoredEntry(creds.password);
+}
+
+export async function loadStoredEntry(): Promise<StoredIdentityEntry | null> {
+  return readStoredEntry(keychainOptions);
+}
+
+export async function loadStoredEntryWithBiometrics(): Promise<StoredIdentityEntry | null> {
+  return readStoredEntry(biometricOnlyOptions);
+}
+
+export async function loadStoredEntryWithDevicePasscode(): Promise<StoredIdentityEntry | null> {
+  return readStoredEntry(devicePasscodeOptions);
 }
 
 export async function saveStoredEntry(entry: StoredIdentityEntry): Promise<void> {

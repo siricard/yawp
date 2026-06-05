@@ -62,3 +62,26 @@ export function defaultUnlockAvailability(): UnlockAvailability {
     passphrase: true,
   };
 }
+
+export async function detectUnlockAvailability(): Promise<UnlockAvailability> {
+  const fallback = defaultUnlockAvailability();
+  if (Platform.OS === 'web') return fallback;
+  try {
+    const Keychain = require('react-native-keychain');
+    const [biometry, passcode] = await Promise.all([
+      typeof Keychain.getSupportedBiometryType === 'function'
+        ? Keychain.getSupportedBiometryType()
+        : Promise.resolve(null),
+      typeof Keychain.isPasscodeAuthAvailable === 'function'
+        ? Keychain.isPasscodeAuthAvailable()
+        : Promise.resolve(fallback.devicePasscode),
+    ]);
+    return {
+      ...fallback,
+      biometric: !!biometry,
+      devicePasscode: !!passcode,
+    };
+  } catch {
+    return fallback;
+  }
+}

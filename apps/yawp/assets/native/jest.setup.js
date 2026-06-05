@@ -31,6 +31,8 @@ jest.mock('react-native-keychain', () => {
       store.delete(service);
       return true;
     }),
+    getSupportedBiometryType: jest.fn(async () => 'FaceID'),
+    isPasscodeAuthAvailable: jest.fn(async () => true),
     ACCESSIBLE: {
       WHEN_PASSCODE_SET_THIS_DEVICE_ONLY: 'AccessibleWhenPasscodeSetThisDeviceOnly',
       WHEN_UNLOCKED_THIS_DEVICE_ONLY: 'AccessibleWhenUnlockedThisDeviceOnly',
@@ -42,6 +44,7 @@ jest.mock('react-native-keychain', () => {
         'BiometryCurrentSetOrDevicePasscode',
     },
     AUTHENTICATION_TYPE: {
+      BIOMETRICS: 'AuthenticationWithBiometrics',
       DEVICE_PASSCODE_OR_BIOMETRICS: 'AuthenticationWithBiometricsDevicePasscode',
     },
     SECURITY_LEVEL: {},

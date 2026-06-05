@@ -5,6 +5,7 @@ import {ScrollView, Text, View} from 'react-native';
 import {usePassphrase} from '../identity-context';
 import {
   defaultUnlockAvailability,
+  detectUnlockAvailability,
   resolveUnlockChoice,
   type UnlockMethod,
 } from '../identity/unlock-methods';
@@ -20,6 +21,7 @@ const METHOD_LABEL: Record<UnlockMethod, string> = {
 export function LockedScreen() {
   const {
     unlock,
+    unlockNative,
     unlockWithPasskey,
     canUsePasskey,
     passkeyAvailableHint,
@@ -34,17 +36,45 @@ export function LockedScreen() {
   >([{type: 'start'}]);
   const [activeFallback, setActiveFallback] = useState<UnlockMethod>('passphrase');
   const [passkeyCapable, setPasskeyCapable] = useState(passkeyAvailableHint);
+  const [availability, setAvailability] = useState(defaultUnlockAvailability);
   useEffect(() => {
     let mounted = true;
     void canUsePasskey().then(ok => {
       if (mounted) setPasskeyCapable(ok);
     });
+    void detectUnlockAvailability().then(next => {
+      if (mounted) setAvailability(next);
+    });
     return () => {
       mounted = false;
     };
   }, [canUsePasskey]);
-  const availability = defaultUnlockAvailability();
-  availability.passkey = passkeyCapable && passkeyEnrolled;
+  useEffect(() => {
+    let mounted = true;
+    if (availability.biometric) {
+      setPending(true);
+      setError(null);
+      void unlockNative('biometric').then(result => {
+        if (!mounted) return;
+        setPending(false);
+        if (!result.ok) {
+          setAttempts(prev => [...prev, {type: 'biometric_declined'}]);
+          setError('Biometric unlock was not completed. Choose another method.');
+        }
+      });
+    } else {
+      setAttempts(prev => [...prev, {type: 'biometric_unavailable'}]);
+    }
+    return () => {
+      mounted = false;
+    };
+  }, [availability.biometric, unlockNative]);
+  useEffect(() => {
+    setAvailability(prev => {
+      if (prev.passkey === passkeyCapable && prev.passphrase) return prev;
+      return {...prev, passkey: passkeyCapable && passkeyEnrolled};
+    });
+  }, [passkeyCapable, passkeyEnrolled]);
   const choice = resolveUnlockChoice(availability, attempts);
   const showPassphrase =
     activeFallback === 'passphrase' ||
@@ -91,14 +121,26 @@ export function LockedScreen() {
       return;
     }
     if (method === 'biometric') {
-      setAttempts(prev => [...prev, {type: 'biometric_declined'}]);
-      setError('Biometric unlock was not completed. Choose another method.');
+      setPending(true);
+      setError(null);
+      void unlockNative('biometric').then(result => {
+        setPending(false);
+        if (!result.ok) {
+          setAttempts(prev => [...prev, {type: 'biometric_declined'}]);
+          setError('Biometric unlock was not completed. Choose another method.');
+        }
+      });
       return;
     }
-    setActiveFallback(method);
-    setError(
-      'Device passcode unlock is available from the native system prompt.',
-    );
+    setPending(true);
+    setError(null);
+    void unlockNative('device_passcode').then(result => {
+      setPending(false);
+      if (!result.ok) {
+        setActiveFallback('passphrase');
+        setError('Device passcode unlock was not completed. Use your passphrase.');
+      }
+    });
   }
 
   return (

@@ -2,6 +2,7 @@ import {Platform} from 'react-native';
 
 import {
   defaultUnlockAvailability,
+  detectUnlockAvailability,
   resolveUnlockChoice,
 } from '../identity/unlock-methods';
 
@@ -91,6 +92,19 @@ describe('unlock method fallback decisions', () => {
     Object.defineProperty(global, 'PublicKeyCredential', {
       value: originalCredential,
       configurable: true,
+    });
+  });
+
+  test('queries native keychain capability instead of assuming biometrics exist', async () => {
+    Object.defineProperty(Platform, 'OS', {value: 'ios'});
+    const Keychain = require('react-native-keychain');
+    Keychain.getSupportedBiometryType.mockResolvedValueOnce(null);
+    Keychain.isPasscodeAuthAvailable.mockResolvedValueOnce(true);
+
+    await expect(detectUnlockAvailability()).resolves.toMatchObject({
+      biometric: false,
+      devicePasscode: true,
+      passphrase: true,
     });
   });
 });
