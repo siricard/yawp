@@ -5,6 +5,7 @@ defmodule YawpWeb.FederationController do
 
   alias Yawp.Federation
   alias Yawp.Federation.AnchorHost
+  alias Yawp.Federation.DeliveryBudget
   alias Yawp.Federation.DeviceSignature
   alias Yawp.Federation.InnerSignature
   alias Yawp.Federation.MessagePipeline
@@ -48,12 +49,15 @@ defmodule YawpWeb.FederationController do
   def inbox_push(conn, params) do
     with_inner(conn, params, fn inner, anchor ->
       with :ok <- validate_envelope_recipients(inner),
+           :ok <- consume_delivery_budget(anchor),
            :ok <- verify_inbox_envelope(inner, anchor),
            {:ok, _} <- MessagePipeline.maybe_refresh_ppe(inner),
            {:ok, acks} <- append_envelope(inner),
+           :ok <- DeliveryBudget.record_accepted(anchor),
            :ok <- push_delivery_acks(anchor, acks) do
         ok(conn, %{"status" => "appended"})
       else
+        {:error, {:rate_limited, retry_after}} -> rate_limited(conn, anchor, retry_after)
         {:error, :invalid_inner_signature} -> error(conn, 403, "invalid_inner_signature")
         {:error, :unresolvable_sender} -> error(conn, 422, "unresolvable_sender")
         _ -> error(conn, 422, "invalid_envelope")
@@ -263,6 +267,12 @@ defmodule YawpWeb.FederationController do
 
   defp outbound_read_receipts_enabled(_), do: {:error, :invalid_read_marker}
 
+  defp consume_delivery_budget(anchor) when is_binary(anchor) do
+    DeliveryBudget.consume(anchor)
+  end
+
+  defp consume_delivery_budget(_), do: {:error, {:rate_limited, 60}}
+
   defp serialize_entry(entry) do
     %{
       "envelope_id" => entry.envelope_id,
@@ -310,6 +320,18 @@ defmodule YawpWeb.FederationController do
   end
 
   defp ok(conn, body), do: json(conn, body)
+
+  defp rate_limited(conn, anchor, retry_after) do
+    :telemetry.execute(
+      [:yawp, :federation, :delivery_budget, :rate_limited],
+      %{count: 1, retry_after: retry_after},
+      %{peer_anchor: anchor}
+    )
+
+    conn
+    |> put_resp_header("retry-after", Integer.to_string(retry_after))
+    |> error(429, "rate_limited")
+  end
 
   defp error(conn, status, slug) do
     conn

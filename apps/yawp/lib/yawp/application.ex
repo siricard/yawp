@@ -18,6 +18,7 @@ defmodule Yawp.Application do
       Yawp.Federation.KeyDocCache,
       Yawp.Federation.DeliveryNonceCache,
       YawpWeb.Presence,
+      Yawp.Federation.DeliveryBudget,
       Yawp.Federation.PresenceBroker,
       Yawp.Federation.RemotePresence,
       Yawp.Vault,

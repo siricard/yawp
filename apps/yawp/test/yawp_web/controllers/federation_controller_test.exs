@@ -7,6 +7,7 @@ defmodule YawpWeb.FederationControllerTest do
   import Bitwise
 
   alias Yawp.Federation
+  alias Yawp.Federation.DeliveryBudget
   alias Yawp.Federation.DeliveryNonceCache
   alias Yawp.Federation.KeyDocCache
   alias Yawp.Federation.PpeRefreshWorker
@@ -19,6 +20,7 @@ defmodule YawpWeb.FederationControllerTest do
   setup do
     KeyDocCache.clear()
     DeliveryNonceCache.clear()
+    DeliveryBudget.clear()
 
     {:ok, _} = Federation.generate_server_key()
     {:ok, active} = Federation.get_active_server_key()
@@ -598,6 +600,68 @@ defmodule YawpWeb.FederationControllerTest do
       assert {:ok, [_entry]} = Federation.pull_inbox(recipient, 0, 100)
       assert {:ok, cached} = Identity.get_ppe_by_did(sender_did)
       assert cached.display_name == "Fetched Sender"
+    end
+
+    test "rejects half of a 200 envelope flood with retry-after and telemetry" do
+      {master_pub, master_priv} = user_keypair()
+      {device_pub, device_priv} = device_keypair()
+      device_id = "device-flood"
+      seed_sender_ppe(master_pub, master_priv, device_pub, device_id)
+
+      test_pid = self()
+      handler_id = "delivery-budget-test-#{System.unique_integer([:positive])}"
+      previous_budget_config = Application.get_env(:yawp, DeliveryBudget)
+      Application.put_env(:yawp, DeliveryBudget, now_ms: 1_700_000_000_000)
+
+      :telemetry.attach(
+        handler_id,
+        [:yawp, :federation, :delivery_budget, :rate_limited],
+        fn event, measurements, metadata, _ ->
+          send(test_pid, {:budget_hit, event, measurements, metadata})
+        end,
+        nil
+      )
+
+      on_exit(fn -> :telemetry.detach(handler_id) end)
+
+      on_exit(fn ->
+        if previous_budget_config,
+          do: Application.put_env(:yawp, DeliveryBudget, previous_budget_config),
+          else: Application.delete_env(:yawp, DeliveryBudget)
+      end)
+
+      responses =
+        for n <- 1..200 do
+          envelope =
+            dm_envelope(master_pub, device_priv, device_id, %{
+              "envelope_id" => "flood-#{n}",
+              "recipient_did" => "did:yawp:flood-recipient",
+              "conversation_id" => "conv-flood"
+            })
+
+          build_conn()
+          |> post_federation("/federation/inbox/push", envelope)
+        end
+
+      assert 100 == Enum.count(responses, &(&1.status == 200))
+      limited = Enum.filter(responses, &(&1.status == 429))
+      assert 100 == length(limited)
+      assert Enum.all?(limited, &(get_resp_header(&1, "retry-after") != []))
+
+      assert_receive {:budget_hit, [:yawp, :federation, :delivery_budget, :rate_limited],
+                      %{count: 1}, %{peer_anchor: @host}}
+    end
+  end
+
+  describe "delivery budget scaling" do
+    test "capacity grows linearly by days of accepted traffic and is capped" do
+      now = 1_700_000_000_000
+      peer = "trusted.example"
+
+      assert DeliveryBudget.capacity_for(peer, now_ms: now) == 100
+      assert :ok = DeliveryBudget.record_accepted(peer, now_ms: now)
+      assert DeliveryBudget.capacity_for(peer, now_ms: now + 86_400_000) == 110
+      assert DeliveryBudget.capacity_for(peer, now_ms: now + 990 * 86_400_000) == 10_000
     end
   end
 
