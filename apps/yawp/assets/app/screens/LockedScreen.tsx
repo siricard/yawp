@@ -3,13 +3,34 @@ import React, {useState} from 'react';
 import {ScrollView, Text, View} from 'react-native';
 
 import {usePassphrase} from '../identity-context';
+import {
+  defaultUnlockAvailability,
+  resolveUnlockChoice,
+  type UnlockMethod,
+} from '../identity/unlock-methods';
 import {Button, Card, DidPill, Field, Input} from '../ui';
+
+const METHOD_LABEL: Record<UnlockMethod, string> = {
+  biometric: 'Use biometrics',
+  device_passcode: 'Use device passcode',
+  passkey: 'Use passkey',
+  passphrase: 'Use passphrase',
+};
 
 export function LockedScreen() {
   const {unlock, lockedDidPrefix} = usePassphrase();
   const [passphrase, setPassphrase] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
+  const [attempts, setAttempts] = useState<
+    Parameters<typeof resolveUnlockChoice>[1]
+  >([{type: 'start'}]);
+  const [activeFallback, setActiveFallback] = useState<UnlockMethod>('passphrase');
+  const choice = resolveUnlockChoice(defaultUnlockAvailability(), attempts);
+  const showPassphrase =
+    activeFallback === 'passphrase' ||
+    choice.primary === 'passphrase' ||
+    choice.fallbacks.includes('passphrase');
 
   async function onSubmit() {
     if (!passphrase || pending) return;
@@ -28,6 +49,25 @@ export function LockedScreen() {
     }
   }
 
+  function onMethodPress(method: UnlockMethod) {
+    if (method === 'passphrase') {
+      setActiveFallback('passphrase');
+      setError(null);
+      return;
+    }
+    if (method === 'biometric') {
+      setAttempts(prev => [...prev, {type: 'biometric_declined'}]);
+      setError('Biometric unlock was not completed. Choose another method.');
+      return;
+    }
+    setActiveFallback(method);
+    setError(
+      method === 'passkey'
+        ? 'Passkey unlock is available after enrolling this device in Settings.'
+        : 'Device passcode unlock is available from the native system prompt.',
+    );
+  }
+
   return (
     <ScrollView
       className="flex-1 bg-bg"
@@ -44,7 +84,7 @@ export function LockedScreen() {
             Unlock Yawp
           </Text>
           <Text className="text-sm text-text-secondary mb-6">
-            This device is protected by a passphrase. Enter it to continue.
+            Unlock with the strongest method available on this device, or choose a fallback.
           </Text>
 
           {lockedDidPrefix ? (
@@ -63,23 +103,58 @@ export function LockedScreen() {
             </View>
           )}
 
-          <Field
-            label="Passphrase"
-            error={error ?? undefined}
-            testID="locked-passphrase-field">
-            <Input
-              testID="locked-passphrase-input"
-              accessibilityLabel="passphrase"
-              value={passphrase}
-              onChangeText={setPassphrase}
-              autoCapitalize="none"
-              autoCorrect={false}
-              variant="password"
-              placeholder="Your passphrase"
-              onSubmitEditing={onSubmit}
-              error={!!error}
-            />
-          </Field>
+          {choice.primary && choice.primary !== 'passphrase' ? (
+            <View style={{marginBottom: 12}}>
+              <Button
+                testID={`locked-${choice.primary}-btn`}
+                accessibilityLabel={METHOD_LABEL[choice.primary].toLowerCase()}
+                variant="primary"
+                size="md"
+                block
+                label={METHOD_LABEL[choice.primary]}
+                onPress={() => onMethodPress(choice.primary!)}
+              />
+            </View>
+          ) : null}
+
+          {choice.fallbacks.length > 0 ? (
+            <View
+              testID="locked-fallback-methods"
+              className="flex-row flex-wrap mb-4"
+              style={{gap: 8}}>
+              {choice.fallbacks.map(method => (
+                <Button
+                  key={method}
+                  testID={`locked-${method}-fallback-btn`}
+                  accessibilityLabel={METHOD_LABEL[method].toLowerCase()}
+                  variant={activeFallback === method ? 'secondary' : 'ghost'}
+                  size="sm"
+                  label={METHOD_LABEL[method]}
+                  onPress={() => onMethodPress(method)}
+                />
+              ))}
+            </View>
+          ) : null}
+
+          {showPassphrase ? (
+            <Field
+              label="Passphrase"
+              error={error ?? undefined}
+              testID="locked-passphrase-field">
+              <Input
+                testID="locked-passphrase-input"
+                accessibilityLabel="passphrase"
+                value={passphrase}
+                onChangeText={setPassphrase}
+                autoCapitalize="none"
+                autoCorrect={false}
+                variant="password"
+                placeholder="Your passphrase"
+                onSubmitEditing={onSubmit}
+                error={!!error}
+              />
+            </Field>
+          ) : null}
 
           {error ? (
             <Text

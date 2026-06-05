@@ -31,9 +31,19 @@ jest.mock('react-native-keychain', () => {
       store.delete(service);
       return true;
     }),
-    ACCESSIBLE: {},
-    ACCESS_CONTROL: {},
-    AUTHENTICATION_TYPE: {},
+    ACCESSIBLE: {
+      WHEN_PASSCODE_SET_THIS_DEVICE_ONLY: 'AccessibleWhenPasscodeSetThisDeviceOnly',
+      WHEN_UNLOCKED_THIS_DEVICE_ONLY: 'AccessibleWhenUnlockedThisDeviceOnly',
+    },
+    ACCESS_CONTROL: {
+      BIOMETRY_CURRENT_SET: 'BiometryCurrentSet',
+      BIOMETRY_ANY: 'BiometryAny',
+      BIOMETRY_CURRENT_SET_OR_DEVICE_PASSCODE:
+        'BiometryCurrentSetOrDevicePasscode',
+    },
+    AUTHENTICATION_TYPE: {
+      DEVICE_PASSCODE_OR_BIOMETRICS: 'AuthenticationWithBiometricsDevicePasscode',
+    },
     SECURITY_LEVEL: {},
     STORAGE_TYPE: {},
     BIOMETRY_TYPE: {},

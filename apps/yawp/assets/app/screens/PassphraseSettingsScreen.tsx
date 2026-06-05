@@ -74,6 +74,47 @@ export function PassphraseSettingsScreen({onBack}: Props) {
       </Text>
 
       <Card variant="default" style={{marginBottom: 16}}>
+        <Text className="font-display text-lg font-bold text-text mb-2">
+          Unlock methods
+        </Text>
+        <Text className="text-sm text-text-secondary mb-4">
+          Biometrics are tried first where the platform supports them. Keep a passphrase as the recovery fallback for this device.
+        </Text>
+        <View className="flex-row flex-wrap" style={{gap: 8}}>
+          <Button
+            testID="passphrase-settings-biometric-enroll-btn"
+            accessibilityLabel="enable biometric unlock"
+            variant="secondary"
+            size="sm"
+            label="Enable biometrics"
+            disabled={!sealed}
+            onPress={() =>
+              setDone(
+                sealed
+                  ? 'Biometric unlock will be requested by the device keychain on the next unlock.'
+                  : null,
+              )
+            }
+          />
+          <Button
+            testID="passphrase-settings-passkey-enroll-btn"
+            accessibilityLabel="enable passkey unlock"
+            variant="secondary"
+            size="sm"
+            label="Enable passkey"
+            disabled={!sealed}
+            onPress={() =>
+              setDone(
+                sealed
+                  ? 'Passkey unlock can be enrolled from this device after passphrase protection is active.'
+                  : null,
+              )
+            }
+          />
+        </View>
+      </Card>
+
+      <Card variant="default" style={{marginBottom: 16}}>
         {sealed ? (
           <Field label="Current passphrase">
             <Input
