@@ -3,6 +3,7 @@ defmodule Yawp.Federation.PresenceBroker do
 
   use GenServer
 
+  alias Yawp.Federation.AnchorHost
   alias Yawp.Federation.Client
 
   @default_idle_after_ms 300_000
@@ -67,6 +68,7 @@ defmodule Yawp.Federation.PresenceBroker do
 
   @impl true
   def handle_call({:subscribe, did, peer_host}, _from, state) do
+    peer_host = AnchorHost.normalize(peer_host)
     bare = bare(did)
     already_watching? = Map.has_key?(state.subscriptions, did)
 
@@ -92,12 +94,15 @@ defmodule Yawp.Federation.PresenceBroker do
 
   @impl true
   def handle_call({:allow_subscriber, did, peer_host}, _from, state) do
+    peer_host = AnchorHost.normalize(peer_host)
     peers = state.allowed_subscribers |> Map.get(did, MapSet.new()) |> MapSet.put(peer_host)
     {:reply, :ok, put_in(state, [:allowed_subscribers, did], peers)}
   end
 
   @impl true
   def handle_call({:subscriber_allowed?, did, peer_host}, _from, state) do
+    peer_host = AnchorHost.normalize(peer_host)
+
     allowed? =
       state.allowed_subscribers
       |> Map.get(did, MapSet.new())
@@ -108,6 +113,7 @@ defmodule Yawp.Federation.PresenceBroker do
 
   @impl true
   def handle_call({:unsubscribe, did, peer_host}, _from, state) do
+    peer_host = AnchorHost.normalize(peer_host)
     peers = state.subscriptions |> Map.get(did, MapSet.new()) |> MapSet.delete(peer_host)
 
     state =

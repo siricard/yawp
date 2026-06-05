@@ -44,10 +44,10 @@ defmodule Yawp.Federation.PresenceTwoAnchorTest do
     did = did_for(pub)
     bare = String.replace_prefix(did, "did:yawp:", "")
 
-    topic = TwoAnchor.call(b, PresenceHarness, :seed_guest, [did, [TwoAnchor.host(a)]])
+    topic = TwoAnchor.call(b, PresenceHarness, :seed_guest, [did, [TwoAnchor.base_url(a)]])
 
     TwoAnchor.call(a, PresenceHarness, :start_tracker, [bare])
-    TwoAnchor.call(a, PresenceBroker, :allow_subscriber, [did, TwoAnchor.host(b)])
+    TwoAnchor.call(a, PresenceBroker, :allow_subscriber, [did, TwoAnchor.base_url(b)])
 
     subscribe_body = TwoAnchor.sign_on(b, %{"did" => did})
 
@@ -126,5 +126,19 @@ defmodule Yawp.Federation.PresenceTwoAnchorTest do
              TwoAnchor.post(b, "/federation/presence/notify", notify_body)
 
     refute TwoAnchor.call(b, PresenceHarness, :present?, [topic, bare])
+  end
+
+  test "authorized notify accepts a home anchor stored as a full URL", %{a: a, b: b} do
+    {pub, _priv} = :crypto.generate_key(:eddsa, :ed25519)
+    did = did_for(pub)
+    bare = String.replace_prefix(did, "did:yawp:", "")
+
+    topic = TwoAnchor.call(b, PresenceHarness, :seed_guest, [did, [TwoAnchor.base_url(a)]])
+    notify_body = TwoAnchor.sign_on(a, %{"did" => did, "state" => "online"})
+
+    assert {:ok, %Req.Response{status: 200, body: %{"status" => "noted"}}} =
+             TwoAnchor.post(b, "/federation/presence/notify", notify_body)
+
+    assert TwoAnchor.call(b, PresenceHarness, :present?, [topic, bare])
   end
 end

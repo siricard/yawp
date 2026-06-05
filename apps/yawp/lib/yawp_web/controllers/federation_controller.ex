@@ -4,6 +4,7 @@ defmodule YawpWeb.FederationController do
   use YawpWeb, :controller
 
   alias Yawp.Federation
+  alias Yawp.Federation.AnchorHost
   alias Yawp.Federation.DeviceSignature
   alias Yawp.Federation.InnerSignature
   alias Yawp.Federation.MessagePipeline
@@ -228,7 +229,8 @@ defmodule YawpWeb.FederationController do
   defp authorize_presence_notify(did, anchor) do
     with true <- is_binary(anchor) and anchor != "",
          {:ok, %Identity.Identity{anchor_list: anchors}} <- Identity.get_identity_by_did(did),
-         true <- anchor in (anchors || []) do
+         normalized_anchor = AnchorHost.normalize(anchor),
+         true <- normalized_anchor in Enum.map(anchors || [], &AnchorHost.normalize/1) do
       :ok
     else
       _ -> {:error, :unauthorized_presence}

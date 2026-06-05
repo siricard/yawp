@@ -130,7 +130,26 @@ defmodule YawpWeb.FederationPresenceTest do
       server: server,
       channel: channel
     } do
-      did = seed_guest(server, anchor_list: [@host])
+      did = seed_guest(server, anchor_list: ["https://#{@host}"])
+      topic = "server:#{server.id}:channel:#{channel.id}"
+      bare = String.replace_prefix(did, "did:yawp:", "")
+
+      conn =
+        post_federation(conn, "/federation/presence/notify", %{
+          "did" => did,
+          "state" => "online"
+        })
+
+      assert json_response(conn, 200) == %{"status" => "noted"}
+      assert Map.has_key?(Presence.list(topic), bare)
+    end
+
+    test "accepts a notify from a verified host stored as a full URL", %{
+      conn: conn,
+      server: server,
+      channel: channel
+    } do
+      did = seed_guest(server, anchor_list: ["https://#{@host}/ignored/path"])
       topic = "server:#{server.id}:channel:#{channel.id}"
       bare = String.replace_prefix(did, "did:yawp:", "")
 

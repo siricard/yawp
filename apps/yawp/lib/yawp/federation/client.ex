@@ -1,6 +1,7 @@
 defmodule Yawp.Federation.Client do
   @moduledoc false
 
+  alias Yawp.Federation.AnchorHost
   alias Yawp.Federation.Wrapper
 
   @default_timeout 10_000
@@ -68,6 +69,7 @@ defmodule Yawp.Federation.Client do
   end
 
   defp post(peer_host, path, inner) do
+    peer_host = AnchorHost.normalize(peer_host)
     body = Wrapper.encode_body(inner, sender_anchor_id: this_anchor_id())
     url = "#{scheme(peer_host)}://#{peer_host}#{path}"
 
