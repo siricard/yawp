@@ -28,14 +28,7 @@ const servers = [{url: "localhost:4000", label: "Local"}];
 let anchorInbox: ((event: unknown) => void) | undefined;
 let anchorDeliveryState: ((event: unknown) => void) | undefined;
 let serverScreenProps: Record<string, unknown> | undefined;
-const mockAcceptPeerRequest: jest.Mock<Promise<unknown>, [unknown]> = jest.fn(async (_config: unknown) => ({
-  success: true,
-  data: { did: "did:yawp:alice" },
-}));
-
-jest.mock("../ash_generated", () => ({
-  acceptPeerRequest: (config: unknown) => mockAcceptPeerRequest(config),
-}));
+const mockFetch = jest.fn();
 
 jest.mock("../session", () => ({
   getValidSessionToken: async () => ({ ok: true, sessionToken: "session" }),
@@ -160,7 +153,12 @@ describe("App direct-message route", () => {
     anchorInbox = undefined;
     anchorDeliveryState = undefined;
     serverScreenProps = undefined;
-    mockAcceptPeerRequest.mockClear();
+    mockFetch.mockReset();
+    mockFetch.mockResolvedValue({
+      ok: true,
+      json: async () => ({ success: true, data: { did: "did:yawp:alice" } }),
+    });
+    global.fetch = mockFetch as unknown as typeof fetch;
   });
 
   test("opens the group peer picker and keeps send disabled until a peer is selected", async () => {
@@ -345,11 +343,22 @@ describe("App direct-message route", () => {
       await root.root.findByProps({ testID: "dm-accept-request-button" }).props.onPress();
     });
 
-    expect(mockAcceptPeerRequest).toHaveBeenCalledWith({
+    expect(mockFetch).toHaveBeenCalledWith(
+      "/rpc/run",
+      expect.objectContaining({
+        method: "POST",
+        headers: expect.objectContaining({
+          Authorization: "Bearer session",
+          "Content-Type": "application/json",
+        }),
+      }),
+    );
+    const requestBody = JSON.parse(mockFetch.mock.calls[0][1].body as string);
+    expect(requestBody).toEqual({
+      action: "accept_peer_request",
       identity: { did: "did:yawp:alice" },
       input: { peerDid: "did:yawp:eve" },
       fields: ["did"],
-      headers: { Authorization: "Bearer session" },
     });
     expect(root.root.findAllByProps({ testID: "dm-message-request-card" })).toHaveLength(0);
     expect(root.root.findByProps({ testID: "dm-composer-input" })).toBeTruthy();
