@@ -1,5 +1,5 @@
 
-import React, {useState} from 'react';
+import React, {useEffect, useState} from 'react';
 import {ScrollView, Text, View} from 'react-native';
 
 import {usePassphrase} from '../identity-context';
@@ -12,13 +12,31 @@ type Props = {
 };
 
 export function PassphraseSettingsScreen({onBack}: Props) {
-  const {sealed, changePassphrase} = usePassphrase();
+  const {
+    sealed,
+    changePassphrase,
+    canUsePasskey,
+    passkeyAvailableHint,
+    passkeyEnrolled,
+    enrollPasskey,
+  } = usePassphrase();
   const [current, setCurrent] = useState('');
   const [next, setNext] = useState('');
   const [confirm, setConfirm] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
+  const [passkeyCapable, setPasskeyCapable] = useState(passkeyAvailableHint);
+
+  useEffect(() => {
+    let mounted = true;
+    void canUsePasskey().then(ok => {
+      if (mounted) setPasskeyCapable(ok);
+    });
+    return () => {
+      mounted = false;
+    };
+  }, [canUsePasskey]);
 
   const removingSeal = sealed && next.length === 0 && confirm.length === 0;
   const settingNew = next.length > 0;
@@ -54,6 +72,23 @@ export function PassphraseSettingsScreen({onBack}: Props) {
     setCurrent('');
     setNext('');
     setConfirm('');
+  }
+
+  async function onEnrollPasskey() {
+    setError(null);
+    setDone(null);
+    setPending(true);
+    const result = await enrollPasskey();
+    setPending(false);
+    if (!result.ok) {
+      setError(
+        result.reason === 'unavailable'
+          ? 'Passkey enrollment is not available on this browser.'
+          : 'Could not enroll a passkey.',
+      );
+      return;
+    }
+    setDone('Passkey enrolled. You can now unlock this device with your passkey or passphrase.');
   }
 
   return (
@@ -101,15 +136,9 @@ export function PassphraseSettingsScreen({onBack}: Props) {
             accessibilityLabel="enable passkey unlock"
             variant="secondary"
             size="sm"
-            label="Enable passkey"
-            disabled={!sealed}
-            onPress={() =>
-              setDone(
-                sealed
-                  ? 'Passkey unlock can be enrolled from this device after passphrase protection is active.'
-                  : null,
-              )
-            }
+            label={passkeyEnrolled ? 'Passkey enabled' : 'Enable passkey'}
+            disabled={!sealed || !passkeyCapable || passkeyEnrolled || pending}
+            onPress={onEnrollPasskey}
           />
         </View>
       </Card>

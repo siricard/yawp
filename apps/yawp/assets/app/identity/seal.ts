@@ -23,12 +23,17 @@ export const SEAL_INFO = 'yawp.identity.seal.v1';
 export type SealedEnvelopeV2 = {
   version: 2;
   sealed: true;
-  /** base64url(16-byte salt) — fresh per seal. */
   salt: string;
-  /** base64url(12-byte nonce) — fresh per seal. */
   nonce: string;
-  /** base64url(ciphertext || poly1305 tag). */
   ciphertext: string;
+  passkey?: {
+    version: 1;
+    credentialId: string;
+    label: string;
+    salt: string;
+    envelope: SealedEnvelopeV2;
+    enrolledAt: string;
+  };
 };
 
 export type SealedReason =
@@ -45,6 +50,12 @@ export class UnsealError extends Error {
     this.reason = reason;
   }
 }
+
+export type UnsealedEnvelopeResult = {
+  bundle: IdentityBundleV1;
+  sealKey: Uint8Array;
+  salt: Uint8Array;
+};
 
 export function isSealedEnvelopeV2(value: unknown): value is SealedEnvelopeV2 {
   if (!value || typeof value !== 'object') return false;
@@ -169,7 +180,24 @@ export function unsealEnvelope(
   envelope: SealedEnvelopeV2,
   passphrase: string,
   _internal?: {iters?: number},
-): {bundle: IdentityBundleV1; sealKey: Uint8Array; salt: Uint8Array} {
+): UnsealedEnvelopeResult {
+  if (!isSealedEnvelopeV2(envelope)) {
+    throw new UnsealError('malformed_envelope');
+  }
+  let salt: Uint8Array;
+  try {
+    salt = b64UrlToBytes(envelope.salt);
+  } catch {
+    throw new UnsealError('malformed_envelope');
+  }
+  const key = deriveSealKey(passphrase, salt, {iters: _internal?.iters});
+  return unsealEnvelopeWithKey(envelope, key);
+}
+
+export function unsealEnvelopeWithKey(
+  envelope: SealedEnvelopeV2,
+  key: Uint8Array,
+): UnsealedEnvelopeResult {
   if (!isSealedEnvelopeV2(envelope)) {
     throw new UnsealError('malformed_envelope');
   }
@@ -186,7 +214,9 @@ export function unsealEnvelope(
   if (salt.length !== SEAL_SALT_BYTES || nonce.length !== SEAL_NONCE_BYTES) {
     throw new UnsealError('malformed_envelope');
   }
-  const key = deriveSealKey(passphrase, salt, {iters: _internal?.iters});
+  if (key.length !== 32) {
+    throw new UnsealError('malformed_envelope');
+  }
   const aad = new TextEncoder().encode(SEAL_INFO);
   const cipher = chacha20poly1305(key, nonce, aad);
   let plaintext: Uint8Array;

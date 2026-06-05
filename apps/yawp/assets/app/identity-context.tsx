@@ -13,6 +13,12 @@ import {
   saveSealedEnvelope,
 } from './identity/storage-bundle';
 import {
+  browserMaySupportPasskeyPrf,
+  canUsePasskeyPrf,
+  enrollPasskeySeal,
+  unlockPasskeySeal,
+} from './identity/passkey';
+import {
   SEAL_SALT_BYTES,
   UnsealError,
   deriveSealKey,
@@ -109,6 +115,10 @@ export type ChangePassphraseResult =
   | {ok: true}
   | {ok: false; reason: 'wrong_passphrase' | 'invalid' | 'unknown'};
 
+export type PasskeyResult =
+  | {ok: true}
+  | {ok: false; reason: 'unavailable' | 'cancelled' | 'tampered' | 'unknown'};
+
 type State =
   | {status: 'loading'; identity: null; error: null}
   | {
@@ -146,6 +156,7 @@ type State =
       sealKey: Uint8Array | null;
       /** Salt that pairs with `sealKey`. Same lifetime as `sealKey`. */
       sealSalt: Uint8Array | null;
+      passkey: SealedEnvelopeV2['passkey'] | null;
       error: null;
     }
   | {status: 'error'; identity: null; error: string};
@@ -235,6 +246,11 @@ type Ctx = {
     current: string | null;
     next: string | null;
   }) => Promise<ChangePassphraseResult>;
+  canUsePasskey: () => Promise<boolean>;
+  passkeyAvailableHint: boolean;
+  passkeyEnrolled: boolean;
+  enrollPasskey: () => Promise<PasskeyResult>;
+  unlockWithPasskey: () => Promise<PasskeyResult>;
 };
 
 const IdentityContext = createContext<Ctx | null>(null);
@@ -421,6 +437,7 @@ export function IdentityProvider({children}: {children: React.ReactNode}) {
             unlockedBundle: entry.bundle,
             sealKey: null,
             sealSalt: null,
+            passkey: null,
             error: null,
           });
           return;
@@ -539,6 +556,7 @@ export function IdentityProvider({children}: {children: React.ReactNode}) {
           current.sealKey,
           current.sealSalt,
         );
+        if (current.passkey) envelope.passkey = current.passkey;
         await saveSealedEnvelope(envelope, didPrefix(current.identity.didFull));
       } else {
         await saveIdentity(nextBundle);
@@ -698,6 +716,7 @@ export function IdentityProvider({children}: {children: React.ReactNode}) {
         unlockedBundle: bundle,
         sealKey: null,
         sealSalt: null,
+        passkey: null,
         error: null,
       });
       return {ok: true};
@@ -732,6 +751,7 @@ export function IdentityProvider({children}: {children: React.ReactNode}) {
       unlockedBundle,
       sealKey: cached?.sealKey ?? null,
       sealSalt: cached?.salt ?? null,
+      passkey: null,
       error: null,
     });
   }, [applyState, displayName]);
@@ -752,6 +772,7 @@ export function IdentityProvider({children}: {children: React.ReactNode}) {
           unlockedBundle: bundle,
           sealKey,
           sealSalt: salt,
+          passkey: envelope.passkey ?? null,
           error: null,
         });
         return {ok: true};
@@ -769,6 +790,63 @@ export function IdentityProvider({children}: {children: React.ReactNode}) {
     },
     [applyState, setServersState],
   );
+
+  const canUsePasskey = useCallback(() => canUsePasskeyPrf(), []);
+
+  const enrollPasskey = useCallback(async (): Promise<PasskeyResult> => {
+    const current = stateRef.current;
+    if (current.status !== 'ready' || !current.sealed) {
+      return {ok: false, reason: 'unavailable'};
+    }
+    try {
+      const passkey = await enrollPasskeySeal(current.unlockedBundle);
+      const envelope = sealBundleWithKey(
+        current.unlockedBundle,
+        current.sealKey!,
+        current.sealSalt!,
+      );
+      envelope.passkey = passkey;
+      await saveSealedEnvelope(envelope, didPrefix(current.identity.didFull));
+      applyState({...current, passkey});
+      return {ok: true};
+    } catch (e) {
+      const msg = e instanceof Error ? e.message.toLowerCase() : '';
+      if (msg.includes('available')) return {ok: false, reason: 'unavailable'};
+      if (msg.includes('cancel')) return {ok: false, reason: 'cancelled'};
+      return {ok: false, reason: 'unknown'};
+    }
+  }, [applyState]);
+
+  const unlockWithPasskey = useCallback(async (): Promise<PasskeyResult> => {
+    const current = stateRef.current;
+    if (current.status !== 'locked' || !current.sealedEnvelope.passkey) {
+      return {ok: false, reason: 'unavailable'};
+    }
+    try {
+      const {bundle} = await unlockPasskeySeal(
+        current.sealedEnvelope.passkey,
+      );
+      setDisplayNameState(bundle.metadata?.displayNameOverride ?? null);
+      setServersState(serversFromBundle(bundle));
+      applyState({
+        status: 'ready',
+        identity: buildIdentityFromBundle(bundle),
+        sealed: true,
+        unlockedBundle: bundle,
+        sealKey: null,
+        sealSalt: null,
+        passkey: current.sealedEnvelope.passkey,
+        error: null,
+      });
+      return {ok: true};
+    } catch (e) {
+      if (e instanceof UnsealError) return {ok: false, reason: 'tampered'};
+      const msg = e instanceof Error ? e.message.toLowerCase() : '';
+      if (msg.includes('available')) return {ok: false, reason: 'unavailable'};
+      if (msg.includes('cancel')) return {ok: false, reason: 'cancelled'};
+      return {ok: false, reason: 'unknown'};
+    }
+  }, [applyState, setServersState]);
 
   const changePassphrase = useCallback(
     async ({
@@ -797,6 +875,7 @@ export function IdentityProvider({children}: {children: React.ReactNode}) {
           const salt = randomSaltBytes();
           const sealKey = deriveSealKey(next, salt);
           const envelope = sealBundleWithKey(bundle, sealKey, salt);
+          if (currentState.passkey) envelope.passkey = currentState.passkey;
           await saveSealedEnvelope(
             envelope,
             didPrefix(currentState.identity.didFull),
@@ -806,6 +885,7 @@ export function IdentityProvider({children}: {children: React.ReactNode}) {
             sealed: true,
             sealKey,
             sealSalt: salt,
+            passkey: currentState.passkey,
           });
         } else {
           await saveIdentity(bundle);
@@ -814,6 +894,7 @@ export function IdentityProvider({children}: {children: React.ReactNode}) {
             sealed: false,
             sealKey: null,
             sealSalt: null,
+            passkey: null,
           });
         }
         return {ok: true};
@@ -846,6 +927,16 @@ export function IdentityProvider({children}: {children: React.ReactNode}) {
         restoreFromMnemonic,
         unlock,
         changePassphrase,
+        canUsePasskey,
+        passkeyAvailableHint: browserMaySupportPasskeyPrf(),
+        passkeyEnrolled:
+          state.status === 'ready'
+            ? !!state.passkey
+            : state.status === 'locked'
+              ? !!state.sealedEnvelope.passkey
+              : false,
+        enrollPasskey,
+        unlockWithPasskey,
       }}>
       {children}
     </IdentityContext.Provider>
@@ -932,6 +1023,11 @@ export function usePassphrase(): {
     current: string | null;
     next: string | null;
   }) => Promise<ChangePassphraseResult>;
+  canUsePasskey: () => Promise<boolean>;
+  passkeyAvailableHint: boolean;
+  passkeyEnrolled: boolean;
+  enrollPasskey: () => Promise<PasskeyResult>;
+  unlockWithPasskey: () => Promise<PasskeyResult>;
 } {
   const ctx = useContext(IdentityContext);
   if (!ctx) {
@@ -947,6 +1043,11 @@ export function usePassphrase(): {
       ctx.state.status === 'locked' ? ctx.state.didPrefix : null,
     unlock: ctx.unlock,
     changePassphrase: ctx.changePassphrase,
+    canUsePasskey: ctx.canUsePasskey,
+    passkeyAvailableHint: ctx.passkeyAvailableHint,
+    passkeyEnrolled: ctx.passkeyEnrolled,
+    enrollPasskey: ctx.enrollPasskey,
+    unlockWithPasskey: ctx.unlockWithPasskey,
   };
 }
 
