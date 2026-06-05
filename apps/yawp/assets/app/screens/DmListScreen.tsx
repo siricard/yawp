@@ -67,6 +67,7 @@ export function DmListScreen({
   const [items, setItems] = useState<DmThreadMessage[]>(conversation?.messages ?? []);
   const [accepted, setAccepted] = useState(false);
   const [selectedPeers, setSelectedPeers] = useState<string[]>([]);
+  const [creatingConversation, setCreatingConversation] = useState(false);
   const seq = useRef(0);
   const wasDegraded = useRef(degraded);
   const participantLabels = new Map(
@@ -88,7 +89,10 @@ export function DmListScreen({
     const decision = decideDmSend(draft, degraded);
     if (!decision.accepted && decision.reason === 'empty') return;
     if (!conversation && onStartConversation && selectedPeers.length === 0) return;
-    onStartConversation?.(selectedPeers, draft.trim());
+    if (!conversation) {
+      onStartConversation?.(selectedPeers, draft.trim());
+      setCreatingConversation(false);
+    }
     seq.current += 1;
     const item: DmThreadMessage = {
       id: `dm-${seq.current}`,
@@ -135,7 +139,7 @@ export function DmListScreen({
     });
   }
 
-  if (!conversation && visibleConversations.length > 0) {
+  if (!conversation && visibleConversations.length > 0 && !creatingConversation) {
     const requestConversations = visibleConversations.filter(item => item.isRequest);
     const mainConversations = visibleConversations.filter(item => !item.isRequest);
     const pinnedConversations = sortPinned(mainConversations, pinnedIds);
@@ -146,6 +150,15 @@ export function DmListScreen({
       <View testID="dm-list-screen" className="flex-1 bg-bg">
         <DmHeader onBack={onBack} />
         <ScrollView className="flex-1 px-6 py-4">
+          {onStartConversation ? (
+            <View className="mb-4">
+              <Button
+                testID="dm-new-group-button"
+                label="New group DM"
+                onPress={() => setCreatingConversation(true)}
+              />
+            </View>
+          ) : null}
           <DmSection
             title="Message Requests"
             conversations={sortRecent(requestConversations)}

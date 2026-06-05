@@ -273,6 +273,112 @@ describe("App direct-message route", () => {
     ReactTestRenderer.act(() => root.unmount());
   });
 
+  test("appends the second group message without recreating the conversation", async () => {
+    let root!: ReactTestRenderer.ReactTestRenderer;
+    await ReactTestRenderer.act(async () => {
+      root = ReactTestRenderer.create(<App />);
+    });
+    await flush();
+
+    await ReactTestRenderer.act(async () => {
+      root.root.findByProps({ testID: "workspace-dm-tile" }).props.onPress();
+    });
+
+    await ReactTestRenderer.act(async () => {
+      root.root
+        .findByProps({ testID: "dm-peer-toggle-did:yawp:bob" })
+        .props.onPress();
+      root.root
+        .findByProps({ testID: "dm-peer-toggle-did:yawp:carol" })
+        .props.onPress();
+      root.root
+        .findByProps({ testID: "dm-composer-input" })
+        .props.onChangeText("first message");
+    });
+
+    await ReactTestRenderer.act(async () => {
+      root.root.findByProps({ testID: "dm-send-button" }).props.onPress();
+    });
+
+    await ReactTestRenderer.act(async () => {
+      root.root
+        .findByProps({ testID: "dm-composer-input" })
+        .props.onChangeText("second message");
+    });
+
+    await ReactTestRenderer.act(async () => {
+      root.root.findByProps({ testID: "dm-send-button" }).props.onPress();
+    });
+
+    expect(root.root.findByProps({ testID: "dm-participant-did:yawp:bob" })).toBeTruthy();
+    expect(root.root.findByProps({ testID: "dm-participant-did:yawp:carol" })).toBeTruthy();
+    const bodyText = root.root
+      .findAllByType(require("react-native").Text)
+      .map(node => node.props.children)
+      .flat(Infinity)
+      .join(" ");
+    expect(bodyText).toContain("first message");
+    expect(bodyText).toContain("second message");
+
+    ReactTestRenderer.act(() => root.unmount());
+  });
+
+  test("starts a new group direct message from a non-empty direct-message list", async () => {
+    let root!: ReactTestRenderer.ReactTestRenderer;
+    await ReactTestRenderer.act(async () => {
+      root = ReactTestRenderer.create(<App />);
+    });
+    await flush();
+
+    await ReactTestRenderer.act(async () => {
+      anchorInbox?.({
+        envelope_id: "existing-dm-1",
+        inbox_serial: 1,
+        is_request: false,
+        envelope: {
+          sender_did: "did:yawp:bob",
+          recipient_dids: ["did:yawp:alice"],
+          conversation_id: "conversation-existing",
+          timestamp: "2026-06-05T00:00:00.000Z",
+          body: "existing message",
+        },
+      });
+    });
+
+    await ReactTestRenderer.act(async () => {
+      root.root.findByProps({ testID: "workspace-dm-tile" }).props.onPress();
+    });
+
+    expect(root.root.findAllByProps({ testID: "dm-conversation-conversation-existing" }).length).toBeGreaterThan(0);
+
+    await ReactTestRenderer.act(async () => {
+      root.root.findByProps({ testID: "dm-new-group-button" }).props.onPress();
+    });
+
+    await ReactTestRenderer.act(async () => {
+      root.root
+        .findByProps({ testID: "dm-peer-toggle-did:yawp:carol" })
+        .props.onPress();
+      root.root
+        .findByProps({ testID: "dm-composer-input" })
+        .props.onChangeText("new thread");
+    });
+
+    await ReactTestRenderer.act(async () => {
+      root.root.findByProps({ testID: "dm-send-button" }).props.onPress();
+    });
+
+    expect(root.root.findByProps({ testID: "dm-participant-did:yawp:carol" })).toBeTruthy();
+    const bodyText = root.root
+      .findAllByType(require("react-native").Text)
+      .map(node => node.props.children)
+      .flat(Infinity)
+      .join(" ");
+    expect(bodyText).toContain("new thread");
+
+    ReactTestRenderer.act(() => root.unmount());
+  });
+
   test("renders inbound request events in the real direct-message route", async () => {
     let root!: ReactTestRenderer.ReactTestRenderer;
     await ReactTestRenderer.act(async () => {
