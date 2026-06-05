@@ -304,11 +304,15 @@ defmodule YawpWeb.FederationControllerTest do
           "envelope_id" => "notif-#{System.unique_integer([:positive])}",
           "kind" => "notification",
           "signed_by" => active.key_id,
-          "source_server" => @host
+          "source_server" => @host,
+          "source_kind" => "room_mention",
+          "room_id_or_thread_id" => "room-1",
+          "message_id" => "msg-1",
+          "timestamp" => DateTime.utc_now() |> DateTime.to_iso8601()
         }
         |> Map.merge(attrs)
 
-      sign_inner(payload, "sender_signature", active.private_key)
+      sign_inner(payload, "source_server_signature", active.private_key)
     end
 
     test "appends a device-signed envelope addressed to a single recipient", %{conn: conn} do
@@ -356,18 +360,16 @@ defmodule YawpWeb.FederationControllerTest do
     test "appends a source-server-signed notification envelope", %{conn: conn} do
       envelope =
         notification_envelope(%{
-          "recipient_dids" => ["did:yawp:notify-one", "did:yawp:notify-two"],
-          "conversation_id" => nil,
-          "message_id" => "msg-1"
+          "user_did" => "did:yawp:notify-one"
         })
 
       conn = post_federation(conn, "/federation/inbox/push", envelope)
       assert json_response(conn, 200) == %{"status" => "appended"}
 
       assert {:ok, [e1]} = Federation.pull_inbox("did:yawp:notify-one", 0, 100)
-      assert {:ok, [e2]} = Federation.pull_inbox("did:yawp:notify-two", 0, 100)
+      assert {:ok, []} = Federation.pull_inbox("did:yawp:notify-two", 0, 100)
       assert e1.kind == "notification"
-      assert e2.envelope_id == envelope["envelope_id"]
+      assert e1.envelope_id == envelope["envelope_id"]
     end
 
     test "rejects a notification envelope signed by a device key", %{conn: conn} do
@@ -379,13 +381,31 @@ defmodule YawpWeb.FederationControllerTest do
           "envelope_id" => "notif-#{System.unique_integer([:positive])}",
           "kind" => "notification",
           "signed_by" => "device-not-server",
-          "recipient_did" => "did:yawp:notify-forged"
+          "user_did" => "did:yawp:notify-forged",
+          "source_kind" => "room_message",
+          "source_server" => @host,
+          "room_id_or_thread_id" => "room-forged",
+          "message_id" => "msg-forged",
+          "timestamp" => DateTime.utc_now() |> DateTime.to_iso8601()
         }
-        |> sign_inner("sender_signature", device_priv)
+        |> sign_inner("source_server_signature", device_priv)
 
       conn = post_federation(conn, "/federation/inbox/push", envelope)
       assert json_response(conn, 403) == %{"error" => "invalid_inner_signature"}
       assert {:ok, []} = Federation.pull_inbox("did:yawp:notify-forged", 0, 100)
+    end
+
+    test "rejects a notification envelope whose source server does not match the wrapper sender",
+         %{conn: conn} do
+      envelope =
+        notification_envelope(%{
+          "user_did" => "did:yawp:notify-mismatch",
+          "source_server" => "other.example"
+        })
+
+      conn = post_federation(conn, "/federation/inbox/push", envelope)
+      assert json_response(conn, 403) == %{"error" => "invalid_inner_signature"}
+      assert {:ok, []} = Federation.pull_inbox("did:yawp:notify-mismatch", 0, 100)
     end
 
     test "rejects an envelope with no recipient with 422", %{conn: conn} do

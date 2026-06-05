@@ -8,7 +8,10 @@ defmodule Yawp.Federation.NotificationSignature do
   def verify(envelope, source_anchor) when is_map(envelope) and is_binary(source_anchor) do
     with key_id when is_binary(key_id) and key_id != "" <-
            Map.get(envelope, "signed_by", Map.get(envelope, "key_id", :missing)),
-         sig_b64 when is_binary(sig_b64) <- Map.get(envelope, "sender_signature", :missing),
+         ^source_anchor <- Map.get(envelope, "source_server", :missing),
+         :ok <- validate_shape(envelope),
+         sig_b64 when is_binary(sig_b64) <-
+           Map.get(envelope, "source_server_signature", :missing),
          {:ok, sig} <- decode(sig_b64, 64),
          true <- verify_signature(envelope, source_anchor, key_id, sig) do
       :ok
@@ -19,10 +22,30 @@ defmodule Yawp.Federation.NotificationSignature do
 
   def verify(_envelope, _source_anchor), do: {:error, :invalid_inner_signature}
 
+  defp validate_shape(%{
+         "kind" => "notification",
+         "user_did" => user_did,
+         "source_kind" => source_kind,
+         "source_server" => source_server,
+         "room_id_or_thread_id" => room_or_thread,
+         "message_id" => message_id,
+         "timestamp" => timestamp
+       })
+       when is_binary(user_did) and user_did != "" and
+              source_kind in ["room_message", "room_mention", "dm"] and
+              is_binary(source_server) and source_server != "" and
+              is_binary(room_or_thread) and room_or_thread != "" and
+              is_binary(message_id) and message_id != "" and is_binary(timestamp) and
+              timestamp != "" do
+    :ok
+  end
+
+  defp validate_shape(_), do: :error
+
   defp verify_signature(envelope, source_anchor, key_id, sig) do
     canonical =
       envelope
-      |> Map.delete("sender_signature")
+      |> Map.delete("source_server_signature")
       |> CanonicalJson.encode()
 
     KeyDocFetcher.verify_with(source_anchor, key_id, canonical, sig)

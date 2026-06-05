@@ -137,6 +137,9 @@ defmodule YawpWeb.FederationController do
   defp validate_envelope_recipients(%{"envelope_id" => env_id} = envelope)
        when is_binary(env_id) do
     cond do
+      Map.get(envelope, "kind") == "notification" and is_binary(Map.get(envelope, "user_did")) ->
+        :ok
+
       match?(%{"recipient_dids" => list} when is_list(list), envelope) ->
         %{"recipient_dids" => list} = envelope
         if list != [] and Enum.all?(list, &is_binary/1), do: :ok, else: :error
@@ -174,6 +177,14 @@ defmodule YawpWeb.FederationController do
   end
 
   defp append_envelope(%{"recipient_did" => did} = envelope) when is_binary(did) do
+    case Federation.append_inbox(did, envelope) do
+      {:ok, _} -> :ok
+      {:error, _} -> :error
+    end
+  end
+
+  defp append_envelope(%{"kind" => "notification", "user_did" => did} = envelope)
+       when is_binary(did) do
     case Federation.append_inbox(did, envelope) do
       {:ok, _} -> :ok
       {:error, _} -> :error

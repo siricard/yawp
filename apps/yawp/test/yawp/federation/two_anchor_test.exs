@@ -39,11 +39,13 @@ defmodule Yawp.Federation.TwoAnchorTest do
     payload = Map.put(payload, "signed_by", active.key_id)
 
     {:ok, signature, key_id} =
-      TwoAnchor.call(anchor, Yawp.Federation, :sign, [Map.delete(payload, "sender_signature")])
+      TwoAnchor.call(anchor, Yawp.Federation, :sign, [
+        Map.delete(payload, "source_server_signature")
+      ])
 
     payload
     |> Map.put("signed_by", key_id)
-    |> Map.put("sender_signature", Base.url_encode64(signature, padding: false))
+    |> Map.put("source_server_signature", Base.url_encode64(signature, padding: false))
   end
 
   test "a user-signed PPE signed on A round-trips to B over real sockets", %{a: a, b: b} do
@@ -369,9 +371,12 @@ defmodule Yawp.Federation.TwoAnchorTest do
       sign_server_inner(a, %{
         "envelope_id" => "notif-#{System.unique_integer([:positive])}",
         "kind" => "notification",
-        "recipient_did" => recipient,
+        "user_did" => recipient,
+        "source_kind" => "room_mention",
         "source_server" => TwoAnchor.host(a),
-        "message_id" => "msg-#{System.unique_integer([:positive])}"
+        "room_id_or_thread_id" => "room-#{System.unique_integer([:positive])}",
+        "message_id" => "msg-#{System.unique_integer([:positive])}",
+        "timestamp" => DateTime.utc_now() |> DateTime.to_iso8601()
       })
 
     body = TwoAnchor.sign_on(a, envelope)
@@ -393,10 +398,14 @@ defmodule Yawp.Federation.TwoAnchorTest do
         "envelope_id" => "notif-#{System.unique_integer([:positive])}",
         "kind" => "notification",
         "signed_by" => a.key_id,
-        "recipient_did" => recipient,
-        "source_server" => TwoAnchor.host(a)
+        "user_did" => recipient,
+        "source_kind" => "room_message",
+        "source_server" => TwoAnchor.host(a),
+        "room_id_or_thread_id" => "room-bad",
+        "message_id" => "msg-bad",
+        "timestamp" => DateTime.utc_now() |> DateTime.to_iso8601()
       }
-      |> sign_inner("sender_signature", rogue_priv)
+      |> sign_inner("source_server_signature", rogue_priv)
 
     body = TwoAnchor.sign_on(a, envelope)
 
