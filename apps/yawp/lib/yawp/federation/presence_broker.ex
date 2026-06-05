@@ -25,10 +25,23 @@ defmodule Yawp.Federation.PresenceBroker do
   def subscribe_peers(server \\ __MODULE__, did, peers)
       when is_binary(did) and is_list(peers) do
     for peer <- peers, is_binary(peer) and peer != "" do
+      allow_subscriber(server, did, peer)
       subscribe(server, did, peer)
     end
 
     :ok
+  end
+
+  @spec allow_subscriber(GenServer.server(), String.t(), String.t()) :: :ok
+  def allow_subscriber(server \\ __MODULE__, did, peer_host)
+      when is_binary(did) and is_binary(peer_host) do
+    GenServer.call(server, {:allow_subscriber, did, peer_host})
+  end
+
+  @spec subscriber_allowed?(GenServer.server(), String.t(), String.t()) :: boolean()
+  def subscriber_allowed?(server \\ __MODULE__, did, peer_host)
+      when is_binary(did) and is_binary(peer_host) do
+    GenServer.call(server, {:subscriber_allowed?, did, peer_host})
   end
 
   @spec unsubscribe(GenServer.server(), String.t(), String.t()) :: :ok
@@ -42,6 +55,7 @@ defmodule Yawp.Federation.PresenceBroker do
     state = %{
       notifier: Keyword.get(opts, :notifier, &default_notifier/3),
       idle_after_ms: Keyword.get_lazy(opts, :idle_after_ms, &configured_idle_after_ms/0),
+      allowed_subscribers: %{},
       subscriptions: %{},
       bare_to_did: %{},
       presence: %{},
@@ -74,6 +88,22 @@ defmodule Yawp.Federation.PresenceBroker do
     state = arm_idle_timer(state, did, current)
 
     {:reply, :ok, state}
+  end
+
+  @impl true
+  def handle_call({:allow_subscriber, did, peer_host}, _from, state) do
+    peers = state.allowed_subscribers |> Map.get(did, MapSet.new()) |> MapSet.put(peer_host)
+    {:reply, :ok, put_in(state, [:allowed_subscribers, did], peers)}
+  end
+
+  @impl true
+  def handle_call({:subscriber_allowed?, did, peer_host}, _from, state) do
+    allowed? =
+      state.allowed_subscribers
+      |> Map.get(did, MapSet.new())
+      |> MapSet.member?(peer_host)
+
+    {:reply, allowed?, state}
   end
 
   @impl true

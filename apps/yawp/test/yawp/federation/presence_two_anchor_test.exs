@@ -2,6 +2,7 @@ defmodule Yawp.Federation.PresenceTwoAnchorTest do
   use ExUnit.Case, async: false
 
   alias Yawp.Identity
+  alias Yawp.Federation.PresenceBroker
   alias Yawp.TestSupport.PresenceHarness
   alias Yawp.TestSupport.TwoAnchor
 
@@ -43,9 +44,10 @@ defmodule Yawp.Federation.PresenceTwoAnchorTest do
     did = did_for(pub)
     bare = String.replace_prefix(did, "did:yawp:", "")
 
-    topic = TwoAnchor.call(b, PresenceHarness, :seed_guest, [did])
+    topic = TwoAnchor.call(b, PresenceHarness, :seed_guest, [did, [TwoAnchor.host(a)]])
 
     TwoAnchor.call(a, PresenceHarness, :start_tracker, [bare])
+    TwoAnchor.call(a, PresenceBroker, :allow_subscriber, [did, TwoAnchor.host(b)])
 
     subscribe_body = TwoAnchor.sign_on(b, %{"did" => did})
 
@@ -75,8 +77,9 @@ defmodule Yawp.Federation.PresenceTwoAnchorTest do
     did = did_for(pub)
     bare = String.replace_prefix(did, "did:yawp:", "")
 
-    topic = TwoAnchor.call(b, PresenceHarness, :seed_guest, [did])
+    topic = TwoAnchor.call(b, PresenceHarness, :seed_guest, [did, [TwoAnchor.host(a)]])
     TwoAnchor.call(a, PresenceHarness, :start_tracker, [bare])
+    TwoAnchor.call(a, PresenceBroker, :allow_subscriber, [did, TwoAnchor.host(b)])
 
     subscribe_body =
       TwoAnchor.sign_on(b, %{"did" => did, "peer_host" => "attacker.example:9"})
@@ -89,5 +92,39 @@ defmodule Yawp.Federation.PresenceTwoAnchorTest do
                fn -> TwoAnchor.call(b, PresenceHarness, :present?, [topic, bare]) end,
                @deadline_ms
              )
+  end
+
+  test "unauthorized subscribe is rejected and does not push diffs", %{a: a, b: b} do
+    {pub, _priv} = :crypto.generate_key(:eddsa, :ed25519)
+    did = did_for(pub)
+    bare = String.replace_prefix(did, "did:yawp:", "")
+
+    topic = TwoAnchor.call(b, PresenceHarness, :seed_guest, [did, [TwoAnchor.host(a)]])
+    TwoAnchor.call(a, PresenceHarness, :start_tracker, [bare])
+
+    subscribe_body = TwoAnchor.sign_on(b, %{"did" => did})
+
+    assert {:ok, %Req.Response{status: 403, body: %{"error" => "unauthorized_presence"}}} =
+             TwoAnchor.post(a, "/federation/presence/subscribe", subscribe_body)
+
+    assert :timeout =
+             poll_until(
+               fn -> TwoAnchor.call(b, PresenceHarness, :present?, [topic, bare]) end,
+               1_000
+             )
+  end
+
+  test "unauthorized notify is rejected and does not update remote presence", %{a: a, b: b} do
+    {pub, _priv} = :crypto.generate_key(:eddsa, :ed25519)
+    did = did_for(pub)
+    bare = String.replace_prefix(did, "did:yawp:", "")
+
+    topic = TwoAnchor.call(b, PresenceHarness, :seed_guest, [did, ["different.example"]])
+    notify_body = TwoAnchor.sign_on(a, %{"did" => did, "state" => "online"})
+
+    assert {:ok, %Req.Response{status: 403, body: %{"error" => "unauthorized_presence"}}} =
+             TwoAnchor.post(b, "/federation/presence/notify", notify_body)
+
+    refute TwoAnchor.call(b, PresenceHarness, :present?, [topic, bare])
   end
 end

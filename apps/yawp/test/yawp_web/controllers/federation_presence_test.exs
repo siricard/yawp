@@ -1,13 +1,5 @@
 defmodule YawpWeb.FederationPresenceTest do
-  @moduledoc """
-  Inbound `/federation/presence/*` endpoints. A peer anchor subscribes
-  to a user's presence; the user's anchor notifies subscribed peers of
-  coarse presence (`online` / `idle` / `offline`). Each request body is
-  a signed delivery wrapper verified against the relaying anchor's
-  published key document (stubbed via `Req.Test`). On receipt the
-  notify endpoint fans the diff out to local Phoenix Presence on the
-  channels where the user is a guest.
-  """
+  @moduledoc false
   use YawpWeb.ConnCase, async: false
 
   import Yawp.TestSupport.PubKey
@@ -65,12 +57,16 @@ defmodule YawpWeb.FederationPresenceTest do
     |> post(path, signed(inner))
   end
 
-  defp seed_guest(server) do
+  defp seed_guest(server, opts) do
     {master_pk, _sk} = :crypto.generate_key(:eddsa, :ed25519)
     did = "did:yawp:" <> Identity.did_from_pubkey(master_pk)
 
     identity =
-      Ash.Seed.seed!(Yawp.Identity.Identity, %{did: did, master_public_key: master_pk})
+      Ash.Seed.seed!(Yawp.Identity.Identity, %{
+        did: did,
+        master_public_key: master_pk,
+        anchor_list: Keyword.get(opts, :anchor_list, [])
+      })
 
     Ash.Seed.seed!(Yawp.Servers.Membership, %{
       identity_id: identity.id,
@@ -85,6 +81,7 @@ defmodule YawpWeb.FederationPresenceTest do
   describe "POST /federation/presence/subscribe" do
     test "records the peer subscription and acknowledges", %{conn: conn} do
       did = "did:yawp:presence-sub"
+      :ok = PresenceBroker.allow_subscriber(did, @host)
 
       conn =
         post_federation(conn, "/federation/presence/subscribe", %{
@@ -93,6 +90,18 @@ defmodule YawpWeb.FederationPresenceTest do
         })
 
       assert json_response(conn, 200) == %{"status" => "subscribed"}
+    end
+
+    test "rejects unauthorized subscriptions before recording the peer", %{conn: conn} do
+      did = "did:yawp:presence-leak"
+
+      conn =
+        post_federation(conn, "/federation/presence/subscribe", %{
+          "did" => did,
+          "peer_host" => "peer-b.example"
+        })
+
+      assert json_response(conn, 403) == %{"error" => "unauthorized_presence"}
     end
 
     test "rejects a subscribe with no did with 422", %{conn: conn} do
@@ -121,7 +130,7 @@ defmodule YawpWeb.FederationPresenceTest do
       server: server,
       channel: channel
     } do
-      did = seed_guest(server)
+      did = seed_guest(server, anchor_list: [@host])
       topic = "server:#{server.id}:channel:#{channel.id}"
       bare = String.replace_prefix(did, "did:yawp:", "")
 
@@ -140,7 +149,7 @@ defmodule YawpWeb.FederationPresenceTest do
       server: server,
       channel: channel
     } do
-      did = seed_guest(server)
+      did = seed_guest(server, anchor_list: [@host])
       topic = "server:#{server.id}:channel:#{channel.id}"
       bare = String.replace_prefix(did, "did:yawp:", "")
 
@@ -164,6 +173,25 @@ defmodule YawpWeb.FederationPresenceTest do
         })
 
       assert json_response(conn, 422) == %{"error" => "invalid_notify"}
+    end
+
+    test "rejects unauthorized notify without changing remote presence", %{
+      conn: conn,
+      server: server,
+      channel: channel
+    } do
+      did = seed_guest(server, anchor_list: ["different.example"])
+      topic = "server:#{server.id}:channel:#{channel.id}"
+      bare = String.replace_prefix(did, "did:yawp:", "")
+
+      conn =
+        post_federation(conn, "/federation/presence/notify", %{
+          "did" => did,
+          "state" => "online"
+        })
+
+      assert json_response(conn, 403) == %{"error" => "unauthorized_presence"}
+      refute Map.has_key?(Presence.list(topic), bare)
     end
   end
 

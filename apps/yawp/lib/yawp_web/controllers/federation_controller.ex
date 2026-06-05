@@ -87,22 +87,26 @@ defmodule YawpWeb.FederationController do
   def presence_subscribe(conn, params) do
     with_inner(conn, params, fn inner, anchor ->
       with %{"did" => did} when is_binary(did) and did != "" <- inner,
-           true <- is_binary(anchor) and anchor != "" do
+           true <- is_binary(anchor) and anchor != "",
+           :ok <- authorize_presence_subscribe(did, anchor) do
         :ok = PresenceBroker.subscribe(did, anchor)
         ok(conn, %{"status" => "subscribed"})
       else
+        {:error, :unauthorized_presence} -> error(conn, 403, "unauthorized_presence")
         _ -> error(conn, 422, "invalid_subscribe")
       end
     end)
   end
 
   def presence_notify(conn, params) do
-    with_inner(conn, params, fn inner, _anchor ->
+    with_inner(conn, params, fn inner, anchor ->
       with %{"did" => did, "state" => state}
-           when is_binary(did) and state in ["online", "idle", "offline"] <- inner do
+           when is_binary(did) and state in ["online", "idle", "offline"] <- inner,
+           :ok <- authorize_presence_notify(did, anchor) do
         :ok = RemotePresence.apply(did, state)
         ok(conn, %{"status" => "noted"})
       else
+        {:error, :unauthorized_presence} -> error(conn, 403, "unauthorized_presence")
         _ -> error(conn, 422, "invalid_notify")
       end
     end)
@@ -210,6 +214,24 @@ defmodule YawpWeb.FederationController do
       {:error, :invalid_signature} -> error(conn, 401, "invalid_signature")
       {:error, :replay} -> error(conn, 409, "replay")
       {:error, _} -> error(conn, 400, "malformed")
+    end
+  end
+
+  defp authorize_presence_subscribe(did, anchor) do
+    if PresenceBroker.subscriber_allowed?(did, anchor) do
+      :ok
+    else
+      {:error, :unauthorized_presence}
+    end
+  end
+
+  defp authorize_presence_notify(did, anchor) do
+    with true <- is_binary(anchor) and anchor != "",
+         {:ok, %Identity.Identity{anchor_list: anchors}} <- Identity.get_identity_by_did(did),
+         true <- anchor in (anchors || []) do
+      :ok
+    else
+      _ -> {:error, :unauthorized_presence}
     end
   end
 

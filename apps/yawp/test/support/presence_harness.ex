@@ -7,10 +7,19 @@ defmodule Yawp.TestSupport.PresenceHarness do
 
   @spec seed_guest(String.t()) :: String.t()
   def seed_guest(did) when is_binary(did) do
+    seed_guest(did, [])
+  end
+
+  @spec seed_guest(String.t(), [String.t()]) :: String.t()
+  def seed_guest(did, anchors) when is_binary(did) and is_list(anchors) do
     {master_pk, _sk} = :crypto.generate_key(:eddsa, :ed25519)
 
     identity =
-      Ash.Seed.seed!(Identity.Identity, %{did: did, master_public_key: master_pk})
+      Ash.Seed.seed!(Identity.Identity, %{
+        did: did,
+        master_public_key: master_pk,
+        anchor_list: anchors
+      })
 
     {:ok, server} = Servers.create_server("Guest-#{System.unique_integer([:positive])}")
 
