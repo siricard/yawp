@@ -8,6 +8,7 @@ import {didFromPubkey, didPrefix, fingerprintFromPubkey} from './identity/did';
 import {masterFromMnemonicSeed, masterPkFromSk, signWithMaster} from './identity/master';
 import {
   loadIdentity,
+  loadSealedEnvelopeFallback,
   loadStoredEntry,
   loadStoredEntryWithBiometrics,
   loadStoredEntryWithDevicePasscode,
@@ -140,6 +141,8 @@ type State =
     }
   | {
       status: 'locked_native';
+      sealedEnvelope?: SealedEnvelopeV2;
+      didPrefix?: string | null;
       identity: null;
       error: null;
     }
@@ -469,7 +472,18 @@ export function IdentityProvider({children}: {children: React.ReactNode}) {
           'name' in e &&
           (e as {name?: unknown}).name === 'KeychainReadError'
         ) {
-          applyState({status: 'locked_native', identity: null, error: null});
+          const fallbackEntry = await loadSealedEnvelopeFallback();
+          if (fallbackEntry?.kind === 'sealed') {
+            applyState({
+              status: 'locked_native',
+              sealedEnvelope: fallbackEntry.envelope,
+              didPrefix: fallbackEntry.didPrefix ?? null,
+              identity: null,
+              error: null,
+            });
+          } else {
+            applyState({status: 'locked_native', identity: null, error: null});
+          }
           return;
         }
         const msg =
@@ -778,7 +792,12 @@ export function IdentityProvider({children}: {children: React.ReactNode}) {
   const unlock = useCallback(
     async (passphrase: string): Promise<UnlockResult> => {
       const current = stateRef.current;
-      if (current.status !== 'locked') return {ok: false, reason: 'unknown'};
+      if (current.status !== 'locked' && current.status !== 'locked_native') {
+        return {ok: false, reason: 'unknown'};
+      }
+      if (!('sealedEnvelope' in current) || !current.sealedEnvelope) {
+        return {ok: false, reason: 'unknown'};
+      }
       const envelope = current.sealedEnvelope;
       try {
         const {bundle, sealKey, salt} = unsealEnvelope(envelope, passphrase);
@@ -1121,7 +1140,9 @@ export function usePassphrase(): {
   return {
     sealed,
     lockedDidPrefix:
-      ctx.state.status === 'locked' ? ctx.state.didPrefix : null,
+      ctx.state.status === 'locked' || ctx.state.status === 'locked_native'
+        ? ctx.state.didPrefix ?? null
+        : null,
     unlock: ctx.unlock,
     changePassphrase: ctx.changePassphrase,
     canUsePasskey: ctx.canUsePasskey,

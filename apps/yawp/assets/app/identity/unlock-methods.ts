@@ -53,8 +53,8 @@ export function resolveUnlockChoice(
 export function defaultUnlockAvailability(): UnlockAvailability {
   const web = Platform.OS === 'web';
   return {
-    biometric: !web,
-    devicePasscode: !web,
+    biometric: false,
+    devicePasscode: false,
     passkey:
       typeof navigator !== 'undefined' &&
       !!navigator.credentials &&

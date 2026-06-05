@@ -95,6 +95,16 @@ describe('unlock method fallback decisions', () => {
     });
   });
 
+  test('does not assume native biometric or passcode capability before probing', () => {
+    Object.defineProperty(Platform, 'OS', {value: 'ios'});
+
+    expect(defaultUnlockAvailability()).toMatchObject({
+      biometric: false,
+      devicePasscode: false,
+      passphrase: true,
+    });
+  });
+
   test('queries native keychain capability instead of assuming biometrics exist', async () => {
     Object.defineProperty(Platform, 'OS', {value: 'ios'});
     const Keychain = require('react-native-keychain');

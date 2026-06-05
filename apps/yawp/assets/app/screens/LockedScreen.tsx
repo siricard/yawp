@@ -4,9 +4,9 @@ import {ScrollView, Text, View} from 'react-native';
 
 import {usePassphrase} from '../identity-context';
 import {
-  defaultUnlockAvailability,
   detectUnlockAvailability,
   resolveUnlockChoice,
+  type UnlockAvailability,
   type UnlockMethod,
 } from '../identity/unlock-methods';
 import {Button, Card, DidPill, Field, Input} from '../ui';
@@ -36,7 +36,16 @@ export function LockedScreen() {
   >([{type: 'start'}]);
   const [activeFallback, setActiveFallback] = useState<UnlockMethod>('passphrase');
   const [passkeyCapable, setPasskeyCapable] = useState(passkeyAvailableHint);
-  const [availability, setAvailability] = useState(defaultUnlockAvailability);
+  const [availability, setAvailability] = useState<UnlockAvailability | null>(
+    null,
+  );
+  const resolvedAvailability =
+    availability ?? {
+      biometric: false,
+      devicePasscode: false,
+      passkey: false,
+      passphrase: false,
+    };
   useEffect(() => {
     let mounted = true;
     void canUsePasskey().then(ok => {
@@ -51,6 +60,7 @@ export function LockedScreen() {
   }, [canUsePasskey]);
   useEffect(() => {
     let mounted = true;
+    if (!availability) return;
     if (availability.biometric) {
       setPending(true);
       setError(null);
@@ -68,14 +78,15 @@ export function LockedScreen() {
     return () => {
       mounted = false;
     };
-  }, [availability.biometric, unlockNative]);
+  }, [availability, unlockNative]);
   useEffect(() => {
     setAvailability(prev => {
+      if (!prev) return prev;
       if (prev.passkey === passkeyCapable && prev.passphrase) return prev;
       return {...prev, passkey: passkeyCapable && passkeyEnrolled};
     });
   }, [passkeyCapable, passkeyEnrolled]);
-  const choice = resolveUnlockChoice(availability, attempts);
+  const choice = resolveUnlockChoice(resolvedAvailability, attempts);
   const showPassphrase =
     activeFallback === 'passphrase' ||
     choice.primary === 'passphrase' ||

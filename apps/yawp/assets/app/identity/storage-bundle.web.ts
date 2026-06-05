@@ -197,6 +197,10 @@ export async function loadStoredEntryWithDevicePasscode(): Promise<StoredIdentit
   return null;
 }
 
+export async function loadSealedEnvelopeFallback(): Promise<StoredIdentityEntry | null> {
+  return loadStoredEntry();
+}
+
 export async function saveStoredEntry(entry: StoredIdentityEntry): Promise<void> {
   const payload =
     entry.kind === 'unsealed'

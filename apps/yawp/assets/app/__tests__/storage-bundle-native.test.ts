@@ -1,8 +1,10 @@
 import * as Keychain from 'react-native-keychain';
 
 import {
+  loadSealedEnvelopeFallback,
   loadStoredEntryWithBiometrics,
   loadStoredEntryWithDevicePasscode,
+  saveSealedEnvelope,
   saveIdentity,
 } from '../identity/storage-bundle.native';
 import type {IdentityBundleV1} from '../identity/bundle';
@@ -68,6 +70,34 @@ describe('native identity keychain policy', () => {
           Keychain.ACCESS_CONTROL.BIOMETRY_CURRENT_SET_OR_DEVICE_PASSCODE,
         authenticationType:
           Keychain.AUTHENTICATION_TYPE.DEVICE_PASSCODE_OR_BIOMETRICS,
+      }),
+    );
+  });
+
+  test('keeps a sealed envelope readable for passphrase fallback after keychain cancellation', async () => {
+    await saveSealedEnvelope(
+      {
+        version: 2,
+        sealed: true,
+        salt: 'AAAAAAAAAAAAAAAAAAAAAA',
+        nonce: 'AAAAAAAAAAAAAAAA',
+        ciphertext: 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA',
+      },
+      'did:yawp:z6MkNative',
+    );
+
+    const entry = await loadSealedEnvelopeFallback();
+
+    expect(entry).toMatchObject({
+      kind: 'sealed',
+      didPrefix: 'did:yawp:z6MkNative',
+    });
+    expect(Keychain.setGenericPassword).toHaveBeenLastCalledWith(
+      expect.any(String),
+      expect.any(String),
+      expect.objectContaining({
+        service: expect.stringContaining('.sealed'),
+        accessible: Keychain.ACCESSIBLE.WHEN_UNLOCKED_THIS_DEVICE_ONLY,
       }),
     );
   });

@@ -24,6 +24,7 @@ const keychainAccessControl =
 const keychainAccessible =
   Keychain.ACCESSIBLE?.WHEN_PASSCODE_SET_THIS_DEVICE_ONLY ??
   Keychain.ACCESSIBLE?.WHEN_UNLOCKED_THIS_DEVICE_ONLY;
+const sealedFallbackService = `${STORAGE_KEY_V1}.sealed`;
 
 const keychainOptions = {
   service: STORAGE_KEY_V1,
@@ -80,6 +81,16 @@ function parseStoredEntry(password: string): StoredIdentityEntry {
   throw new KeychainReadError('Stored identity payload failed shape validation');
 }
 
+function stringifyStoredEntry(entry: StoredIdentityEntry): string {
+  const payload =
+    entry.kind === 'unsealed'
+      ? entry.bundle
+      : entry.didPrefix
+        ? {...entry.envelope, didPrefix: entry.didPrefix}
+        : entry.envelope;
+  return JSON.stringify(payload);
+}
+
 async function readStoredEntry(
   options: Parameters<typeof Keychain.getGenericPassword>[0],
 ): Promise<StoredIdentityEntry | null> {
@@ -109,15 +120,16 @@ export async function loadStoredEntryWithDevicePasscode(): Promise<StoredIdentit
 }
 
 export async function saveStoredEntry(entry: StoredIdentityEntry): Promise<void> {
-  const payload =
-    entry.kind === 'unsealed'
-      ? entry.bundle
-      : entry.didPrefix
-        ? {...entry.envelope, didPrefix: entry.didPrefix}
-        : entry.envelope;
-  await Keychain.setGenericPassword(STORAGE_KEY_V1, JSON.stringify(payload), {
+  await Keychain.setGenericPassword(STORAGE_KEY_V1, stringifyStoredEntry(entry), {
     ...keychainOptions,
   });
+}
+
+export async function loadSealedEnvelopeFallback(): Promise<StoredIdentityEntry | null> {
+  const entry = await readStoredEntry({
+    service: sealedFallbackService,
+  });
+  return entry?.kind === 'sealed' ? entry : null;
 }
 
 export async function loadIdentity(): Promise<IdentityBundleV1 | null> {
@@ -133,9 +145,15 @@ export async function saveSealedEnvelope(
   envelope: SealedEnvelopeV2,
   didPrefix?: string,
 ): Promise<void> {
-  await saveStoredEntry({kind: 'sealed', envelope, didPrefix});
+  const entry: StoredIdentityEntry = {kind: 'sealed', envelope, didPrefix};
+  await saveStoredEntry(entry);
+  await Keychain.setGenericPassword(STORAGE_KEY_V1, stringifyStoredEntry(entry), {
+    service: sealedFallbackService,
+    accessible: Keychain.ACCESSIBLE?.WHEN_UNLOCKED_THIS_DEVICE_ONLY,
+  });
 }
 
 export async function clearIdentityBundle(): Promise<void> {
   await Keychain.resetGenericPassword({service: STORAGE_KEY_V1});
+  await Keychain.resetGenericPassword({service: sealedFallbackService});
 }
