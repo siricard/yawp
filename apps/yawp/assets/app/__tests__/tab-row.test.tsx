@@ -95,6 +95,16 @@ describe('TabRow', () => {
     expect(onOpenDmList).toHaveBeenCalledTimes(1);
   });
 
+  test('recent DM chips open the selected conversation', () => {
+    const onSelectRecentDm = jest.fn();
+    const recentDms = [{id: 'conversation-bob-alice', label: 'Bob'}];
+    const root = render({recentDms, onSelectRecentDm});
+    ReactTestRenderer.act(() => {
+      root.root.findByProps({testID: 'dm-tab-conversation-bob-alice'}).props.onPress();
+    });
+    expect(onSelectRecentDm).toHaveBeenCalledWith(recentDms[0]);
+  });
+
   test('a channel with unreadCount renders a badge', () => {
     const root = render();
     expect(countHost(root, 'channel-tab-badge-ch-2')).toBeGreaterThan(0);

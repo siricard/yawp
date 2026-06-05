@@ -32,6 +32,7 @@ type DmThreadMessage = DmOutboxItem & {
   recipientDids?: string[];
   deliveryStates?: PerRecipientDelivery[];
   replyToId?: string | null;
+  createdAt?: string;
 };
 
 export type DmConversation = {
@@ -71,6 +72,10 @@ export function DmListScreen({
   const participantLabels = new Map(
     (conversation?.participants ?? []).map(participant => [participant.did, participant.label]),
   );
+
+  useEffect(() => {
+    setItems(conversation?.messages ?? []);
+  }, [conversation?.conversationId, conversation?.messages]);
 
   useEffect(() => {
     if (wasDegraded.current && !degraded) {
@@ -133,6 +138,10 @@ export function DmListScreen({
   if (!conversation && visibleConversations.length > 0) {
     const requestConversations = visibleConversations.filter(item => item.isRequest);
     const mainConversations = visibleConversations.filter(item => !item.isRequest);
+    const pinnedConversations = sortPinned(mainConversations, pinnedIds);
+    const unpinnedConversations = mainConversations.filter(
+      item => !pinnedIds.has(conversationKey(item)),
+    );
     return (
       <View testID="dm-list-screen" className="flex-1 bg-bg">
         <DmHeader onBack={onBack} />
@@ -146,14 +155,14 @@ export function DmListScreen({
           />
           <DmSection
             title="Pinned"
-            conversations={sortPinned(mainConversations)}
+            conversations={pinnedConversations}
             pinnedIds={pinnedIds}
             onTogglePin={togglePin}
             onOpenConversation={onOpenConversation}
           />
           <DmSection
             title="Recent"
-            conversations={sortRecent(mainConversations)}
+            conversations={sortRecent(unpinnedConversations)}
             pinnedIds={pinnedIds}
             onTogglePin={togglePin}
             onOpenConversation={onOpenConversation}
@@ -237,7 +246,8 @@ export function DmListScreen({
               const showHeader =
                 !previous ||
                 previous.senderDid !== item.senderDid ||
-                item.senderDid === undefined;
+                item.senderDid === undefined ||
+                !withinGroupedWindow(previous, item);
               const replyTo = item.replyToId
                 ? items.find(existing => existing.id === item.replyToId) ?? null
                 : null;
@@ -362,7 +372,7 @@ function DmSection({
       </Text>
       <View style={{gap: 8}}>
         {conversations.map(conversation => {
-          const id = conversation.conversationId ?? conversation.participants.map(p => p.did).sort().join('|');
+          const id = conversationKey(conversation);
           const label = conversation.participants.map(p => p.label).join(', ');
           return (
             <Pressable
@@ -397,10 +407,21 @@ function DmSection({
   );
 }
 
-function sortPinned(conversations: DmConversation[]): DmConversation[] {
+function conversationKey(conversation: DmConversation): string {
+  return conversation.conversationId ?? conversation.participants.map(p => p.did).sort().join('|');
+}
+
+function sortPinned(
+  conversations: DmConversation[],
+  pinnedIds: Set<string>,
+): DmConversation[] {
   return conversations
-    .filter(c => typeof c.pinnedPosition === 'number')
-    .sort((a, b) => (a.pinnedPosition ?? 0) - (b.pinnedPosition ?? 0));
+    .filter(c => pinnedIds.has(conversationKey(c)))
+    .sort((a, b) => {
+      const aIndex = Array.from(pinnedIds).indexOf(conversationKey(a));
+      const bIndex = Array.from(pinnedIds).indexOf(conversationKey(b));
+      return aIndex - bIndex;
+    });
 }
 
 function sortRecent(conversations: DmConversation[]): DmConversation[] {
@@ -423,6 +444,13 @@ function metadataPinnedPeers(meta: unknown): string[] {
   return Array.isArray(peers) ? peers.filter((peer): peer is string => typeof peer === 'string') : [];
 }
 
+function withinGroupedWindow(previous: DmThreadMessage, next: DmThreadMessage): boolean {
+  const previousTime = new Date(previous.createdAt ?? 0).getTime();
+  const nextTime = new Date(next.createdAt ?? 0).getTime();
+  if (!Number.isFinite(previousTime) || !Number.isFinite(nextTime)) return false;
+  if (previousTime <= 0 || nextTime <= 0) return false;
+  return Math.abs(nextTime - previousTime) <= 300000;
+}
 
 function DeliveryIndicator({item}: {item: DmThreadMessage}) {
   const recipients = item.recipientDids ?? [];

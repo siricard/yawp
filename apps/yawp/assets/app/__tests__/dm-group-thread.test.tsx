@@ -3,6 +3,7 @@ import ReactTestRenderer from 'react-test-renderer';
 
 const mockStatus = {value: {status: 'connected', degraded: false}};
 const mockMutate = jest.fn(async mut => mut({}));
+let mockMetadata: {pinnedPeers?: string[]} = {pinnedPeers: ['conv-alice']};
 
 jest.mock('../chat/anchor-connection', () => ({
   useAnchorStatus: () => mockStatus.value,
@@ -10,7 +11,7 @@ jest.mock('../chat/anchor-connection', () => ({
 
 jest.mock('../identity-context', () => ({
   useOptionalBundleMetadata: () => ({
-    metadata: {pinnedPeers: ['conv-alice']},
+    metadata: mockMetadata,
     ready: true,
     mutate: mockMutate,
   }),
@@ -19,6 +20,10 @@ jest.mock('../identity-context', () => ({
 import {DmListScreen} from '../screens/DmListScreen';
 
 describe('DmListScreen group thread', () => {
+  beforeEach(() => {
+    mockMetadata = {pinnedPeers: ['conv-alice']};
+    mockMutate.mockClear();
+  });
   test('shows fixed participants and attributes bubbles to senders', () => {
     let root!: ReactTestRenderer.ReactTestRenderer;
     ReactTestRenderer.act(() => {
@@ -135,8 +140,8 @@ describe('DmListScreen group thread', () => {
               {did: 'did:yawp:bob', label: 'Bob'},
             ],
             messages: [
-              {id: 'm1', senderDid: 'did:yawp:alice', body: 'hello', delivery: 'sent'},
-              {id: 'm2', senderDid: 'did:yawp:alice', body: 'follow-up', delivery: 'sent'},
+              {id: 'm1', senderDid: 'did:yawp:alice', body: 'hello', delivery: 'sent', createdAt: '2026-06-05T00:00:00.000Z'},
+              {id: 'm2', senderDid: 'did:yawp:alice', body: 'follow-up', delivery: 'sent', createdAt: '2026-06-05T00:04:00.000Z'},
               {id: 'm3', senderDid: 'did:yawp:bob', replyToId: 'm1', body: 'replying', delivery: 'sent'},
             ],
           }}
@@ -158,7 +163,31 @@ describe('DmListScreen group thread', () => {
     ReactTestRenderer.act(() => root.unmount());
   });
 
-  test('dedicated page renders pinned, recent, and all sections keyed by conversation id', async () => {
+  test('same-author headers repeat after the grouping window', () => {
+    let root!: ReactTestRenderer.ReactTestRenderer;
+    ReactTestRenderer.act(() => {
+      root = ReactTestRenderer.create(
+        <DmListScreen
+          onBack={() => {}}
+          conversation={{
+            participants: [{did: 'did:yawp:alice', label: 'Alice'}],
+            messages: [
+              {id: 'm1', senderDid: 'did:yawp:alice', body: 'hello', delivery: 'sent', createdAt: '2026-06-05T00:00:00.000Z'},
+              {id: 'm2', senderDid: 'did:yawp:alice', body: 'later', delivery: 'sent', createdAt: '2026-06-05T00:06:00.000Z'},
+            ],
+          }}
+        />,
+      );
+    });
+
+    expect(root.root.findByProps({testID: 'dm-message-sender-m1'}).props.children).toBe('Alice');
+    expect(root.root.findByProps({testID: 'dm-message-sender-m2'}).props.children).toBe('Alice');
+
+    ReactTestRenderer.act(() => root.unmount());
+  });
+
+  test('dedicated page orders pinned conversations from metadata before recent and all sections', async () => {
+    mockMetadata = {pinnedPeers: ['conv-alice', 'conv-bob']};
     let root!: ReactTestRenderer.ReactTestRenderer;
     await ReactTestRenderer.act(async () => {
       root = ReactTestRenderer.create(
@@ -167,14 +196,12 @@ describe('DmListScreen group thread', () => {
           conversations={[
             {
               conversationId: 'conv-bob',
-              pinnedPosition: 2,
               lastActivityAt: '2026-01-01T12:00:00.000Z',
               participants: [{did: 'did:yawp:bob', label: 'Bob'}],
               messages: [],
             },
             {
               conversationId: 'conv-alice',
-              pinnedPosition: 1,
               lastActivityAt: '2026-01-01T13:00:00.000Z',
               participants: [{did: 'did:yawp:alice', label: 'Alice'}],
               messages: [],
@@ -187,7 +214,19 @@ describe('DmListScreen group thread', () => {
     expect(root.root.findByProps({testID: 'dm-section-pinned'})).toBeTruthy();
     expect(root.root.findByProps({testID: 'dm-section-recent'})).toBeTruthy();
     expect(root.root.findByProps({testID: 'dm-section-all'})).toBeTruthy();
-    expect(root.root.findAllByProps({testID: 'dm-conversation-conv-bob'}).length).toBeGreaterThan(0);
+    const pinned = root.root.findByProps({testID: 'dm-section-pinned'});
+    const pinnedRows = pinned.findAll(
+      node =>
+        typeof node.type === 'string' &&
+        node.props.testID === 'dm-conversation-conv-alice' ||
+        (typeof node.type === 'string' &&
+          node.props.testID === 'dm-conversation-conv-bob'),
+    );
+    expect(pinnedRows.map(row => row.props.testID)).toEqual([
+      'dm-conversation-conv-alice',
+      'dm-conversation-conv-bob',
+    ]);
+    expect(root.root.findByProps({testID: 'dm-section-recent'}).findAllByProps({testID: 'dm-conversation-conv-bob'})).toHaveLength(0);
 
     ReactTestRenderer.act(() => {
       root.root.findAllByProps({testID: 'dm-pin-conv-bob'})[0].props.onPress();

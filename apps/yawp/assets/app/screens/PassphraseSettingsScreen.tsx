@@ -98,13 +98,21 @@ export function PassphraseSettingsScreen({onBack}: Props) {
 
   async function onToggleReadReceipts() {
     const next = !readReceiptsEnabled;
+    setError(null);
+    setDone(null);
     setReceiptsPending(true);
     await mutate(prev => ({...prev, readReceiptsEnabled: next}));
-    await setReadReceipts({
+    const result = await setReadReceipts({
       identity: {did: identity.didFull},
       input: {readReceiptsEnabled: next},
       fields: ['did', 'readReceiptsEnabled'],
     });
+    if (!result.success) {
+      await mutate(prev => ({...prev, readReceiptsEnabled: readReceiptsEnabled}));
+      setError('Could not update read receipts.');
+    } else {
+      setDone(next ? 'Read receipts enabled.' : 'Read receipts disabled.');
+    }
     setReceiptsPending(false);
   }
 

@@ -24,7 +24,9 @@ const metadata = {
   acceptedPeers: ["did:yawp:bob", "did:yawp:carol"],
   publishedProfile: { anchors: ["localhost:4000"] },
 };
+const servers = [{url: "localhost:4000", label: "Local"}];
 let anchorInbox: ((event: unknown) => void) | undefined;
+let serverScreenProps: Record<string, unknown> | undefined;
 const mockAcceptPeerRequest: jest.Mock<Promise<unknown>, [unknown]> = jest.fn(async (_config: unknown) => ({
   success: true,
   data: { did: "did:yawp:alice" },
@@ -32,6 +34,18 @@ const mockAcceptPeerRequest: jest.Mock<Promise<unknown>, [unknown]> = jest.fn(as
 
 jest.mock("../ash_generated", () => ({
   acceptPeerRequest: (config: unknown) => mockAcceptPeerRequest(config),
+}));
+
+jest.mock("../session", () => ({
+  getValidSessionToken: async () => ({ ok: true, token: "session" }),
+}));
+
+jest.mock("../chat/discover", () => ({
+  discoverGeneralChannel: async () => ({
+    id: "channel-general",
+    name: "general",
+    serverId: "server-local",
+  }),
 }));
 
 jest.mock("../identity-context", () => ({
@@ -42,9 +56,10 @@ jest.mock("../identity-context", () => ({
     error: null,
   }),
   useWorkspaceServers: () => ({
-    servers: [],
+    servers,
     removeServer: jest.fn(),
     reorderServers: jest.fn(),
+    setServerUnread: jest.fn(),
   }),
   useDisplayName: () => ({
     displayName: null,
@@ -103,7 +118,23 @@ jest.mock("../screens/PassphraseSettingsScreen", () => ({
 }));
 
 jest.mock("../screens/ServerScreen", () => ({
-  ServerScreen: () => null,
+  ServerScreen: (props: Record<string, unknown>) => {
+    const ReactModule = require("react");
+    const { Pressable, Text, View } = require("react-native");
+    serverScreenProps = props;
+    return ReactModule.createElement(
+      View,
+      { testID: "server-screen-mock" },
+      ReactModule.createElement(
+        Pressable,
+        {
+          testID: "server-open-dm-list",
+          onPress: props.onOpenDmList,
+        },
+        ReactModule.createElement(Text, null, "open"),
+      ),
+    );
+  },
 }));
 
 import App from "../App";
@@ -119,6 +150,7 @@ async function flush() {
 describe("App direct-message route", () => {
   beforeEach(() => {
     anchorInbox = undefined;
+    serverScreenProps = undefined;
     mockAcceptPeerRequest.mockClear();
   });
 
@@ -238,6 +270,68 @@ describe("App direct-message route", () => {
     });
     expect(root.root.findAllByProps({ testID: "dm-message-request-card" })).toHaveLength(0);
     expect(root.root.findByProps({ testID: "dm-composer-input" })).toBeTruthy();
+
+    ReactTestRenderer.act(() => root.unmount());
+  });
+
+  test("wires live conversations into the channel tab row and opens recent DMs in place", async () => {
+    let root!: ReactTestRenderer.ReactTestRenderer;
+    await ReactTestRenderer.act(async () => {
+      root = ReactTestRenderer.create(<App />);
+    });
+    await flush();
+
+    await ReactTestRenderer.act(async () => {
+      root.root
+        .findByProps({ testID: "workspace-tile-localhost:4000" })
+        .props.onPress();
+    });
+    await flush();
+
+    await ReactTestRenderer.act(async () => {
+      anchorInbox?.({
+        envelope_id: "inbox-recent-1",
+        inbox_serial: 1,
+        is_request: false,
+        envelope: {
+          sender_did: "did:yawp:bob",
+          recipient_dids: ["did:yawp:alice"],
+          conversation_id: "conversation-bob-alice",
+          timestamp: "2026-06-05T00:00:00.000Z",
+          body: "hello from bob",
+        },
+      });
+    });
+
+    expect(serverScreenProps?.recentDms).toEqual([
+      { id: "conversation-bob-alice", label: "bob" },
+    ]);
+
+    await ReactTestRenderer.act(async () => {
+      (serverScreenProps?.onSelectRecentDm as (dm: { id: string; label: string }) => void)?.({
+        id: "conversation-bob-alice",
+        label: "bob",
+      });
+    });
+
+    expect(root.root.findByProps({ testID: "dm-message-inbox-recent-1" })).toBeTruthy();
+
+    await ReactTestRenderer.act(async () => {
+      anchorInbox?.({
+        envelope_id: "inbox-recent-2",
+        inbox_serial: 2,
+        is_request: false,
+        envelope: {
+          sender_did: "did:yawp:bob",
+          recipient_dids: ["did:yawp:alice"],
+          conversation_id: "conversation-bob-alice",
+          timestamp: "2026-06-05T00:01:00.000Z",
+          body: "live update",
+        },
+      });
+    });
+
+    expect(root.root.findByProps({ testID: "dm-message-inbox-recent-2" })).toBeTruthy();
 
     ReactTestRenderer.act(() => root.unmount());
   });

@@ -3,7 +3,7 @@ import {Pressable, Text, View} from 'react-native';
 
 import {useEditMode} from '../chat/edit-mode';
 import {useServerUnread} from '../chat/server-unread';
-import {TabRow} from '../chat/TabRow';
+import {TabRow, type RecentDm} from '../chat/TabRow';
 import {useWorkspaceServers} from '../identity-context';
 import {pointerCursor} from '../ui/cursor';
 import {
@@ -28,6 +28,8 @@ type Props = {
   initialChannelName: string;
   onBack: () => void;
   onOpenDmList?: () => void;
+  recentDms?: RecentDm[];
+  onSelectRecentDm?: (dm: RecentDm) => void;
   onRemoved?: (reason: string) => void;
 };
 
@@ -41,6 +43,8 @@ export function ServerScreen({
   initialChannelName,
   onBack,
   onOpenDmList,
+  recentDms,
+  onSelectRecentDm,
   onRemoved,
 }: Props) {
   const [tree, setTree] = useState<ServerTree>(EMPTY_TREE);
@@ -189,6 +193,8 @@ export function ServerScreen({
         activeChannelId={activeChannel.id}
         onSelectChannel={handleSelectChannel}
         onOpenDmList={onOpenDmList}
+        recentDms={recentDms}
+        onSelectRecentDm={onSelectRecentDm}
         editMode={editMode.enabled}
         editAvailable={editMode.available}
         onToggleEdit={editMode.toggle}

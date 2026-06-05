@@ -8,6 +8,7 @@ import {submitBindDevice} from './bind';
 import {AnchorConnectionProvider, type InboxEvent} from './chat/anchor-connection';
 import {normalizeAnchorServerUrl} from './chat/anchor-url';
 import {discoverGeneralChannel} from './chat/discover';
+import type {RecentDm} from './chat/TabRow';
 import {
   IdentityProvider,
   useIdentityState,
@@ -132,6 +133,18 @@ function AppShell() {
     setDmConversation({participants, messages: []});
   }
 
+  function handleSelectRecentDm(dm: RecentDm) {
+    const conversation = inboxConversations.find(item => item.conversationId === dm.id);
+    if (!conversation) return;
+    setDmConversation(conversation);
+    setScreen({kind: 'dm'});
+  }
+
+  function handleOpenDmList() {
+    setDmConversation(null);
+    setScreen({kind: 'dm'});
+  }
+
   async function handleAcceptDmRequest(senderDid: string): Promise<boolean> {
     if (identityState.status !== 'ready') return false;
     const result = await acceptPeerRequest({
@@ -156,6 +169,12 @@ function AppShell() {
     const conversation = conversationFromInboxEvent(event);
     if (!conversation) return;
     setInboxConversations(prev => mergeInboxConversation(prev, conversation));
+    setDmConversation(prev => {
+      if (!prev) return prev;
+      return prev.conversationId === conversation.conversationId
+        ? mergeInboxConversation([prev], conversation)[0]
+        : prev;
+    });
   }, []);
 
   if (identityState.status === 'onboarding') {
@@ -247,7 +266,9 @@ function AppShell() {
           initialChannelId={screen.channelId}
           initialChannelName={screen.channelName}
           onBack={() => setScreen({kind: 'home'})}
-          onOpenDmList={() => setScreen({kind: 'dm'})}
+          onOpenDmList={handleOpenDmList}
+          recentDms={recentDmsFromConversations(inboxConversations)}
+          onSelectRecentDm={handleSelectRecentDm}
           onRemoved={reason => handleRemovedFromServer(screen.serverUrl, reason)}
         />
       );
@@ -268,7 +289,7 @@ function AppShell() {
           <WorkspaceBar
             onAddServer={() => setScreen({kind: 'add-server'})}
             onSelectServer={handleSelectServer}
-            onSelectDm={() => setScreen({kind: 'dm'})}
+            onSelectDm={handleOpenDmList}
             dmActive={screen.kind === 'dm'}
             activeServerUrl={
               screen.kind === 'channel' ? screen.serverUrl : null
@@ -303,9 +324,34 @@ function conversationFromInboxEvent(event: InboxEvent): DmConversation | null {
           ? envelope.recipient_dids.filter((did): did is string => typeof did === 'string')
           : [],
         delivery: 'delivered',
+        createdAt: typeof envelope.timestamp === 'string' ? envelope.timestamp : undefined,
       },
     ],
   };
+}
+
+export function recentDmsFromConversations(
+  conversations: DmConversation[],
+): RecentDm[] {
+  return [...conversations]
+    .filter(conversation => !conversation.isRequest)
+    .sort(
+      (a, b) =>
+        new Date(b.lastActivityAt ?? 0).getTime() -
+        new Date(a.lastActivityAt ?? 0).getTime(),
+    )
+    .slice(0, 5)
+    .map(conversation => {
+      const id =
+        conversation.conversationId ??
+        conversation.participants.map(participant => participant.did).sort().join('|');
+      return {
+        id,
+        label:
+          conversation.participants.map(participant => participant.label).join(', ') ||
+          'Direct message',
+      };
+    });
 }
 
 function mergeInboxConversation(
