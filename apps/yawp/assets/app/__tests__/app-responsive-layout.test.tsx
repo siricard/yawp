@@ -17,6 +17,8 @@ const SERVER: WorkspaceServer = {
 };
 
 const url = (host: string) => ['http:', host].join(String.fromCharCode(47, 47));
+const secureUrl = (host: string) =>
+  ['https:', host].join(String.fromCharCode(47, 47));
 
 const GUEST_SERVER: WorkspaceServer = {
   url: url('guest.example'),
@@ -132,7 +134,7 @@ describe('App — workspace bar is a top horizontal strip at every width', () =>
       addServer: jest.fn(),
     });
     (useBundleMetadata as jest.Mock).mockReturnValue({
-      metadata: {publishedProfile: {anchors: [url('localhost:4000')]}},
+      metadata: {publishedProfile: {anchors: ['localhost:4000']}},
       ready: true,
       mutate: jest.fn(),
     });
@@ -162,7 +164,7 @@ describe('App — workspace bar is a top horizontal strip at every width', () =>
     (useBundleMetadata as jest.Mock).mockReturnValue({
       metadata: {
         publishedProfile: {
-          anchors: [url('anchor-a.example'), url('anchor-b.example')],
+          anchors: ['anchor-a.example', 'anchor-b.example'],
         },
       },
       ready: true,
@@ -172,10 +174,10 @@ describe('App — workspace bar is a top horizontal strip at every width', () =>
     const root = await render();
 
     expect(capturedAnchorUrls).toEqual([
-      url('anchor-a.example'),
-      url('anchor-b.example'),
+      secureUrl('anchor-a.example'),
+      secureUrl('anchor-b.example'),
     ]);
-    expect(capturedAnchorUrls).not.toContain(url('guest.example'));
+    expect(capturedAnchorUrls).not.toContain(secureUrl('guest.example'));
     expect(capturedGuestAnchors).toEqual(['localhost:4000', 'guest.example']);
     ReactTestRenderer.act(() => root.unmount());
   });
@@ -185,12 +187,17 @@ describe('configuredAnchorUrls', () => {
   test('normalizes configured anchor input without workspace fallback', () => {
     expect(
       configuredAnchorUrls([
-        ` ${url('anchor-a.example')} `,
+        ' localhost:4000 ',
+        ' anchor-a.example ',
         '',
-        url('anchor-a.example'),
-        url('anchor-b.example'),
+        'anchor-a.example',
+        'anchor-b.example',
       ]),
-    ).toEqual([url('anchor-a.example'), url('anchor-b.example')]);
+    ).toEqual([
+      url('localhost:4000'),
+      secureUrl('anchor-a.example'),
+      secureUrl('anchor-b.example'),
+    ]);
     expect(configuredAnchorUrls(undefined)).toEqual([]);
   });
 });

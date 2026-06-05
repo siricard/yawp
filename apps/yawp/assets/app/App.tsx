@@ -5,6 +5,7 @@ import {SafeAreaProvider, SafeAreaView} from 'react-native-safe-area-context';
 
 import {submitBindDevice} from './bind';
 import {AnchorConnectionProvider} from './chat/anchor-connection';
+import {normalizeAnchorServerUrl} from './chat/anchor-url';
 import {discoverGeneralChannel} from './chat/discover';
 import {
   IdentityProvider,
@@ -27,13 +28,6 @@ import {VectorTestScreen} from './screens/VectorTestScreen';
 import {WorkspaceBar} from './screens/WorkspaceBar';
 import {getValidSessionToken} from './session';
 
-/**
- * lazy auto-bind on server-tile click. If we have no
- * session for `serverUrl` (or the stored one is within 30s of
- * expiring), transparently call `submitBindDevice` so the channel
- * path always has a usable Bearer token. Returns ok=false with a
- * humanized error message on failure so the caller can show a banner.
- */
 export async function ensureSession(
   serverUrl: string,
   identity: Identity,
@@ -240,8 +234,8 @@ export function configuredAnchorUrls(anchors: string[] | undefined): string[] {
   return Array.from(
     new Set(
       (anchors ?? [])
-        .map(anchor => anchor.trim())
-        .filter(anchor => anchor.length > 0),
+        .map(normalizeAnchorServerUrl)
+        .filter((anchor): anchor is string => Boolean(anchor)),
     ),
   );
 }

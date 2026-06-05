@@ -2,13 +2,14 @@
 import {Socket, type SocketConnectOption} from 'phoenix';
 
 import {getValidSessionToken} from '../session';
+import {normalizeAnchorServerUrl} from './anchor-url';
 
 type CacheEntry = {socket: Socket; token: string};
 
 const sockets = new Map<string, CacheEntry>();
 
 function normalize(url: string): string {
-  return url.trim().replace(/\/+$/, '');
+  return normalizeAnchorServerUrl(url) ?? url.trim().replace(/\/+$/, '');
 }
 
 function wsUrl(serverUrl: string): string {
@@ -65,7 +66,6 @@ export async function getSocket(
   return {ok: true, socket};
 }
 
-/** Test-only: drop the cached socket for `serverUrl`. */
 export function _resetSocketCache(): void {
   for (const base of Array.from(sockets.keys())) {
     dropCachedSocket(base);

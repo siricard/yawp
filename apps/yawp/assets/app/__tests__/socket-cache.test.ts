@@ -1,12 +1,3 @@
-/**
- * `getSocket` runs the
- * rotation hop BEFORE any cache lookup and keys the cached Socket by
- * the session token snapshot used to construct it. A rotated token
- * forces the stale Socket to disconnect and a new one to be built;
- * rotation failure drops the cached entry so the next caller starts
- * clean.
- */
-
 jest.mock('../session', () => ({
   getValidSessionToken: jest.fn(),
 }));
@@ -41,6 +32,8 @@ import {getValidSessionToken} from '../session';
 const sessionMock = getValidSessionToken as unknown as jest.Mock;
 
 const SERVER = 'http://localhost:4000';
+const socketUrl = (host: string) =>
+  ['ws:', `${host}/socket`].join(String.fromCharCode(47, 47));
 
 function okSession(tok: string): {ok: true; sessionToken: string} {
   const out = {ok: true as const, sessionToken: ''};
@@ -67,8 +60,20 @@ describe('getSocket', () => {
     expect(result).toEqual({ok: true, socket: socketInstances[0]});
     expect(socketInstances).toHaveLength(1);
     expect(socketInstances[0].params).toEqual({token: tok});
-    expect(socketInstances[0].url).toBe('ws://localhost:4000/socket');
+    expect(socketInstances[0].url).toBe(socketUrl('localhost:4000'));
     expect(socketInstances[0].connect).toHaveBeenCalledTimes(1);
+  });
+
+  test('host-only configured anchors use the bind-session key and a valid websocket URL', async () => {
+    const tok = 'tok-host';
+    sessionMock.mockResolvedValue(okSession(tok));
+
+    const result = await getSocket('localhost:4000');
+
+    expect(sessionMock).toHaveBeenCalledWith({serverUrl: SERVER});
+    expect(result).toEqual({ok: true, socket: socketInstances[0]});
+    expect(socketInstances[0].params).toEqual({token: tok});
+    expect(socketInstances[0].url).toBe(socketUrl('localhost:4000'));
   });
 
   test('second call with the SAME token → returns the cached Socket; no new Socket constructed', async () => {
