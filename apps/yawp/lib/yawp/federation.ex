@@ -44,6 +44,7 @@ defmodule Yawp.Federation do
         ciphertext_envelope: envelope,
         envelope: envelope,
         wrapper_signature: Keyword.get(opts, :wrapper_signature),
+        is_request: message_request?(recipient_did, envelope),
         received_at: Keyword.get_lazy(opts, :received_at, &DateTime.utc_now/0)
       })
 
@@ -295,6 +296,55 @@ defmodule Yawp.Federation do
         []
     end
   end
+
+  defp message_request?(recipient_did, %{"kind" => kind}) when kind != "dm" do
+    message_request?(recipient_did, %{})
+  end
+
+  defp message_request?(recipient_did, %{"sender_did" => sender_did})
+       when is_binary(recipient_did) and is_binary(sender_did) do
+    not shared_server?(recipient_did, sender_did) and
+      sender_did not in accepted_peers(recipient_did)
+  end
+
+  defp message_request?(_, _), do: false
+
+  defp shared_server?(left_did, right_did) do
+    %{rows: [[count]]} =
+      Yawp.Repo.query!(
+        """
+        SELECT COUNT(*)
+        FROM server_memberships left_membership
+        JOIN identities left_identity ON left_identity.id = left_membership.identity_id
+        JOIN server_memberships right_membership ON right_membership.server_id = left_membership.server_id
+        JOIN identities right_identity ON right_identity.id = right_membership.identity_id
+        WHERE left_identity.did = $1 AND right_identity.did = $2
+          AND left_membership.banned = false AND left_membership.kicked = false
+          AND right_membership.banned = false AND right_membership.kicked = false
+        """,
+        [left_did, right_did]
+      )
+
+    count > 0
+  end
+
+  defp accepted_peers(did) do
+    case Identity.get_private_blob_by_did(did) do
+      {:ok, %Identity.PrivateBlob{ciphertext: ciphertext}} -> decode_accepted_peers(ciphertext)
+      _ -> []
+    end
+  end
+
+  defp decode_accepted_peers(ciphertext) when is_binary(ciphertext) do
+    with {:ok, blob} <- Jason.decode(ciphertext),
+         peers when is_list(peers) <- Map.get(blob, "accepted_peers", []) do
+      Enum.filter(peers, &is_binary/1)
+    else
+      _ -> []
+    end
+  end
+
+  defp decode_accepted_peers(_), do: []
 
   defp endpoint_host do
     url = Application.get_env(:yawp, YawpWeb.Endpoint, [])[:url] || []

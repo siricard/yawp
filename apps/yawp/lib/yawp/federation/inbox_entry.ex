@@ -24,6 +24,7 @@ defmodule Yawp.Federation.InboxEntry do
         :ciphertext_envelope,
         :envelope,
         :wrapper_signature,
+        :is_request,
         :received_at
       ]
 
@@ -86,6 +87,12 @@ defmodule Yawp.Federation.InboxEntry do
 
     attribute :wrapper_signature, :string do
       allow_nil? true
+      public? true
+    end
+
+    attribute :is_request, :boolean do
+      allow_nil? false
+      default false
       public? true
     end
 

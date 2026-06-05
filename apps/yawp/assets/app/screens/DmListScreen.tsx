@@ -13,6 +13,7 @@ import {
 } from '../chat/dm-outbox';
 import {Banner, Button, Input} from '../ui';
 import {pointerCursor} from '../ui/cursor';
+import {useOptionalBundleMetadata} from '../identity-context';
 
 const monospace = Platform.select({
   ios: 'Menlo',
@@ -35,6 +36,7 @@ type DmThreadMessage = DmOutboxItem & {
 type DmConversation = {
   participants: DmParticipant[];
   messages: DmThreadMessage[];
+  isRequest?: boolean;
 };
 
 export function DmListScreen({
@@ -49,8 +51,10 @@ export function DmListScreen({
   onStartConversation?: (recipientDids: string[]) => void;
 }) {
   const {degraded} = useAnchorStatus();
+  const {mutate} = useOptionalBundleMetadata();
   const [draft, setDraft] = useState('');
   const [items, setItems] = useState<DmThreadMessage[]>(conversation?.messages ?? []);
+  const [accepted, setAccepted] = useState(false);
   const [selectedPeers, setSelectedPeers] = useState<string[]>([]);
   const seq = useRef(0);
   const wasDegraded = useRef(degraded);
@@ -85,6 +89,18 @@ export function DmListScreen({
     );
   }
 
+  const isRequest = Boolean(conversation?.isRequest && !accepted);
+  const requestSender = conversation?.participants[0];
+
+  async function acceptRequest() {
+    if (!requestSender) return;
+    await mutate(prev => {
+      const acceptedPeers = Array.from(new Set([...(prev.acceptedPeers ?? []), requestSender.did]));
+      return {...prev, acceptedPeers};
+    });
+    setAccepted(true);
+  }
+
   return (
     <View testID="dm-list-screen" className="flex-1 bg-bg">
       <View className="px-6 py-3 border-b border-border-soft flex-row items-center bg-surface">
@@ -106,6 +122,19 @@ export function DmListScreen({
       </View>
 
       <View className="flex-1 px-6 py-4">
+        {isRequest ? (
+          <View
+            testID="dm-message-request-card"
+            className="mb-4 rounded-lg border border-warning bg-warning-soft px-4 py-3">
+            <Text className="text-sm font-bold text-text">Message Requests</Text>
+            <Text className="text-xs text-text-secondary mt-1">
+              Accept this conversation to reply and move it to your inbox.
+            </Text>
+            <View className="mt-3 flex-row">
+              <Button testID="dm-accept-request-button" label="Accept" onPress={acceptRequest} />
+            </View>
+          </View>
+        ) : null}
         {conversation ? (
           <View testID="dm-participant-list" className="mb-4 flex-row flex-wrap" style={{gap: 6}}>
             {conversation.participants.map(participant => (
@@ -179,7 +208,14 @@ export function DmListScreen({
       </View>
 
       <View className="px-6 pb-4 pt-2 border-t border-border-soft bg-surface">
-        {degraded ? (
+        {isRequest ? (
+          <View testID="dm-request-read-only-notice" className="mb-2">
+            <Banner
+              kind="info"
+              message="This request is read-only until you accept the conversation."
+            />
+          </View>
+        ) : degraded ? (
           <View className="mb-2">
             <Banner
               testID="dm-degraded-notice"
@@ -188,23 +224,25 @@ export function DmListScreen({
             />
           </View>
         ) : null}
-        <View className="flex-row items-end" style={{gap: 8}}>
-          <View className="flex-1">
-            <Input
-              testID="dm-composer-input"
-              variant="textarea"
-              placeholder="Write a message"
-              value={draft}
-              onChangeText={setDraft}
+        {isRequest ? null : (
+          <View className="flex-row items-end" style={{gap: 8}}>
+            <View className="flex-1">
+              <Input
+                testID="dm-composer-input"
+                variant="textarea"
+                placeholder="Write a message"
+                value={draft}
+                onChangeText={setDraft}
+              />
+            </View>
+            <Button
+              testID="dm-send-button"
+              label={degraded ? 'Queue' : 'Send'}
+              onPress={handleSend}
+              disabled={draft.trim().length === 0}
             />
           </View>
-          <Button
-            testID="dm-send-button"
-            label={degraded ? 'Queue' : 'Send'}
-            onPress={handleSend}
-            disabled={draft.trim().length === 0}
-          />
-        </View>
+        )}
       </View>
     </View>
   );

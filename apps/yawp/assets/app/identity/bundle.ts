@@ -47,6 +47,7 @@ export type IdentityBundleV1 = {
       bio?: string;
       anchors?: string[];
     };
+    acceptedPeers?: string[];
   };
 };
 
@@ -146,6 +147,10 @@ export function isIdentityBundleV1(value: unknown): value is IdentityBundleV1 {
         if (!Array.isArray(prof.anchors)) return false;
         if (!prof.anchors.every(a => typeof a === 'string')) return false;
       }
+    }
+    if ('acceptedPeers' in meta && meta.acceptedPeers !== undefined) {
+      if (!Array.isArray(meta.acceptedPeers)) return false;
+      if (!meta.acceptedPeers.every(peer => typeof peer === 'string')) return false;
     }
     if ('servers' in meta && meta.servers !== undefined) {
       if (!Array.isArray(meta.servers)) return false;

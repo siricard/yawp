@@ -51,6 +51,7 @@ defmodule YawpWeb.UserChannel do
       envelope_id: entry.envelope_id,
       conversation_id: entry.conversation_id,
       kind: entry.kind,
+      is_request: entry.is_request,
       inbox_serial: entry.inbox_serial,
       envelope: entry.envelope
     })

@@ -965,9 +965,28 @@ export function useBundleMetadata(): {
   ready: boolean;
   mutate: Ctx['mutateBundleMetadata'];
 } {
+  const value = useOptionalBundleMetadata();
   const ctx = useContext(IdentityContext);
   if (!ctx) {
     throw new Error('useBundleMetadata must be used inside an <IdentityProvider>');
+  }
+  return value;
+}
+
+export function useOptionalBundleMetadata(): {
+  metadata: NonNullable<IdentityBundleV1['metadata']>;
+  ready: boolean;
+  mutate: Ctx['mutateBundleMetadata'];
+} {
+  const ctx = useContext(IdentityContext);
+  if (!ctx) {
+    return {
+      metadata: EMPTY_METADATA,
+      ready: false,
+      mutate: async () => {
+        throw new Error('identity is not ready');
+      },
+    };
   }
   return {
     metadata: ctx.bundleMetadata,

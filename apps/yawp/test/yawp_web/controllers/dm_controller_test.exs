@@ -60,7 +60,38 @@ defmodule YawpWeb.DmControllerTest do
     assert entry.envelope_id == "same-anchor-envelope"
     assert entry.identity_id == recipient_did
     assert entry.ciphertext_envelope["body"] == "hello bob"
+    assert entry.is_request
     refute_receive {:federation_http, _}
+  end
+
+  test "accepted private blob peers bypass message requests" do
+    {sender_pub, _sender_priv} = user_keypair()
+    {recipient_pub, _recipient_priv} = user_keypair()
+    sender_did = did_for(sender_pub)
+    recipient_did = did_for(recipient_pub)
+
+    assert {:ok, _} =
+             Ash.create(
+               Yawp.Identity.PrivateBlob,
+               %{
+                 did: recipient_did,
+                 ciphertext: Jason.encode!(%{"accepted_peers" => [sender_did]}),
+                 blob_version: 1
+               },
+               action: :upsert
+             )
+
+    envelope = %{
+      "envelope_id" => "accepted-peer-envelope",
+      "sender_did" => sender_did,
+      "recipient_dids" => [recipient_did],
+      "conversation_id" =>
+        Yawp.Federation.DmEnvelope.conversation_id(sender_did, [recipient_did]),
+      "kind" => "dm"
+    }
+
+    assert {:ok, entry} = Federation.append_inbox(recipient_did, envelope)
+    refute entry.is_request
   end
 
   test "cross-anchor DM wraps and posts once for each remote recipient anchor", %{conn: conn} do
