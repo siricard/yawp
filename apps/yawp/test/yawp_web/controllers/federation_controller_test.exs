@@ -349,7 +349,7 @@ defmodule YawpWeb.FederationControllerTest do
       device_id = "device-one"
       seed_sender_ppe(master_pub, master_priv, device_pub, device_id)
 
-      recipient = "did:yawp:inbox-one"
+      recipient = seed_recipient_ppe([Federation.local_anchor_host()])
 
       envelope =
         dm_envelope(master_pub, device_priv, device_id, %{
@@ -575,7 +575,7 @@ defmodule YawpWeb.FederationControllerTest do
       {device_pub, device_priv} = device_keypair()
       device_id = "device-fetched"
       sender_did = did_for(master_pub)
-      recipient = "did:yawp:inbox-firstcontact-ok"
+      recipient = seed_recipient_ppe([Federation.local_anchor_host()])
       issued_at = "2026-01-01T00:00:00Z"
       device_pk_b64 = Base.url_encode64(device_pub, padding: false)
 
@@ -764,8 +764,9 @@ defmodule YawpWeb.FederationControllerTest do
     test "returns envelopes after a cursor serial, oldest first", %{conn: conn} do
       {master_pub, master_priv} = user_keypair()
       {device_pub, device_priv} = :crypto.generate_key(:eddsa, :ed25519)
+      {recipient_pub, recipient_priv} = user_keypair()
       device_id = "device-pull"
-      did = "did:yawp:pull"
+      did = did_for(recipient_pub)
       issued_at = "2026-01-01T00:00:00Z"
       device_pk_b64 = Base.url_encode64(device_pub, padding: false)
 
@@ -794,6 +795,14 @@ defmodule YawpWeb.FederationControllerTest do
         |> sign_inner("signature", master_priv)
 
       {:ok, _} = Identity.apply_ppe_if_newer(ppe)
+
+      recipient_ppe =
+        signed_ppe(recipient_pub, recipient_priv, 1, %{
+          "anchors" => [Federation.local_anchor_host()],
+          "display_name" => "Pull Recipient"
+        })
+
+      {:ok, _} = Identity.apply_ppe_if_newer(recipient_ppe)
 
       for n <- 1..3 do
         envelope =

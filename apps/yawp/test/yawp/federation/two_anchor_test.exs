@@ -151,10 +151,11 @@ defmodule Yawp.Federation.TwoAnchorTest do
        %{a: a, b: b} do
     {master_pub, master_priv} = user_keypair()
     {device_pub, device_priv} = user_keypair()
+    {recipient_pub, recipient_priv} = user_keypair()
     device_id = "device-xa"
     issued_at = "2026-01-01T00:00:00Z"
     sender_did = did_for(master_pub)
-    recipient = "did:yawp:two-anchor-inbox"
+    recipient = did_for(recipient_pub)
     env_id = "env-#{System.unique_integer([:positive])}"
 
     ppe =
@@ -177,6 +178,11 @@ defmodule Yawp.Federation.TwoAnchorTest do
       |> sign_inner("signature", master_priv)
 
     assert {:ok, :applied} = TwoAnchor.call(a, Yawp.Identity, :apply_ppe_if_newer, [ppe])
+    recipient_ppe = signed_ppe(recipient, recipient_pub, recipient_priv, [TwoAnchor.host(b)])
+
+    assert {:ok, :applied} =
+             TwoAnchor.call(b, Yawp.Identity, :apply_ppe_if_newer, [recipient_ppe])
+
     assert {:ok, nil} = TwoAnchor.call(b, Yawp.Identity, :get_ppe_by_did, [sender_did])
 
     envelope =
@@ -247,17 +253,23 @@ defmodule Yawp.Federation.TwoAnchorTest do
   test "federated inbox delivery persists the verified wrapper signature", %{a: a, b: b} do
     {master_pub, master_priv} = user_keypair()
     {device_pub, device_priv} = user_keypair()
+    {recipient_pub, recipient_priv} = user_keypair()
     device_id = "device-wrapper-sig"
     issued_at = "2026-01-01T00:00:00Z"
     sender_did = did_for(master_pub)
-    recipient = "did:yawp:wrapper-sig-recipient"
+    recipient = did_for(recipient_pub)
 
-    ppe =
+    sender_ppe =
       signed_ppe(sender_did, master_pub, master_priv, [TwoAnchor.host(a)], [
         delegated_device(device_id, device_pub, issued_at, master_priv)
       ])
 
-    assert {:ok, :applied} = TwoAnchor.call(a, Yawp.Identity, :apply_ppe_if_newer, [ppe])
+    recipient_ppe = signed_ppe(recipient, recipient_pub, recipient_priv, [TwoAnchor.host(b)])
+
+    assert {:ok, :applied} = TwoAnchor.call(a, Yawp.Identity, :apply_ppe_if_newer, [sender_ppe])
+
+    assert {:ok, :applied} =
+             TwoAnchor.call(b, Yawp.Identity, :apply_ppe_if_newer, [recipient_ppe])
 
     envelope =
       %{
@@ -280,6 +292,48 @@ defmodule Yawp.Federation.TwoAnchorTest do
     assert {:ok, [entry]} = TwoAnchor.call(b, Yawp.Federation, :pull_inbox, [recipient, 0, 100])
     assert is_binary(entry.wrapper_signature)
     assert byte_size(entry.wrapper_signature) > 0
+  end
+
+  test "recipient anchor skips a single recipient it is not authoritative for", %{a: a, b: b} do
+    {master_pub, master_priv} = user_keypair()
+    {device_pub, device_priv} = user_keypair()
+    {recipient_pub, recipient_priv} = user_keypair()
+    device_id = "device-single-authority"
+    issued_at = "2026-01-01T00:00:00Z"
+    sender_did = did_for(master_pub)
+    recipient = did_for(recipient_pub)
+
+    sender_ppe =
+      signed_ppe(sender_did, master_pub, master_priv, [TwoAnchor.host(a)], [
+        delegated_device(device_id, device_pub, issued_at, master_priv)
+      ])
+
+    recipient_ppe = signed_ppe(recipient, recipient_pub, recipient_priv, [TwoAnchor.host(a)])
+
+    assert {:ok, :applied} = TwoAnchor.call(a, Yawp.Identity, :apply_ppe_if_newer, [sender_ppe])
+
+    assert {:ok, :applied} =
+             TwoAnchor.call(b, Yawp.Identity, :apply_ppe_if_newer, [recipient_ppe])
+
+    envelope =
+      %{
+        "envelope_id" => "env-#{System.unique_integer([:positive])}",
+        "sender_did" => sender_did,
+        "signed_by" => device_id,
+        "recipient_did" => recipient,
+        "conversation_id" => "conv-single-authority",
+        "kind" => "dm",
+        "sender_profile_version" => 1,
+        "sender_anchors" => [TwoAnchor.host(a)]
+      }
+      |> sign_inner("sender_signature", device_priv)
+
+    body = TwoAnchor.sign_on(a, envelope)
+
+    assert {:ok, %Req.Response{status: 200, body: %{"status" => "appended"}}} =
+             TwoAnchor.post(b, "/federation/inbox/push", body)
+
+    assert {:ok, []} = TwoAnchor.call(b, Yawp.Federation, :pull_inbox, [recipient, 0, 100])
   end
 
   test "recipient anchor appends only recipients it is authoritative for", %{a: a, b: b} do
@@ -333,12 +387,13 @@ defmodule Yawp.Federation.TwoAnchorTest do
     {master_pub, master_priv} = user_keypair()
     {old_device_pub, _old_device_priv} = user_keypair()
     {new_device_pub, new_device_priv} = user_keypair()
+    {recipient_pub, recipient_priv} = user_keypair()
     old_device_id = "device-old"
     new_device_id = "device-new"
     old_issued_at = "2026-01-01T00:00:00Z"
     new_issued_at = "2026-01-02T00:00:00Z"
     sender_did = did_for(master_pub)
-    recipient = "did:yawp:two-anchor-stale-refresh"
+    recipient = did_for(recipient_pub)
 
     cached_ppe =
       %{
@@ -380,6 +435,10 @@ defmodule Yawp.Federation.TwoAnchorTest do
 
     assert {:ok, :applied} = TwoAnchor.call(b, Yawp.Identity, :apply_ppe_if_newer, [cached_ppe])
     assert {:ok, :applied} = TwoAnchor.call(a, Yawp.Identity, :apply_ppe_if_newer, [fresh_ppe])
+    recipient_ppe = signed_ppe(recipient, recipient_pub, recipient_priv, [TwoAnchor.host(b)])
+
+    assert {:ok, :applied} =
+             TwoAnchor.call(b, Yawp.Identity, :apply_ppe_if_newer, [recipient_ppe])
 
     envelope =
       %{

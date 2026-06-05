@@ -223,8 +223,9 @@ defmodule YawpWeb.FederationController do
 
   defp append_envelope(%{"recipient_did" => did} = envelope, wrapper_signature)
        when is_binary(did) do
-    case Federation.append_inbox(did, envelope, wrapper_signature: wrapper_signature) do
+    case append_local_recipient(did, envelope, wrapper_signature) do
       {:ok, _} -> {:ok, [delivery_ack(envelope, did)]}
+      :skip -> {:ok, []}
       {:error, _} -> {:error, :append_failed}
     end
   end
