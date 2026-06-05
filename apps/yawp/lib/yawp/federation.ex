@@ -64,6 +64,7 @@ defmodule Yawp.Federation do
   @spec submit_dm(map()) :: {:ok, map()} | {:error, term()}
   def submit_dm(envelope) when is_map(envelope) do
     with :ok <- DeviceSignature.verify(envelope),
+         :ok <- sender_anchored_here(envelope),
          :ok <- mark_sent(envelope),
          {:ok, deliveries} <- deliver_dm(envelope) do
       {:ok, %{deliveries: deliveries}}
@@ -296,6 +297,18 @@ defmodule Yawp.Federation do
         []
     end
   end
+
+  defp sender_anchored_here(%{"sender_did" => sender_did}) when is_binary(sender_did) do
+    case anchors_for_recipient(sender_did) do
+      anchors when is_list(anchors) ->
+        if local_anchor_host() in anchors, do: :ok, else: {:error, :sender_not_anchored_here}
+
+      _ ->
+        {:error, :sender_not_anchored_here}
+    end
+  end
+
+  defp sender_anchored_here(_), do: {:error, :invalid_envelope}
 
   defp message_request?(recipient_did, %{"kind" => kind}) when kind != "dm" do
     message_request?(recipient_did, %{})

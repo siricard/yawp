@@ -47,12 +47,12 @@ defmodule YawpWeb.FederationController do
   end
 
   def inbox_push(conn, params) do
-    with_inner(conn, params, fn inner, anchor ->
+    with_inner(conn, params, fn inner, anchor, wrapper_signature ->
       with :ok <- validate_envelope_recipients(inner),
            :ok <- consume_delivery_budget(anchor),
            :ok <- verify_inbox_envelope(inner, anchor),
            {:ok, _} <- MessagePipeline.maybe_refresh_ppe(inner),
-           {:ok, acks} <- append_envelope(inner),
+           {:ok, acks} <- append_envelope(inner, wrapper_signature),
            :ok <- DeliveryBudget.record_accepted(anchor),
            :ok <- push_delivery_acks(anchor, acks) do
         ok(conn, %{"status" => "appended"})
@@ -197,11 +197,12 @@ defmodule YawpWeb.FederationController do
     DeviceSignature.verify(envelope)
   end
 
-  defp append_envelope(%{"recipient_dids" => recipient_dids} = envelope)
+  defp append_envelope(%{"recipient_dids" => recipient_dids} = envelope, wrapper_signature)
        when is_list(recipient_dids) do
     Enum.reduce_while(recipient_dids, {:ok, []}, fn did, {:ok, acks} ->
-      case Federation.append_inbox(did, envelope) do
+      case append_local_recipient(did, envelope, wrapper_signature) do
         {:ok, _} -> {:cont, {:ok, [delivery_ack(envelope, did) | acks]}}
+        :skip -> {:cont, {:ok, acks}}
         {:error, _} -> {:halt, {:error, :append_failed}}
       end
     end)
@@ -211,22 +212,52 @@ defmodule YawpWeb.FederationController do
     end
   end
 
-  defp append_envelope(%{"recipient_did" => did} = envelope) when is_binary(did) do
-    case Federation.append_inbox(did, envelope) do
+  defp append_envelope(%{"recipient_did" => did} = envelope, wrapper_signature)
+       when is_binary(did) do
+    case Federation.append_inbox(did, envelope, wrapper_signature: wrapper_signature) do
       {:ok, _} -> {:ok, [delivery_ack(envelope, did)]}
       {:error, _} -> {:error, :append_failed}
     end
   end
 
-  defp append_envelope(%{"kind" => "notification", "user_did" => did} = envelope)
+  defp append_envelope(
+         %{"kind" => "notification", "user_did" => did} = envelope,
+         wrapper_signature
+       )
        when is_binary(did) do
-    case Federation.append_inbox(did, envelope) do
+    case Federation.append_inbox(did, envelope, wrapper_signature: wrapper_signature) do
       {:ok, _} -> {:ok, []}
       {:error, _} -> {:error, :append_failed}
     end
   end
 
-  defp append_envelope(_), do: {:error, :append_failed}
+  defp append_envelope(_, _), do: {:error, :append_failed}
+
+  defp append_local_recipient(did, envelope, wrapper_signature) do
+    if local_recipient?(did) do
+      Federation.append_inbox(did, envelope, wrapper_signature: wrapper_signature)
+    else
+      :skip
+    end
+  end
+
+  defp local_recipient?(did) do
+    local = Federation.local_anchor_host()
+
+    case Identity.get_ppe_by_did(did) do
+      {:ok, %Identity.Ppe{envelope: %{"anchors" => anchors}}} when is_list(anchors) ->
+        local in Enum.map(anchors, &AnchorHost.normalize/1)
+
+      _ ->
+        case Identity.get_identity_by_did(did) do
+          {:ok, %Identity.Identity{anchor_list: anchors}} when is_list(anchors) ->
+            local in Enum.map(anchors, &AnchorHost.normalize/1)
+
+          _ ->
+            false
+        end
+    end
+  end
 
   defp delivery_ack(envelope, did) do
     unsigned = %{
@@ -286,11 +317,18 @@ defmodule YawpWeb.FederationController do
   end
 
   defp with_inner(conn, params, fun) do
-    case Wrapper.unwrap(params, []) do
-      {:ok, inner, anchor} -> fun.(inner, anchor)
+    case Wrapper.unwrap(params, include_signature: true) do
+      {:ok, inner, anchor, signature} -> call_inner_fun(fun, inner, anchor, signature)
       {:error, :invalid_signature} -> error(conn, 401, "invalid_signature")
       {:error, :replay} -> error(conn, 409, "replay")
       {:error, _} -> error(conn, 400, "malformed")
+    end
+  end
+
+  defp call_inner_fun(fun, inner, anchor, signature) do
+    case Function.info(fun, :arity) do
+      {:arity, 3} -> fun.(inner, anchor, signature)
+      {:arity, 2} -> fun.(inner, anchor)
     end
   end
 

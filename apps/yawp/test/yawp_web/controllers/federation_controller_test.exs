@@ -298,6 +298,24 @@ defmodule YawpWeb.FederationControllerTest do
       |> sign_inner("sender_signature", device_priv)
     end
 
+    defp seed_recipient_ppe(anchors) do
+      {pub, priv} = user_keypair()
+      did = did_for(pub)
+
+      ppe =
+        %{
+          "did" => did,
+          "profile_version" => 1,
+          ("public_" <> "key") => pubkey_b64(pub),
+          "anchors" => anchors,
+          "display_name" => "Recipient"
+        }
+        |> sign_inner("signature", priv)
+
+      {:ok, _} = Identity.apply_ppe_if_newer(ppe)
+      did
+    end
+
     defp notification_envelope(attrs) do
       {:ok, active} = Federation.get_active_server_key()
 
@@ -343,18 +361,20 @@ defmodule YawpWeb.FederationControllerTest do
       {device_pub, device_priv} = device_keypair()
       device_id = "device-fan"
       seed_sender_ppe(master_pub, master_priv, device_pub, device_id)
+      r1 = seed_recipient_ppe([Federation.local_anchor_host()])
+      r2 = seed_recipient_ppe([Federation.local_anchor_host()])
 
       envelope =
         dm_envelope(master_pub, device_priv, device_id, %{
-          "recipient_dids" => ["did:yawp:r1", "did:yawp:r2"],
+          "recipient_dids" => [r1, r2],
           "kind" => "dm"
         })
 
       conn = post_federation(conn, "/federation/inbox/push", envelope)
       assert json_response(conn, 200) == %{"status" => "appended"}
 
-      assert {:ok, [e1]} = Federation.pull_inbox("did:yawp:r1", 0, 100)
-      assert {:ok, [e2]} = Federation.pull_inbox("did:yawp:r2", 0, 100)
+      assert {:ok, [e1]} = Federation.pull_inbox(r1, 0, 100)
+      assert {:ok, [e2]} = Federation.pull_inbox(r2, 0, 100)
       assert e1.envelope_id == envelope["envelope_id"]
       assert e2.envelope_id == envelope["envelope_id"]
     end

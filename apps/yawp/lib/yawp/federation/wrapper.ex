@@ -38,7 +38,7 @@ defmodule Yawp.Federation.Wrapper do
   end
 
   @spec unwrap(String.t() | map(), opts()) ::
-          {:ok, inner(), String.t()} | {:error, atom()}
+          {:ok, inner(), String.t()} | {:ok, inner(), String.t(), String.t()} | {:error, atom()}
   def unwrap(body, _opts) when is_binary(body) do
     case Jason.decode(body) do
       {:ok, decoded} -> unwrap(decoded, [])
@@ -53,7 +53,7 @@ defmodule Yawp.Federation.Wrapper do
           "key_id" => key_id,
           "inner" => inner
         },
-        _opts
+        opts
       )
       when is_binary(wrapped) and is_binary(signature_b64) and is_binary(key_id) and
              is_map(inner) do
@@ -64,7 +64,10 @@ defmodule Yawp.Federation.Wrapper do
          true <- verify_signature(sender_anchor_id, key_id, wrapped, signature),
          :ok <- verify_payload_hash(wrapper, inner),
          :ok <- DeliveryNonceCache.record(delivery_nonce) do
-      {:ok, inner, sender_anchor_id}
+      case Keyword.get(opts, :include_signature, false) do
+        true -> {:ok, inner, sender_anchor_id, signature_b64}
+        false -> {:ok, inner, sender_anchor_id}
+      end
     end
   end
 
