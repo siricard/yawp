@@ -60,6 +60,12 @@ defmodule YawpWeb.UserChannel do
   end
 
   @impl true
+  def handle_info({:delivery_state, state}, socket) do
+    push(socket, "delivery_state", state)
+    {:noreply, socket}
+  end
+
+  @impl true
   def handle_in("delivery_ack", payload, socket) do
     if valid_delivery_ack?(payload) do
       broadcast!(socket, "delivery_ack", %{
@@ -83,9 +89,9 @@ defmodule YawpWeb.UserChannel do
 
       broadcast!(socket, "read_marker", %{
         conversation_id: Map.fetch!(payload, "conversation_id"),
-        up_to_serial: Map.fetch!(payload, "up_to_serial"),
+        last_read_envelope_id: Map.fetch!(payload, "last_read_envelope_id"),
         signed_by: Map.fetch!(payload, "signed_by"),
-        signature: Map.fetch!(payload, "signature"),
+        sender_signature: Map.fetch!(payload, "sender_signature"),
         ts: Map.fetch!(payload, "ts")
       })
 
@@ -109,15 +115,20 @@ defmodule YawpWeb.UserChannel do
 
   defp valid_delivery_ack?(_), do: false
 
-  defp valid_read_marker?(%{
-         "conversation_id" => conv,
-         "up_to_serial" => serial,
-         "signed_by" => sb,
-         "signature" => sig,
-         "ts" => ts
-       }) do
-    is_binary(conv) and is_integer(serial) and is_binary(sb) and is_binary(sig) and
-      is_integer(ts)
+  defp valid_read_marker?(
+         %{
+           "conversation_id" => conv,
+           "last_read_envelope_id" => envelope_id,
+           "sender_anchor" => anchor,
+           "signed_by" => sb,
+           "sender_signature" => sig,
+           "ts" => ts
+         } = payload
+       ) do
+    is_binary(conv) and is_binary(envelope_id) and is_binary(anchor) and is_binary(sb) and
+      is_binary(sig) and
+      is_integer(ts) and
+      valid_device_signature?(payload)
   end
 
   defp valid_read_marker?(_), do: false
@@ -134,19 +145,44 @@ defmodule YawpWeb.UserChannel do
         :ok
 
       _ ->
-        _ =
-          Yawp.Federation.Client.push_read_marker!(anchor, %{
+        marker =
+          sign_server_message(%{
             "conversation_id" => Map.fetch!(payload, "conversation_id"),
             "recipient_did" => recipient_did,
             "last_read_envelope_id" => envelope_id,
             "last_read_at" => DateTime.utc_now() |> DateTime.to_iso8601()
           })
 
+        spawn(fn ->
+          try do
+            Yawp.Federation.Client.push_read_marker!(anchor, marker)
+          rescue
+            _ -> :ok
+          catch
+            _, _ -> :ok
+          end
+        end)
+
         :ok
     end
   end
 
   defp forward_read_marker(_, _), do: :ok
+
+  defp valid_device_signature?(payload) do
+    payload
+    |> Map.put("sender_did", Map.get(payload, "sender_did") || Map.get(payload, "recipient_did"))
+    |> Yawp.Federation.DeviceSignature.verify()
+    |> Kernel.==(:ok)
+  end
+
+  defp sign_server_message(unsigned) do
+    {:ok, signature, key_id} = Yawp.Federation.sign(unsigned)
+
+    unsigned
+    |> Map.put("key_id", key_id)
+    |> Map.put("server_signature", Base.encode64(signature))
+  end
 
   defp guest_anchors(params) do
     case params do

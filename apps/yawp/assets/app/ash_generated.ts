@@ -519,6 +519,71 @@ export async function validateRevokeDeviceSessions(
 }
 
 
+export type SetReadReceiptsInput = {
+  readReceiptsEnabled?: boolean;
+};
+
+export type SetReadReceiptsFields = UnifiedFieldSelection<IdentityResourceSchema>[];
+
+export type InferSetReadReceiptsResult<
+  Fields extends SetReadReceiptsFields | undefined,
+> = InferResult<IdentityResourceSchema, Fields>;
+
+export type SetReadReceiptsResult<Fields extends SetReadReceiptsFields | undefined = undefined> = | { success: true; data: InferSetReadReceiptsResult<Fields>; }
+| { success: false; errors: AshRpcError[]; }
+
+;
+
+export async function setReadReceipts<Fields extends SetReadReceiptsFields | undefined = undefined>(
+  config: {
+  tenant?: string;
+  identity: { did: string };
+  input?: SetReadReceiptsInput;
+  fields?: Fields;
+  headers?: Record<string, string>;
+  fetchOptions?: RequestInit;
+  customFetch?: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
+}
+): Promise<SetReadReceiptsResult<Fields extends undefined ? [] : Fields>> {
+  const payload = {
+    action: "set_read_receipts",
+    ...(config.tenant !== undefined && { tenant: config.tenant }),
+    identity: config.identity,
+    input: config.input,
+    ...(config.fields !== undefined && { fields: config.fields })
+  };
+
+  return executeActionRpcRequest<SetReadReceiptsResult<Fields extends undefined ? [] : Fields>>(
+    payload,
+    config
+  );
+}
+
+
+export async function validateSetReadReceipts(
+  config: {
+  tenant?: string;
+  identity: { did: string };
+  input?: SetReadReceiptsInput;
+  headers?: Record<string, string>;
+  fetchOptions?: RequestInit;
+  customFetch?: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
+}
+): Promise<ValidationResult> {
+  const payload = {
+    action: "set_read_receipts",
+    ...(config.tenant !== undefined && { tenant: config.tenant }),
+    identity: config.identity,
+    input: config.input
+  };
+
+  return executeValidationRpcRequest<ValidationResult>(
+    payload,
+    config
+  );
+}
+
+
 export type RotateRefreshInput = {
   token: string;
 };

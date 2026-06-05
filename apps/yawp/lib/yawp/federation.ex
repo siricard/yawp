@@ -10,6 +10,8 @@ defmodule Yawp.Federation do
   alias Yawp.Federation.InboxEntry
   alias Yawp.Identity
 
+  require Ash.Query
+
   resources do
     resource Yawp.Federation.ServerKey do
       define :generate_server_key, action: :generate, args: []
@@ -203,13 +205,20 @@ defmodule Yawp.Federation do
         "envelope_id" => envelope_id,
         "recipient_did" => recipient_did
       }) do
-    upsert_delivery_state(%{
-      envelope_id: envelope_id,
-      recipient_did: recipient_did,
-      state: :delivered,
-      updated_at: DateTime.utc_now()
-    })
-    |> state_result()
+    with {:ok, _state} <- delivery_state_for(envelope_id, recipient_did),
+         {:ok, _} <-
+           upsert_delivery_state(%{
+             envelope_id: envelope_id,
+             recipient_did: recipient_did,
+             state: :delivered,
+             updated_at: DateTime.utc_now()
+           }) do
+      publish_delivery_state(envelope_id, recipient_did, :delivered)
+      :ok
+    else
+      {:error, :not_found} -> {:error, :unknown_delivery_state}
+      {:error, _} = error -> error
+    end
   end
 
   def apply_delivery_ack(_), do: {:error, :invalid_delivery_ack}
@@ -219,13 +228,20 @@ defmodule Yawp.Federation do
         "recipient_did" => recipient_did,
         "last_read_envelope_id" => envelope_id
       }) do
-    upsert_delivery_state(%{
-      envelope_id: envelope_id,
-      recipient_did: recipient_did,
-      state: :read,
-      updated_at: DateTime.utc_now()
-    })
-    |> state_result()
+    with {:ok, _state} <- delivery_state_for(envelope_id, recipient_did),
+         {:ok, _} <-
+           upsert_delivery_state(%{
+             envelope_id: envelope_id,
+             recipient_did: recipient_did,
+             state: :read,
+             updated_at: DateTime.utc_now()
+           }) do
+      publish_delivery_state(envelope_id, recipient_did, :read)
+      :ok
+    else
+      {:error, :not_found} -> {:error, :unknown_delivery_state}
+      {:error, _} = error -> error
+    end
   end
 
   def apply_read_marker(_), do: {:error, :invalid_read_marker}
@@ -250,6 +266,12 @@ defmodule Yawp.Federation do
       |> length()
 
     %{delivered: delivered, read: read, total: total}
+  end
+
+  defp mark_sent(%{"envelope_id" => envelope_id, "sender_did" => sender_did} = envelope)
+       when is_binary(envelope_id) and is_binary(sender_did) do
+    :persistent_term.put({__MODULE__, :envelope_sender, envelope_id}, sender_did)
+    mark_sent(Map.delete(envelope, "sender_did"))
   end
 
   defp mark_sent(%{"envelope_id" => envelope_id, "recipient_dids" => dids})
@@ -284,6 +306,59 @@ defmodule Yawp.Federation do
 
   defp state_result({:ok, _}), do: :ok
   defp state_result({:error, _} = error), do: error
+
+  defp delivery_state_for(envelope_id, recipient_did) do
+    with {:ok, states} <- delivery_states_for_envelope(envelope_id),
+         %DeliveryState{} = state <- Enum.find(states, &(&1.recipient_did == recipient_did)) do
+      {:ok, state}
+    else
+      nil -> {:error, :not_found}
+      error -> error
+    end
+  end
+
+  defp publish_delivery_state(envelope_id, recipient_did, state) do
+    topic = "user:" <> bare_did(sender_did_for_envelope(envelope_id))
+
+    Phoenix.PubSub.broadcast(Yawp.PubSub, topic, {
+      :delivery_state,
+      %{
+        envelope_id: envelope_id,
+        recipient_did: recipient_did,
+        state: Atom.to_string(state)
+      }
+    })
+  end
+
+  defp sender_did_for_envelope(envelope_id) do
+    case :persistent_term.get({__MODULE__, :envelope_sender, envelope_id}, nil) do
+      did when is_binary(did) ->
+        did
+
+      _ ->
+        pull_sender_from_inbox(envelope_id)
+    end
+    |> case do
+      did when is_binary(did) -> did
+      _ -> nil
+    end
+  end
+
+  defp pull_sender_from_inbox(envelope_id) do
+    env_id = envelope_id
+
+    Yawp.Federation.InboxEntry
+    |> Ash.Query.filter(envelope_id == ^env_id)
+    |> Ash.read_one(authorize?: false)
+    |> case do
+      {:ok, %Yawp.Federation.InboxEntry{envelope: %{"sender_did" => did}}} -> did
+      _ -> nil
+    end
+  end
+
+  defp bare_did("did:yawp:" <> bare), do: bare
+  defp bare_did(did) when is_binary(did), do: did
+  defp bare_did(_), do: ""
 
   defp anchors_for_recipient(did) do
     case Identity.get_ppe_by_did(did) do

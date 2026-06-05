@@ -66,20 +66,29 @@ defmodule YawpWeb.FederationController do
   end
 
   def inbox_ack(conn, params) do
-    with_inner(conn, params, fn inner, _anchor ->
-      case Federation.apply_delivery_ack(inner) do
-        :ok -> ok(conn, %{"status" => "delivered"})
-        {:error, _} -> error(conn, 422, "invalid_delivery_ack")
+    with_inner(conn, params, fn inner, anchor ->
+      with :ok <- verify_delivery_ack(inner, anchor),
+           :ok <- Federation.apply_delivery_ack(inner) do
+        ok(conn, %{"status" => "delivered"})
+      else
+        {:error, :invalid_signature} -> error(conn, 403, "invalid_delivery_ack")
+        {:error, :unauthorized_anchor} -> error(conn, 403, "invalid_delivery_ack")
+        {:error, :unknown_delivery_state} -> error(conn, 403, "invalid_delivery_ack")
+        _ -> error(conn, 422, "invalid_delivery_ack")
       end
     end)
   end
 
   def inbox_read_marker(conn, params) do
-    with_inner(conn, params, fn inner, _anchor ->
-      with :ok <- outbound_read_receipts_enabled(inner),
+    with_inner(conn, params, fn inner, anchor ->
+      with :ok <- verify_read_marker(inner, anchor),
+           :ok <- outbound_read_receipts_enabled(inner),
            :ok <- Federation.apply_read_marker(inner) do
         ok(conn, %{"status" => "read"})
       else
+        {:error, :invalid_signature} -> error(conn, 403, "invalid_read_marker")
+        {:error, :unauthorized_anchor} -> error(conn, 403, "invalid_read_marker")
+        {:error, :unknown_delivery_state} -> error(conn, 403, "invalid_read_marker")
         {:error, :read_receipts_disabled} -> ok(conn, %{"status" => "dropped"})
         _ -> error(conn, 422, "invalid_read_marker")
       end
@@ -297,6 +306,89 @@ defmodule YawpWeb.FederationController do
   end
 
   defp outbound_read_receipts_enabled(_), do: {:error, :invalid_read_marker}
+
+  defp verify_delivery_ack(
+         %{
+           "recipient_did" => did,
+           "recipient_anchor" => recipient_anchor,
+           "key_id" => key_id,
+           "server_signature" => signature
+         } = ack,
+         anchor
+       )
+       when is_binary(did) and is_binary(recipient_anchor) and is_binary(key_id) and
+              is_binary(signature) do
+    with true <- AnchorHost.normalize(recipient_anchor) == AnchorHost.normalize(anchor),
+         :ok <- verify_server_signature(ack, anchor),
+         :ok <- recipient_anchor_allowed?(did, anchor) do
+      :ok
+    else
+      false -> {:error, :unauthorized_anchor}
+      {:error, _} = error -> error
+    end
+  end
+
+  defp verify_delivery_ack(_, _), do: {:error, :invalid_signature}
+
+  defp verify_read_marker(
+         %{
+           "recipient_did" => did,
+           "key_id" => key_id,
+           "server_signature" => signature
+         } = marker,
+         anchor
+       )
+       when is_binary(did) and is_binary(key_id) and is_binary(signature) do
+    with :ok <- verify_server_signature(marker, anchor),
+         :ok <- recipient_anchor_allowed?(did, anchor) do
+      :ok
+    end
+  end
+
+  defp verify_read_marker(_, _), do: {:error, :invalid_signature}
+
+  defp verify_server_signature(payload, anchor) do
+    with {:ok, signature} <- Base.decode64(Map.fetch!(payload, "server_signature")),
+         key_id when is_binary(key_id) <- Map.get(payload, "key_id"),
+         canonical <-
+           payload
+           |> Map.delete("server_signature")
+           |> Map.delete("key_id")
+           |> Yawp.CanonicalJson.encode(),
+         true <- Yawp.Federation.KeyDocFetcher.verify_with(anchor, key_id, canonical, signature) do
+      :ok
+    else
+      _ -> {:error, :invalid_signature}
+    end
+  rescue
+    _ -> {:error, :invalid_signature}
+  end
+
+  defp recipient_anchor_allowed?(did, anchor) do
+    normalized = AnchorHost.normalize(anchor)
+
+    case Identity.get_ppe_by_did(did) do
+      {:ok, %Identity.Ppe{envelope: %{"anchors" => anchors}}} when is_list(anchors) ->
+        if normalized in Enum.map(anchors, &AnchorHost.normalize/1) do
+          :ok
+        else
+          {:error, :unauthorized_anchor}
+        end
+
+      _ ->
+        case Identity.get_identity_by_did(did) do
+          {:ok, %Identity.Identity{anchor_list: anchors}} when is_list(anchors) ->
+            if normalized in Enum.map(anchors, &AnchorHost.normalize/1) do
+              :ok
+            else
+              {:error, :unauthorized_anchor}
+            end
+
+          _ ->
+            {:error, :unauthorized_anchor}
+        end
+    end
+  end
 
   defp consume_delivery_budget(anchor) when is_binary(anchor) do
     DeliveryBudget.consume(anchor)

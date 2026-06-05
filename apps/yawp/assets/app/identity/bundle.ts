@@ -49,6 +49,7 @@ export type IdentityBundleV1 = {
     };
     acceptedPeers?: string[];
     pinnedPeers?: string[];
+    readReceiptsEnabled?: boolean;
   };
 };
 
@@ -118,6 +119,13 @@ export function isIdentityBundleV1(value: unknown): value is IdentityBundleV1 {
       'secondAnchorNudgeDismissed' in meta &&
       meta.secondAnchorNudgeDismissed !== undefined &&
       typeof meta.secondAnchorNudgeDismissed !== 'boolean'
+    ) {
+      return false;
+    }
+    if (
+      'readReceiptsEnabled' in meta &&
+      meta.readReceiptsEnabled !== undefined &&
+      typeof meta.readReceiptsEnabled !== 'boolean'
     ) {
       return false;
     }

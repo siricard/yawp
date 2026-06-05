@@ -37,6 +37,7 @@ defmodule Yawp.Identity do
       rpc_action :revoke_device_sessions, :revoke_device_sessions, identities: [:unique_did]
 
       rpc_action :add_anchor, :add_anchor, identities: [:unique_did]
+      rpc_action :set_read_receipts, :set_read_receipts, identities: [:unique_did]
     end
 
     resource Yawp.Identity.RefreshToken do

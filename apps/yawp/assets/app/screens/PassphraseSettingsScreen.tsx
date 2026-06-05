@@ -2,7 +2,8 @@
 import React, {useEffect, useState} from 'react';
 import {ScrollView, Text, View} from 'react-native';
 
-import {usePassphrase} from '../identity-context';
+import {useBundleMetadata, useIdentity, usePassphrase} from '../identity-context';
+import {setReadReceipts} from '../ash_generated';
 import {Button, Card, Field, Input} from '../ui';
 
 const MIN_PASSPHRASE_LENGTH = 8;
@@ -20,13 +21,17 @@ export function PassphraseSettingsScreen({onBack}: Props) {
     passkeyEnrolled,
     enrollPasskey,
   } = usePassphrase();
+  const identity = useIdentity();
+  const {metadata, mutate} = useBundleMetadata();
   const [current, setCurrent] = useState('');
   const [next, setNext] = useState('');
   const [confirm, setConfirm] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
+  const [receiptsPending, setReceiptsPending] = useState(false);
   const [passkeyCapable, setPasskeyCapable] = useState(passkeyAvailableHint);
+  const readReceiptsEnabled = metadata.readReceiptsEnabled !== false;
 
   useEffect(() => {
     let mounted = true;
@@ -91,6 +96,18 @@ export function PassphraseSettingsScreen({onBack}: Props) {
     setDone('Passkey enrolled. You can now unlock this device with your passkey or passphrase.');
   }
 
+  async function onToggleReadReceipts() {
+    const next = !readReceiptsEnabled;
+    setReceiptsPending(true);
+    await mutate(prev => ({...prev, readReceiptsEnabled: next}));
+    await setReadReceipts({
+      identity: {did: identity.didFull},
+      input: {readReceiptsEnabled: next},
+      fields: ['did', 'readReceiptsEnabled'],
+    });
+    setReceiptsPending(false);
+  }
+
   return (
     <ScrollView
       className="flex-1 bg-bg"
@@ -141,6 +158,24 @@ export function PassphraseSettingsScreen({onBack}: Props) {
             onPress={onEnrollPasskey}
           />
         </View>
+      </Card>
+
+      <Card variant="default" style={{marginBottom: 16}}>
+        <Text className="font-display text-lg font-bold text-text mb-2">
+          Direct messages
+        </Text>
+        <Text className="text-sm text-text-secondary mb-4">
+          Send read receipts lets people see when you have read their direct messages.
+        </Text>
+        <Button
+          testID="settings-read-receipts-toggle"
+          accessibilityLabel="toggle send read receipts"
+          variant={readReceiptsEnabled ? 'primary' : 'secondary'}
+          size="sm"
+          label={readReceiptsEnabled ? 'Send read receipts: on' : 'Send read receipts: off'}
+          disabled={receiptsPending}
+          onPress={onToggleReadReceipts}
+        />
       </Card>
 
       <Card variant="default" style={{marginBottom: 16}}>

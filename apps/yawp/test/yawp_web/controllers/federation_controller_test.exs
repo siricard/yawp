@@ -71,6 +71,14 @@ defmodule YawpWeb.FederationControllerTest do
     Map.put(payload, sig_field, Base.url_encode64(sig, padding: false))
   end
 
+  defp sign_server_message(payload) do
+    {:ok, signature, key_id} = Federation.sign(payload)
+
+    payload
+    |> Map.put("key_id", key_id)
+    |> Map.put("server_signature", Base.encode64(signature))
+  end
+
   defp signed_ppe(pub, priv, version, attrs \\ %{}) do
     %{
       "did" => did_for(pub),
@@ -827,18 +835,24 @@ defmodule YawpWeb.FederationControllerTest do
 
   describe "POST /federation/inbox/ack" do
     test "transitions the sender view to delivered", %{conn: conn} do
-      ack = %{
-        "envelope_id" => "env-delivered",
-        "recipient_did" => "did:yawp:bob",
-        "recipient_anchor" => @host,
-        "delivered_at" => "2026-06-05T09:00:00.000Z"
-      }
+      recipient = "did:yawp:bob"
+      create_identity!(recipient, true)
+      :ok = seed_delivery_state("env-delivered", recipient)
+
+      ack =
+        %{
+          "envelope_id" => "env-delivered",
+          "recipient_did" => recipient,
+          "recipient_anchor" => @host,
+          "delivered_at" => "2026-06-05T09:00:00.000Z"
+        }
+        |> sign_server_message()
 
       conn = post_federation(conn, "/federation/inbox/ack", ack)
 
       assert json_response(conn, 200) == %{"status" => "delivered"}
       assert {:ok, [state]} = Federation.delivery_states_for_envelope("env-delivered")
-      assert state.recipient_did == "did:yawp:bob"
+      assert state.recipient_did == recipient
       assert state.state == :delivered
     end
   end
@@ -847,13 +861,16 @@ defmodule YawpWeb.FederationControllerTest do
     test "transitions the sender view to read when receipts are enabled", %{conn: conn} do
       recipient = "did:yawp:reader"
       create_identity!(recipient, true)
+      :ok = seed_delivery_state("env-read", recipient)
 
-      marker = %{
-        "conversation_id" => "conv-read",
-        "recipient_did" => recipient,
-        "last_read_envelope_id" => "env-read",
-        "last_read_at" => "2026-06-05T09:00:01.000Z"
-      }
+      marker =
+        %{
+          "conversation_id" => "conv-read",
+          "recipient_did" => recipient,
+          "last_read_envelope_id" => "env-read",
+          "last_read_at" => "2026-06-05T09:00:01.000Z"
+        }
+        |> sign_server_message()
 
       conn = post_federation(conn, "/federation/inbox/read-marker", marker)
 
@@ -865,18 +882,22 @@ defmodule YawpWeb.FederationControllerTest do
     test "drops outbound read markers when receipts are disabled", %{conn: conn} do
       recipient = "did:yawp:no-receipts"
       create_identity!(recipient, false)
+      :ok = seed_delivery_state("env-drop", recipient)
 
-      marker = %{
-        "conversation_id" => "conv-drop",
-        "recipient_did" => recipient,
-        "last_read_envelope_id" => "env-drop",
-        "last_read_at" => "2026-06-05T09:00:01.000Z"
-      }
+      marker =
+        %{
+          "conversation_id" => "conv-drop",
+          "recipient_did" => recipient,
+          "last_read_envelope_id" => "env-drop",
+          "last_read_at" => "2026-06-05T09:00:01.000Z"
+        }
+        |> sign_server_message()
 
       conn = post_federation(conn, "/federation/inbox/read-marker", marker)
 
       assert json_response(conn, 200) == %{"status" => "dropped"}
-      assert {:ok, []} = Federation.delivery_states_for_envelope("env-drop")
+      assert {:ok, [state]} = Federation.delivery_states_for_envelope("env-drop")
+      assert state.state == :sent
     end
   end
 
@@ -898,5 +919,18 @@ defmodule YawpWeb.FederationControllerTest do
       |> Ash.update(authorize?: false)
 
     identity
+  end
+
+  defp seed_delivery_state(envelope_id, recipient_did) do
+    Federation.upsert_delivery_state(%{
+      envelope_id: envelope_id,
+      recipient_did: recipient_did,
+      state: :sent,
+      updated_at: DateTime.utc_now()
+    })
+    |> case do
+      {:ok, _} -> :ok
+      {:error, reason} -> flunk("could not seed delivery state: #{inspect(reason)}")
+    end
   end
 end

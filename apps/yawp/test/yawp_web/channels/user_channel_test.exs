@@ -6,11 +6,20 @@ defmodule YawpWeb.UserChannelTest do
   alias YawpWeb.Presence
 
   defp seed_identity do
-    {master_pk, _master_sk} = :crypto.generate_key(:eddsa, :ed25519)
+    {master_pk, master_sk} = :crypto.generate_key(:eddsa, :ed25519)
     {device_pk, device_sk} = :crypto.generate_key(:eddsa, :ed25519)
 
     did = "did:yawp:" <> Identity.did_from_pubkey(master_pk)
     device_id = Ecto.UUID.generate()
+    issued_at = DateTime.to_iso8601(DateTime.utc_now())
+    device_pk_b64 = Base.url_encode64(device_pk, padding: false)
+    delegation = %{"device_id" => device_id, "pk" => device_pk_b64, "issued_at" => issued_at}
+
+    delegation_signature =
+      delegation
+      |> Yawp.CanonicalJson.encode()
+      |> then(&:crypto.sign(:eddsa, :none, &1, [master_sk, :ed25519]))
+      |> Base.url_encode64(padding: false)
 
     identity =
       Ash.Seed.seed!(Yawp.Identity.Identity, %{
@@ -20,15 +29,37 @@ defmodule YawpWeb.UserChannelTest do
           "subkeys" => [
             %{
               "device_id" => device_id,
-              "pk" => Base.url_encode64(device_pk, padding: false),
-              "signature" => Base.url_encode64(<<0::64*8>>, padding: false),
-              "issued_at" => DateTime.to_iso8601(DateTime.utc_now())
+              "pk" => device_pk_b64,
+              "signature" => delegation_signature,
+              "issued_at" => issued_at
             }
           ]
         }
       })
 
+    ppe =
+      %{
+        "did" => did,
+        "profile_version" => 1,
+        ("public_" <> "key") => Base.url_encode64(master_pk, padding: false),
+        "anchors" => ["localhost:4000"],
+        "device_subkeys" => [Map.put(delegation, "signature", delegation_signature)]
+      }
+      |> sign_payload("signature", master_sk)
+
+    {:ok, _} = Identity.apply_ppe_if_newer(ppe)
+
     %{identity: identity, did: did, device_id: device_id, device_sk: device_sk}
+  end
+
+  defp sign_payload(payload, field, sk) do
+    sig =
+      payload
+      |> Map.delete(field)
+      |> Yawp.CanonicalJson.encode()
+      |> then(&:crypto.sign(:eddsa, :none, &1, [sk, :ed25519]))
+
+    Map.put(payload, field, Base.url_encode64(sig, padding: false))
   end
 
   defp bare(did), do: String.replace_prefix(did, "did:yawp:", "")
@@ -174,21 +205,26 @@ defmodule YawpWeb.UserChannelTest do
 
   describe "read_marker" do
     test "a well-formed read_marker is accepted and broadcast on the topic" do
+      {:ok, _} = Federation.generate_server_key()
       actor = seed_identity()
       assert {:ok, _reply, socket} = join_user(actor, actor.did)
       assert_push "presence_state", _
 
-      ref =
-        push(socket, "read_marker", %{
+      marker =
+        %{
           "conversation_id" => "conv-1",
-          "up_to_serial" => 7,
+          "last_read_envelope_id" => "env-1",
+          "sender_anchor" => "anchor-a.example",
+          "sender_did" => actor.did,
           "signed_by" => actor.device_id,
-          "signature" => "sig",
           "ts" => System.system_time(:millisecond)
-        })
+        }
+        |> sign_payload("sender_signature", actor.device_sk)
+
+      ref = push(socket, "read_marker", marker)
 
       assert_reply ref, :ok
-      assert_broadcast "read_marker", %{conversation_id: "conv-1", up_to_serial: 7}
+      assert_broadcast "read_marker", %{conversation_id: "conv-1", last_read_envelope_id: "env-1"}
     end
 
     test "a malformed read_marker is rejected" do
