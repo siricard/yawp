@@ -64,5 +64,14 @@ defmodule Yawp.Federation.DmEnvelopeTest do
     assert String.match?(signed.sender_signature, ~r/^[A-Za-z0-9_-]+$/)
     assert :ok = DmEnvelope.verify(signed, ppe)
     assert {:error, :invalid_signature} = DmEnvelope.verify(%{signed | body: "tampered"}, ppe)
+
+    mismatched =
+      %{signed | conversation_id: DmEnvelope.conversation_id(@alice, [@carol])}
+      |> then(fn envelope ->
+        assert {:ok, resigned} = DmEnvelope.sign(envelope, device_sk)
+        resigned
+      end)
+
+    assert {:error, :invalid_signature} = DmEnvelope.verify(mismatched, ppe)
   end
 end

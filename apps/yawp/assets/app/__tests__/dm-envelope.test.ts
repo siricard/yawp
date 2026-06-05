@@ -74,5 +74,12 @@ describe('dm envelope', () => {
 
     await expect(verify(signed, ppe, ed.verify)).resolves.toBe(true);
     await expect(verify({...signed, body: 'tampered'}, ppe, ed.verify)).resolves.toBe(false);
+
+    const mismatched = sign(
+      {...signed, conversation_id: conversationId('did:yawp:alice', ['did:yawp:carol'])},
+      bytes => ed.sign(bytes, deviceSk) as Uint8Array,
+    );
+
+    await expect(verify(mismatched, ppe, ed.verify)).resolves.toBe(false);
   });
 });

@@ -67,6 +67,9 @@ export async function verify(
   ) => boolean | Promise<boolean>,
 ): Promise<boolean> {
   if (!envelope.sender_signature) return false;
+  if (envelope.conversation_id !== conversationId(envelope.sender_did, envelope.recipient_dids)) {
+    return false;
+  }
   const signature = b64UrlToBytes(envelope.sender_signature);
   const message = signingInput(envelope);
   const keys = delegatedDevicePublicKeys(ppe, verifySignature);

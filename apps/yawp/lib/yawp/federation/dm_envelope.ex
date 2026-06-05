@@ -84,6 +84,7 @@ defmodule Yawp.Federation.DmEnvelope do
   def verify(envelope, ppe) when is_map(ppe) do
     with signature when is_binary(signature) <- get_field(envelope, :sender_signature),
          {:ok, sig} <- decode(signature, 64),
+         true <- conversation_id_matches?(envelope),
          {:ok, canonical} <- signing_input(envelope),
          [_ | _] = keys <- delegated_device_keys(ppe),
          true <- Enum.any?(keys, &verify_with_key(canonical, sig, &1)) do
@@ -123,6 +124,17 @@ defmodule Yawp.Federation.DmEnvelope do
   end
 
   defp signing_input(_envelope), do: {:error, :invalid_envelope}
+
+  defp conversation_id_matches?(envelope) do
+    sender_did = get_field(envelope, :sender_did)
+    recipient_dids = get_field(envelope, :recipient_dids)
+    supplied_conversation_id = get_field(envelope, :conversation_id)
+
+    is_binary(sender_did) and is_list(recipient_dids) and
+      supplied_conversation_id == conversation_id(sender_did, recipient_dids)
+  rescue
+    _ -> false
+  end
 
   defp signing_map(%__MODULE__{} = envelope) do
     envelope
