@@ -50,12 +50,34 @@ defmodule YawpWeb.FederationController do
       with :ok <- validate_envelope_recipients(inner),
            :ok <- verify_inbox_envelope(inner, anchor),
            {:ok, _} <- MessagePipeline.maybe_refresh_ppe(inner),
-           :ok <- append_envelope(inner) do
+           {:ok, acks} <- append_envelope(inner),
+           :ok <- push_delivery_acks(anchor, acks) do
         ok(conn, %{"status" => "appended"})
       else
         {:error, :invalid_inner_signature} -> error(conn, 403, "invalid_inner_signature")
         {:error, :unresolvable_sender} -> error(conn, 422, "unresolvable_sender")
         _ -> error(conn, 422, "invalid_envelope")
+      end
+    end)
+  end
+
+  def inbox_ack(conn, params) do
+    with_inner(conn, params, fn inner, _anchor ->
+      case Federation.apply_delivery_ack(inner) do
+        :ok -> ok(conn, %{"status" => "delivered"})
+        {:error, _} -> error(conn, 422, "invalid_delivery_ack")
+      end
+    end)
+  end
+
+  def inbox_read_marker(conn, params) do
+    with_inner(conn, params, fn inner, _anchor ->
+      with :ok <- outbound_read_receipts_enabled(inner),
+           :ok <- Federation.apply_read_marker(inner) do
+        ok(conn, %{"status" => "read"})
+      else
+        {:error, :read_receipts_disabled} -> ok(conn, %{"status" => "dropped"})
+        _ -> error(conn, 422, "invalid_read_marker")
       end
     end)
   end
@@ -173,30 +195,73 @@ defmodule YawpWeb.FederationController do
 
   defp append_envelope(%{"recipient_dids" => recipient_dids} = envelope)
        when is_list(recipient_dids) do
-    Enum.reduce_while(recipient_dids, :ok, fn did, _acc ->
+    Enum.reduce_while(recipient_dids, {:ok, []}, fn did, {:ok, acks} ->
       case Federation.append_inbox(did, envelope) do
-        {:ok, _} -> {:cont, :ok}
-        {:error, _} -> {:halt, :error}
+        {:ok, _} -> {:cont, {:ok, [delivery_ack(envelope, did) | acks]}}
+        {:error, _} -> {:halt, {:error, :append_failed}}
       end
     end)
+    |> case do
+      {:ok, acks} -> {:ok, Enum.reverse(acks)}
+      error -> error
+    end
   end
 
   defp append_envelope(%{"recipient_did" => did} = envelope) when is_binary(did) do
     case Federation.append_inbox(did, envelope) do
-      {:ok, _} -> :ok
-      {:error, _} -> :error
+      {:ok, _} -> {:ok, [delivery_ack(envelope, did)]}
+      {:error, _} -> {:error, :append_failed}
     end
   end
 
   defp append_envelope(%{"kind" => "notification", "user_did" => did} = envelope)
        when is_binary(did) do
     case Federation.append_inbox(did, envelope) do
-      {:ok, _} -> :ok
-      {:error, _} -> :error
+      {:ok, _} -> {:ok, []}
+      {:error, _} -> {:error, :append_failed}
     end
   end
 
-  defp append_envelope(_), do: :error
+  defp append_envelope(_), do: {:error, :append_failed}
+
+  defp delivery_ack(envelope, did) do
+    unsigned = %{
+      "envelope_id" => Map.fetch!(envelope, "envelope_id"),
+      "recipient_did" => did,
+      "recipient_anchor" => Federation.local_anchor_host(),
+      "delivered_at" => DateTime.utc_now() |> DateTime.to_iso8601()
+    }
+
+    sign_server_message(unsigned)
+  end
+
+  defp push_delivery_acks(anchor, acks) do
+    Enum.each(acks, fn ack ->
+      _ = Federation.Client.push_delivery_ack!(anchor, ack)
+    end)
+
+    :ok
+  end
+
+  defp sign_server_message(unsigned) do
+    {:ok, signature, key_id} = Federation.sign(unsigned)
+
+    unsigned
+    |> Map.put("key_id", key_id)
+    |> Map.put("server_signature", Base.encode64(signature))
+  end
+
+  defp outbound_read_receipts_enabled(%{"recipient_did" => did}) when is_binary(did) do
+    case Identity.get_identity_by_did(did) do
+      {:ok, %Identity.Identity{read_receipts_enabled: false}} ->
+        {:error, :read_receipts_disabled}
+
+      _ ->
+        :ok
+    end
+  end
+
+  defp outbound_read_receipts_enabled(_), do: {:error, :invalid_read_marker}
 
   defp serialize_entry(entry) do
     %{

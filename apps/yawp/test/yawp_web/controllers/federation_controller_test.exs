@@ -740,4 +740,79 @@ defmodule YawpWeb.FederationControllerTest do
       assert json_response(conn, 422) == %{"error" => "invalid_pull_request"}
     end
   end
+
+  describe "POST /federation/inbox/ack" do
+    test "transitions the sender view to delivered", %{conn: conn} do
+      ack = %{
+        "envelope_id" => "env-delivered",
+        "recipient_did" => "did:yawp:bob",
+        "recipient_anchor" => @host,
+        "delivered_at" => "2026-06-05T09:00:00.000Z"
+      }
+
+      conn = post_federation(conn, "/federation/inbox/ack", ack)
+
+      assert json_response(conn, 200) == %{"status" => "delivered"}
+      assert {:ok, [state]} = Federation.delivery_states_for_envelope("env-delivered")
+      assert state.recipient_did == "did:yawp:bob"
+      assert state.state == :delivered
+    end
+  end
+
+  describe "POST /federation/inbox/read-marker" do
+    test "transitions the sender view to read when receipts are enabled", %{conn: conn} do
+      recipient = "did:yawp:reader"
+      create_identity!(recipient, true)
+
+      marker = %{
+        "conversation_id" => "conv-read",
+        "recipient_did" => recipient,
+        "last_read_envelope_id" => "env-read",
+        "last_read_at" => "2026-06-05T09:00:01.000Z"
+      }
+
+      conn = post_federation(conn, "/federation/inbox/read-marker", marker)
+
+      assert json_response(conn, 200) == %{"status" => "read"}
+      assert {:ok, [state]} = Federation.delivery_states_for_envelope("env-read")
+      assert state.state == :read
+    end
+
+    test "drops outbound read markers when receipts are disabled", %{conn: conn} do
+      recipient = "did:yawp:no-receipts"
+      create_identity!(recipient, false)
+
+      marker = %{
+        "conversation_id" => "conv-drop",
+        "recipient_did" => recipient,
+        "last_read_envelope_id" => "env-drop",
+        "last_read_at" => "2026-06-05T09:00:01.000Z"
+      }
+
+      conn = post_federation(conn, "/federation/inbox/read-marker", marker)
+
+      assert json_response(conn, 200) == %{"status" => "dropped"}
+      assert {:ok, []} = Federation.delivery_states_for_envelope("env-drop")
+    end
+  end
+
+  defp create_identity!(did, read_receipts_enabled) do
+    {:ok, identity} =
+      Yawp.Identity.Identity
+      |> Ash.Changeset.for_create(:adopt, %{
+        did: did,
+        master_public_key: :crypto.strong_rand_bytes(32),
+        anchor_list: [@host]
+      })
+      |> Ash.create(authorize?: false)
+
+    {:ok, identity} =
+      identity
+      |> Ash.Changeset.for_update(:set_read_receipts, %{
+        read_receipts_enabled: read_receipts_enabled
+      })
+      |> Ash.update(authorize?: false)
+
+    identity
+  end
 end

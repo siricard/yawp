@@ -6,6 +6,7 @@ defmodule Yawp.Federation do
   alias Yawp.Federation.AnchorHost
   alias Yawp.Federation.Client
   alias Yawp.Federation.DeviceSignature
+  alias Yawp.Federation.DeliveryState
   alias Yawp.Federation.InboxEntry
   alias Yawp.Identity
 
@@ -20,6 +21,12 @@ defmodule Yawp.Federation do
     resource Yawp.Federation.InboxEntry do
       define :append_inbox_entry, action: :append
       define :pull_inbox_entries, action: :pull
+    end
+
+    resource Yawp.Federation.DeliveryState do
+      define :upsert_delivery_state, action: :upsert
+      define :delivery_states_for_envelope, action: :for_envelope, args: [:envelope_id]
+      define :delivery_states_for_conversation, action: :for_conversation, args: [:envelope_ids]
     end
   end
 
@@ -56,6 +63,7 @@ defmodule Yawp.Federation do
   @spec submit_dm(map()) :: {:ok, map()} | {:error, term()}
   def submit_dm(envelope) when is_map(envelope) do
     with :ok <- DeviceSignature.verify(envelope),
+         :ok <- mark_sent(envelope),
          {:ok, deliveries} <- deliver_dm(envelope) do
       {:ok, %{deliveries: deliveries}}
     end
@@ -176,10 +184,104 @@ defmodule Yawp.Federation do
 
   defp deliver_remote(anchor, envelope) do
     case Client.push_inbox!(anchor, envelope) do
-      {:ok, _} -> :ok
-      {:error, reason} -> {:error, reason}
+      {:ok, %{"delivery_acks" => acks}} when is_list(acks) ->
+        Enum.each(acks, &apply_delivery_ack/1)
+        :ok
+
+      {:ok, _} ->
+        :ok
+
+      {:error, reason} ->
+        {:error, reason}
     end
   end
+
+  @spec apply_delivery_ack(map()) :: :ok | {:error, term()}
+  def apply_delivery_ack(%{
+        "envelope_id" => envelope_id,
+        "recipient_did" => recipient_did
+      }) do
+    upsert_delivery_state(%{
+      envelope_id: envelope_id,
+      recipient_did: recipient_did,
+      state: :delivered,
+      updated_at: DateTime.utc_now()
+    })
+    |> state_result()
+  end
+
+  def apply_delivery_ack(_), do: {:error, :invalid_delivery_ack}
+
+  @spec apply_read_marker(map()) :: :ok | {:error, term()}
+  def apply_read_marker(%{
+        "recipient_did" => recipient_did,
+        "last_read_envelope_id" => envelope_id
+      }) do
+    upsert_delivery_state(%{
+      envelope_id: envelope_id,
+      recipient_did: recipient_did,
+      state: :read,
+      updated_at: DateTime.utc_now()
+    })
+    |> state_result()
+  end
+
+  def apply_read_marker(_), do: {:error, :invalid_read_marker}
+
+  @spec delivery_summary([DeliveryState.t()], [String.t()]) :: map()
+  def delivery_summary(states, recipient_dids) when is_list(states) and is_list(recipient_dids) do
+    recipients = Enum.uniq(recipient_dids)
+    total = length(recipients)
+
+    delivered =
+      states
+      |> Enum.filter(&(&1.recipient_did in recipients and &1.state in [:delivered, :read]))
+      |> Enum.map(& &1.recipient_did)
+      |> Enum.uniq()
+      |> length()
+
+    read =
+      states
+      |> Enum.filter(&(&1.recipient_did in recipients and &1.state == :read))
+      |> Enum.map(& &1.recipient_did)
+      |> Enum.uniq()
+      |> length()
+
+    %{delivered: delivered, read: read, total: total}
+  end
+
+  defp mark_sent(%{"envelope_id" => envelope_id, "recipient_dids" => dids})
+       when is_binary(envelope_id) and is_list(dids) do
+    dids
+    |> Enum.filter(&is_binary/1)
+    |> Enum.reduce_while(:ok, fn did, :ok ->
+      case upsert_delivery_state(%{
+             envelope_id: envelope_id,
+             recipient_did: did,
+             state: :sent,
+             updated_at: DateTime.utc_now()
+           }) do
+        {:ok, _} -> {:cont, :ok}
+        {:error, reason} -> {:halt, {:error, reason}}
+      end
+    end)
+  end
+
+  defp mark_sent(%{"envelope_id" => envelope_id, "recipient_did" => did})
+       when is_binary(envelope_id) and is_binary(did) do
+    upsert_delivery_state(%{
+      envelope_id: envelope_id,
+      recipient_did: did,
+      state: :sent,
+      updated_at: DateTime.utc_now()
+    })
+    |> state_result()
+  end
+
+  defp mark_sent(_), do: {:error, :invalid_envelope}
+
+  defp state_result({:ok, _}), do: :ok
+  defp state_result({:error, _} = error), do: error
 
   defp anchors_for_recipient(did) do
     case Identity.get_ppe_by_did(did) do

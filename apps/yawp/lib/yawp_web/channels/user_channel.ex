@@ -4,6 +4,7 @@ defmodule YawpWeb.UserChannel do
   use Phoenix.Channel
 
   alias Yawp.Federation.PresenceBroker
+  alias Yawp.Identity
   alias Yawp.Identity.Identity, as: IdentityResource
   alias YawpWeb.Presence
 
@@ -77,6 +78,8 @@ defmodule YawpWeb.UserChannel do
   @impl true
   def handle_in("read_marker", payload, socket) do
     if valid_read_marker?(payload) do
+      forward_read_marker(payload, socket)
+
       broadcast!(socket, "read_marker", %{
         conversation_id: Map.fetch!(payload, "conversation_id"),
         up_to_serial: Map.fetch!(payload, "up_to_serial"),
@@ -117,6 +120,32 @@ defmodule YawpWeb.UserChannel do
   end
 
   defp valid_read_marker?(_), do: false
+
+  defp forward_read_marker(
+         %{"sender_anchor" => anchor, "last_read_envelope_id" => envelope_id} = payload,
+         socket
+       )
+       when is_binary(anchor) and is_binary(envelope_id) do
+    recipient_did = "did:yawp:" <> socket.assigns.did
+
+    case Identity.get_identity_by_did(recipient_did) do
+      {:ok, %IdentityResource{read_receipts_enabled: false}} ->
+        :ok
+
+      _ ->
+        _ =
+          Yawp.Federation.Client.push_read_marker!(anchor, %{
+            "conversation_id" => Map.fetch!(payload, "conversation_id"),
+            "recipient_did" => recipient_did,
+            "last_read_envelope_id" => envelope_id,
+            "last_read_at" => DateTime.utc_now() |> DateTime.to_iso8601()
+          })
+
+        :ok
+    end
+  end
+
+  defp forward_read_marker(_, _), do: :ok
 
   defp guest_anchors(params) do
     case params do

@@ -6,8 +6,10 @@ import {
   appendDmItem,
   decideDmSend,
   flushQueued,
+  aggregateDelivery,
   hasQueued,
   type DmOutboxItem,
+  type PerRecipientDelivery,
 } from '../chat/dm-outbox';
 import {Banner, Button, Input} from '../ui';
 import {pointerCursor} from '../ui/cursor';
@@ -26,6 +28,8 @@ type DmParticipant = {
 
 type DmThreadMessage = DmOutboxItem & {
   senderDid?: string;
+  recipientDids?: string[];
+  deliveryStates?: PerRecipientDelivery[];
 };
 
 type DmConversation = {
@@ -165,7 +169,9 @@ export function DmListScreen({
                     className="text-xs text-warning mt-1">
                     Queued — will send when you reconnect
                   </Text>
-                ) : null}
+                ) : (
+                  <DeliveryIndicator item={item} />
+                )}
               </View>
             ))}
           </View>
@@ -201,5 +207,32 @@ export function DmListScreen({
         </View>
       </View>
     </View>
+  );
+}
+
+function DeliveryIndicator({item}: {item: DmThreadMessage}) {
+  const recipients = item.recipientDids ?? [];
+  const states = item.deliveryStates ?? [];
+  const group = recipients.length > 1 ? aggregateDelivery(states, recipients) : null;
+  const state = item.delivery;
+
+  const marks = state === 'sent' ? '✓' : '✓✓';
+  const color = state === 'read' ? 'text-primary' : 'text-text-tertiary';
+  const label =
+    group && recipients.length > 1
+      ? group.label
+      : state === 'read'
+        ? 'Read'
+        : state === 'delivered'
+          ? 'Delivered'
+          : 'Sent';
+
+  return (
+    <Text
+      testID={`dm-delivery-indicator-${item.id}`}
+      className={`text-xs mt-1 ${color}`}
+      style={Platform.OS === 'web' ? ({transitionDuration: '180ms'} as object) : undefined}>
+      {marks} {label}
+    </Text>
   );
 }

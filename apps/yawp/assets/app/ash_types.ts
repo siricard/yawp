@@ -30,26 +30,28 @@ export type AdminAccountAttributesOnlySchema = {
 // Identity Schema
 export type IdentityResourceSchema = {
   __type: "Resource";
-  __primitiveFields: "id" | "did" | "masterPublicKey" | "deviceSubkeys" | "anchorList" | "profileVersion";
+  __primitiveFields: "id" | "did" | "masterPublicKey" | "deviceSubkeys" | "anchorList" | "profileVersion" | "readReceiptsEnabled";
   id: UUID;
   did: string;
   masterPublicKey: Binary;
   deviceSubkeys: Record<string, any>;
   anchorList: Array<string>;
   profileVersion: number;
+  readReceiptsEnabled: boolean;
 };
 
 
 
 export type IdentityAttributesOnlySchema = {
   __type: "Resource";
-  __primitiveFields: "id" | "did" | "masterPublicKey" | "deviceSubkeys" | "anchorList" | "profileVersion";
+  __primitiveFields: "id" | "did" | "masterPublicKey" | "deviceSubkeys" | "anchorList" | "profileVersion" | "readReceiptsEnabled";
   id: UUID;
   did: string;
   masterPublicKey: Binary;
   deviceSubkeys: Record<string, any>;
   anchorList: Array<string>;
   profileVersion: number;
+  readReceiptsEnabled: boolean;
 };
 
 
@@ -334,6 +336,11 @@ export type IdentityFilterInput = {
     lessThan?: number;
     lessThanOrEqual?: number;
     in?: Array<number>;
+  };
+
+  readReceiptsEnabled?: {
+    eq?: boolean;
+    notEq?: boolean;
   };
 
 
@@ -771,7 +778,7 @@ export type ServerInviteFilterInput = {
 export const adminAccountFilterFields = ["id", "email", "lastLoginAt"] as const;
 export type AdminAccountFilterField = (typeof adminAccountFilterFields)[number];
 
-export const identityFilterFields = ["id", "did", "masterPublicKey", "deviceSubkeys", "anchorList", "profileVersion"] as const;
+export const identityFilterFields = ["id", "did", "masterPublicKey", "deviceSubkeys", "anchorList", "profileVersion", "readReceiptsEnabled"] as const;
 export type IdentityFilterField = (typeof identityFilterFields)[number];
 
 export const refreshTokenFilterFields = ["id", "token", "identityId", "deviceId", "expiresAt", "revokedAt", "rotatedTo", "identity", "rotatedToRefresh"] as const;
@@ -799,7 +806,7 @@ export type ServerInviteFilterField = (typeof serverInviteFilterFields)[number];
 export const adminAccountSortFields = ["id", "email", "lastLoginAt"] as const;
 export type AdminAccountSortField = (typeof adminAccountSortFields)[number];
 
-export const identitySortFields = ["id", "did", "masterPublicKey", "deviceSubkeys", "anchorList", "profileVersion"] as const;
+export const identitySortFields = ["id", "did", "masterPublicKey", "deviceSubkeys", "anchorList", "profileVersion", "readReceiptsEnabled"] as const;
 export type IdentitySortField = (typeof identitySortFields)[number];
 
 export const refreshTokenSortFields = ["id", "token", "identityId", "deviceId", "expiresAt", "revokedAt", "rotatedTo"] as const;

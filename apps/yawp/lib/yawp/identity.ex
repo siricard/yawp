@@ -52,6 +52,7 @@ defmodule Yawp.Identity do
       define :get_identity_by_did, action: :get_by_did, args: [:did]
       define :bind_device, action: :bind_device
       define :add_anchor, action: :add_anchor
+      define :set_read_receipts, action: :set_read_receipts
     end
 
     resource Yawp.Identity.SessionToken do

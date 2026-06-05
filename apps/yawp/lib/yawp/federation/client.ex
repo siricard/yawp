@@ -21,6 +21,16 @@ defmodule Yawp.Federation.Client do
     post(peer_host, "/federation/inbox/push", envelope)
   end
 
+  @spec push_delivery_ack!(String.t(), map()) :: {:ok, map()} | {:error, term()}
+  def push_delivery_ack!(peer_host, ack) when is_binary(peer_host) and is_map(ack) do
+    post(peer_host, "/federation/inbox/ack", ack)
+  end
+
+  @spec push_read_marker!(String.t(), map()) :: {:ok, map()} | {:error, term()}
+  def push_read_marker!(peer_host, marker) when is_binary(peer_host) and is_map(marker) do
+    post(peer_host, "/federation/inbox/read-marker", marker)
+  end
+
   @spec adopt!(String.t(), map()) :: {:ok, map()} | {:error, term()}
   def adopt!(peer_host, adoption) when is_binary(peer_host) and is_map(adoption) do
     post(peer_host, "/federation/anchors/adopt", adoption)

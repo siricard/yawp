@@ -109,6 +109,10 @@ defmodule Yawp.Identity.Identity do
       accept [:device_subkeys, :profile_version]
     end
 
+    update :set_read_receipts do
+      accept [:read_receipts_enabled]
+    end
+
     update :revoke_device_sessions do
       description """
       revokes every session + refresh
@@ -243,6 +247,12 @@ defmodule Yawp.Identity.Identity do
       PPE refresh protocol uses this for conflict
       resolution between anchors.
       """
+    end
+
+    attribute :read_receipts_enabled, :boolean do
+      allow_nil? false
+      public? true
+      default true
     end
 
     create_timestamp :inserted_at

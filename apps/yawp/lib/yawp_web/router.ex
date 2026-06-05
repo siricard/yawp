@@ -78,6 +78,8 @@ defmodule YawpWeb.Router do
     post "/ppe/push", FederationController, :ppe_push
     post "/blob/push", FederationController, :blob_push
     post "/inbox/push", FederationController, :inbox_push
+    post "/inbox/ack", FederationController, :inbox_ack
+    post "/inbox/read-marker", FederationController, :inbox_read_marker
     post "/devices/changed", FederationController, :devices_changed
     post "/anchors/adopt", FederationController, :adopt
     post "/presence/subscribe", FederationController, :presence_subscribe

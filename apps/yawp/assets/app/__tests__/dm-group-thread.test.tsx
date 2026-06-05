@@ -40,6 +40,45 @@ describe('DmListScreen group thread', () => {
     ReactTestRenderer.act(() => root.unmount());
   });
 
+  test('renders per-recipient aggregate delivery state', () => {
+    let root!: ReactTestRenderer.ReactTestRenderer;
+    ReactTestRenderer.act(() => {
+      root = ReactTestRenderer.create(
+        <DmListScreen
+          onBack={() => {}}
+          conversation={{
+            participants: [
+              {did: 'did:yawp:alice', label: 'Alice'},
+              {did: 'did:yawp:bob', label: 'Bob'},
+              {did: 'did:yawp:carol', label: 'Carol'},
+            ],
+            messages: [
+              {
+                id: 'm1',
+                senderDid: 'did:yawp:alice',
+                body: 'hello team',
+                delivery: 'read',
+                recipientDids: ['did:yawp:bob', 'did:yawp:carol'],
+                deliveryStates: [
+                  {recipientDid: 'did:yawp:bob', state: 'read'},
+                  {recipientDid: 'did:yawp:carol', state: 'delivered'},
+                ],
+              },
+            ],
+          }}
+        />,
+      );
+    });
+
+    expect(root.root.findByProps({testID: 'dm-delivery-indicator-m1'}).props.children).toEqual([
+      '✓✓',
+      ' ',
+      'delivered to 2/2, read by 1/2',
+    ]);
+
+    ReactTestRenderer.act(() => root.unmount());
+  });
+
   test('new group draft accepts more than one peer', () => {
     const submitted: string[][] = [];
     let root!: ReactTestRenderer.ReactTestRenderer;
