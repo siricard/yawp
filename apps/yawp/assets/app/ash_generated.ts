@@ -216,6 +216,11 @@ export type AcceptPeerRequestResult<Fields extends AcceptPeerRequestFields | und
 
 ;
 
+/**
+ * Update an existing Identity
+ *
+ * @ashActionType :update
+ */
 export async function acceptPeerRequest<Fields extends AcceptPeerRequestFields | undefined = undefined>(
   config: {
   tenant?: string;
@@ -242,6 +247,12 @@ export async function acceptPeerRequest<Fields extends AcceptPeerRequestFields |
 }
 
 
+/**
+ * Validate: Update an existing Identity
+ *
+ * @ashActionType :update
+ * @validation true
+ */
 export async function validateAcceptPeerRequest(
   config: {
   tenant?: string;
@@ -599,6 +610,11 @@ export type SetReadReceiptsResult<Fields extends SetReadReceiptsFields | undefin
 
 ;
 
+/**
+ * Update an existing Identity
+ *
+ * @ashActionType :update
+ */
 export async function setReadReceipts<Fields extends SetReadReceiptsFields | undefined = undefined>(
   config: {
   tenant?: string;
@@ -625,6 +641,12 @@ export async function setReadReceipts<Fields extends SetReadReceiptsFields | und
 }
 
 
+/**
+ * Validate: Update an existing Identity
+ *
+ * @ashActionType :update
+ * @validation true
+ */
 export async function validateSetReadReceipts(
   config: {
   tenant?: string;
