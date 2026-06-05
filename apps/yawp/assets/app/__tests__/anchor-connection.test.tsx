@@ -97,6 +97,23 @@ function Harness({
   return <Text testID="state">{`${status}|${degraded}`}</Text>;
 }
 
+function HarnessWithDelivery({
+  did,
+  onDeliveryState,
+}: {
+  did: string;
+  onDeliveryState: (payload: unknown) => void;
+}) {
+  const {status, degraded} = useAnchorConnection(
+    [A],
+    did,
+    [],
+    undefined,
+    onDeliveryState,
+  );
+  return <Text testID="state">{`${status}|${degraded}`}</Text>;
+}
+
 function readState(root: ReactTestRenderer.ReactTestRenderer): string {
   return root.root.findByProps({testID: 'state'}).props.children;
 }
@@ -172,6 +189,39 @@ describe('useAnchorConnection', () => {
     });
 
     expect(readState(root)).toBe('connected|false');
+    ReactTestRenderer.act(() => root.unmount());
+  });
+
+  test('forwards delivery_state events to the caller', async () => {
+    const onDeliveryState = jest.fn();
+    let root!: ReactTestRenderer.ReactTestRenderer;
+    await ReactTestRenderer.act(async () => {
+      root = ReactTestRenderer.create(
+        <HarnessWithDelivery did="abc123" onDeliveryState={onDeliveryState} />,
+      );
+    });
+    await flush();
+
+    await ReactTestRenderer.act(async () => {
+      mockSocketFor(A).channels[0].emit('delivery_state', {
+        envelope_id: 'env-1',
+        recipient_did: 'did:yawp:bob',
+        state: 'read',
+      });
+      mockSocketFor(A).channels[0].emit('delivery_state', {
+        envelope_id: 'env-2',
+        recipient_did: 'did:yawp:bob',
+        state: 'bogus',
+      });
+    });
+
+    expect(onDeliveryState).toHaveBeenCalledTimes(1);
+    expect(onDeliveryState).toHaveBeenCalledWith({
+      envelope_id: 'env-1',
+      recipient_did: 'did:yawp:bob',
+      state: 'read',
+    });
+
     ReactTestRenderer.act(() => root.unmount());
   });
 

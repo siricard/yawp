@@ -5,7 +5,11 @@ import {SafeAreaProvider, SafeAreaView} from 'react-native-safe-area-context';
 
 import {acceptPeerRequest} from './ash_generated';
 import {submitBindDevice} from './bind';
-import {AnchorConnectionProvider, type InboxEvent} from './chat/anchor-connection';
+import {
+  AnchorConnectionProvider,
+  type DeliveryStateEvent,
+  type InboxEvent,
+} from './chat/anchor-connection';
 import {normalizeAnchorServerUrl} from './chat/anchor-url';
 import {discoverGeneralChannel} from './chat/discover';
 import type {RecentDm} from './chat/TabRow';
@@ -163,10 +167,15 @@ function AppShell() {
 
   async function handleAcceptDmRequest(senderDid: string): Promise<boolean> {
     if (identityState.status !== 'ready') return false;
+    const session = await getValidSessionToken({
+      serverUrl: primaryAnchorUrl(anchorUrls),
+    });
+    if (!session.ok) return false;
     const result = await acceptPeerRequest({
       identity: {did: identityState.identity.didFull},
       input: {peerDid: senderDid},
       fields: ['did'],
+      headers: {Authorization: `Bearer ${session.sessionToken}`},
     });
     if (result.success) {
       setInboxConversations(prev =>
@@ -191,6 +200,13 @@ function AppShell() {
         ? mergeInboxConversation([prev], conversation)[0]
         : prev;
     });
+  }, []);
+
+  const handleDeliveryState = useCallback((event: DeliveryStateEvent) => {
+    setInboxConversations(prev => mergeDeliveryState(prev, event));
+    setDmConversation(prev =>
+      prev ? mergeDeliveryState([prev], event)[0] ?? prev : prev,
+    );
   }, []);
 
   if (identityState.status === 'onboarding') {
@@ -295,7 +311,8 @@ function AppShell() {
     <AnchorConnectionProvider
       anchorUrls={anchorUrls}
       guestAnchors={guestAnchors}
-      onInbox={handleInbox}>
+      onInbox={handleInbox}
+      onDeliveryState={handleDeliveryState}>
       <SafeAreaView
         edges={['top', 'bottom']}
         className="flex-1 bg-bg"
@@ -318,6 +335,10 @@ function AppShell() {
       </SafeAreaView>
     </AnchorConnectionProvider>
   );
+}
+
+function primaryAnchorUrl(anchorUrls: string[]): string {
+  return anchorUrls[0] ?? '';
 }
 
 function conversationFromInboxEvent(event: InboxEvent): DmConversation | null {
@@ -390,6 +411,30 @@ function mergeInboxConversation(
       ],
     };
   });
+}
+
+function mergeDeliveryState(
+  conversations: DmConversation[],
+  incoming: DeliveryStateEvent,
+): DmConversation[] {
+  return conversations.map(conversation => ({
+    ...conversation,
+    messages: conversation.messages.map(message => {
+      if (message.id !== incoming.envelope_id) return message;
+      const existing = message.deliveryStates ?? [];
+      const withoutRecipient = existing.filter(
+        state => state.recipientDid !== incoming.recipient_did,
+      );
+      return {
+        ...message,
+        delivery: incoming.state,
+        deliveryStates: [
+          ...withoutRecipient,
+          {recipientDid: incoming.recipient_did, state: incoming.state},
+        ],
+      };
+    }),
+  }));
 }
 
 export function configuredAnchorUrls(anchors: string[] | undefined): string[] {

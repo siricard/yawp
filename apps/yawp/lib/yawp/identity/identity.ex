@@ -110,7 +110,10 @@ defmodule Yawp.Identity.Identity do
     end
 
     update :set_read_receipts do
+      require_atomic? false
       accept [:read_receipts_enabled]
+
+      change Yawp.Identity.Identity.Changes.SetReadReceipts
     end
 
     update :accept_peer_request do

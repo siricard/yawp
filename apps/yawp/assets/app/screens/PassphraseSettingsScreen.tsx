@@ -4,6 +4,8 @@ import {ScrollView, Text, View} from 'react-native';
 
 import {useBundleMetadata, useIdentity, usePassphrase} from '../identity-context';
 import {setReadReceipts} from '../ash_generated';
+import {normalizeAnchorServerUrl} from '../chat/anchor-url';
+import {getValidSessionToken} from '../session';
 import {Button, Card, Field, Input} from '../ui';
 
 const MIN_PASSPHRASE_LENGTH = 8;
@@ -102,10 +104,20 @@ export function PassphraseSettingsScreen({onBack}: Props) {
     setDone(null);
     setReceiptsPending(true);
     await mutate(prev => ({...prev, readReceiptsEnabled: next}));
+    const session = await getValidSessionToken({
+      serverUrl: primaryAnchorUrl(metadata.publishedProfile?.anchors),
+    });
+    if (!session.ok) {
+      await mutate(prev => ({...prev, readReceiptsEnabled: readReceiptsEnabled}));
+      setError('Could not update read receipts.');
+      setReceiptsPending(false);
+      return;
+    }
     const result = await setReadReceipts({
       identity: {did: identity.didFull},
       input: {readReceiptsEnabled: next},
       fields: ['did', 'readReceiptsEnabled'],
+      headers: {Authorization: `Bearer ${session.sessionToken}`},
     });
     if (!result.success) {
       await mutate(prev => ({...prev, readReceiptsEnabled: readReceiptsEnabled}));
@@ -264,4 +276,8 @@ export function PassphraseSettingsScreen({onBack}: Props) {
       </View>
     </ScrollView>
   );
+}
+
+function primaryAnchorUrl(anchors: string[] | undefined): string {
+  return normalizeAnchorServerUrl(anchors?.[0] ?? '') ?? '';
 }

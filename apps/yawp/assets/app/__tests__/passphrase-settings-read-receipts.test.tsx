@@ -1,7 +1,10 @@
 import React from 'react';
 import ReactTestRenderer from 'react-test-renderer';
 
-let mockMetadata = {readReceiptsEnabled: true};
+let mockMetadata = {
+  readReceiptsEnabled: true,
+  publishedProfile: {anchors: ['http://localhost:4000']},
+};
 const mockMutate = jest.fn(async updater => {
   mockMetadata = updater(mockMetadata);
 });
@@ -30,11 +33,18 @@ jest.mock('../ash_generated', () => ({
   setReadReceipts: (config: unknown) => mockSetReadReceipts(config),
 }));
 
+jest.mock('../session', () => ({
+  getValidSessionToken: jest.fn(async () => ({ok: true, sessionToken: 'sess-token'})),
+}));
+
 import {PassphraseSettingsScreen} from '../screens/PassphraseSettingsScreen';
 
 describe('PassphraseSettingsScreen read receipts', () => {
   beforeEach(() => {
-    mockMetadata = {readReceiptsEnabled: true};
+    mockMetadata = {
+      readReceiptsEnabled: true,
+      publishedProfile: {anchors: ['http://localhost:4000']},
+    };
     mockMutate.mockClear();
     mockSetReadReceipts.mockReset();
     mockSetReadReceipts.mockResolvedValue({
@@ -57,6 +67,7 @@ describe('PassphraseSettingsScreen read receipts', () => {
       identity: {did: 'did:yawp:alice'},
       input: {readReceiptsEnabled: false},
       fields: ['did', 'readReceiptsEnabled'],
+      headers: {Authorization: 'Bearer sess-token'},
     });
     expect(mockMetadata.readReceiptsEnabled).toBe(false);
 

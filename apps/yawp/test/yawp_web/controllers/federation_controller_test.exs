@@ -911,23 +911,12 @@ defmodule YawpWeb.FederationControllerTest do
   end
 
   defp create_identity!(did, read_receipts_enabled) do
-    {:ok, identity} =
-      Yawp.Identity.Identity
-      |> Ash.Changeset.for_create(:adopt, %{
-        did: did,
-        master_public_key: :crypto.strong_rand_bytes(32),
-        anchor_list: [@host]
-      })
-      |> Ash.create(authorize?: false)
-
-    {:ok, identity} =
-      identity
-      |> Ash.Changeset.for_update(:set_read_receipts, %{
-        read_receipts_enabled: read_receipts_enabled
-      })
-      |> Ash.update(authorize?: false)
-
-    identity
+    Ash.Seed.seed!(Yawp.Identity.Identity, %{
+      did: did,
+      master_public_key: :crypto.strong_rand_bytes(32),
+      anchor_list: [@host],
+      read_receipts_enabled: read_receipts_enabled
+    })
   end
 
   defp seed_delivery_state(envelope_id, recipient_did) do

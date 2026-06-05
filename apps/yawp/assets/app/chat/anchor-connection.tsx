@@ -25,6 +25,12 @@ export type InboxEvent = {
   inbox_serial: number;
 };
 
+export type DeliveryStateEvent = {
+  envelope_id: string;
+  recipient_did: string;
+  state: 'sent' | 'delivered' | 'read';
+};
+
 const AnchorContext = createContext<AnchorConnection>({
   status: 'connecting',
   degraded: false,
@@ -35,6 +41,7 @@ export function useAnchorConnection(
   did: string,
   guestAnchors: string[] = [],
   onInbox?: (event: InboxEvent) => void,
+  onDeliveryState?: (event: DeliveryStateEvent) => void,
 ): AnchorConnection {
   const [status, setStatus] = useState<AnchorStatus>('connecting');
   const degradedTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -113,6 +120,10 @@ export function useAnchorConnection(
           if (cancelled || !isInboxEvent(payload)) return;
           onInbox?.(payload);
         });
+        channel.on('delivery_state', payload => {
+          if (cancelled || !isDeliveryStateEvent(payload)) return;
+          onDeliveryState?.(payload);
+        });
         channel.join();
 
         cleanups.push(() => {
@@ -132,7 +143,7 @@ export function useAnchorConnection(
       clearDegradedTimer();
       cleanups.forEach(fn => fn());
     };
-  }, [anchorsKey, did, guestAnchorsKey, onInbox]);
+  }, [anchorsKey, did, guestAnchorsKey, onInbox, onDeliveryState]);
 
   return {status, degraded: status === 'degraded'};
 }
@@ -141,11 +152,13 @@ export function AnchorConnectionProvider({
   anchorUrls,
   guestAnchors = [],
   onInbox,
+  onDeliveryState,
   children,
 }: {
   anchorUrls: string[];
   guestAnchors?: string[];
   onInbox?: (event: InboxEvent) => void;
+  onDeliveryState?: (event: DeliveryStateEvent) => void;
   children: React.ReactNode;
 }) {
   const state = useIdentityState();
@@ -155,6 +168,7 @@ export function AnchorConnectionProvider({
     did,
     guestAnchors,
     onInbox,
+    onDeliveryState,
   );
   return (
     <AnchorContext.Provider value={connection}>
@@ -172,6 +186,18 @@ function isInboxEvent(payload: unknown): payload is InboxEvent {
     candidate.envelope !== null &&
     typeof candidate.is_request === 'boolean' &&
     typeof candidate.inbox_serial === 'number'
+  );
+}
+
+function isDeliveryStateEvent(payload: unknown): payload is DeliveryStateEvent {
+  if (!payload || typeof payload !== 'object') return false;
+  const candidate = payload as Partial<DeliveryStateEvent>;
+  return (
+    typeof candidate.envelope_id === 'string' &&
+    typeof candidate.recipient_did === 'string' &&
+    (candidate.state === 'sent' ||
+      candidate.state === 'delivered' ||
+      candidate.state === 'read')
   );
 }
 

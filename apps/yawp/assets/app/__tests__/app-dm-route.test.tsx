@@ -26,6 +26,7 @@ let mockMetadata = {
 };
 const servers = [{url: "localhost:4000", label: "Local"}];
 let anchorInbox: ((event: unknown) => void) | undefined;
+let anchorDeliveryState: ((event: unknown) => void) | undefined;
 let serverScreenProps: Record<string, unknown> | undefined;
 const mockAcceptPeerRequest: jest.Mock<Promise<unknown>, [unknown]> = jest.fn(async (_config: unknown) => ({
   success: true,
@@ -37,7 +38,7 @@ jest.mock("../ash_generated", () => ({
 }));
 
 jest.mock("../session", () => ({
-  getValidSessionToken: async () => ({ ok: true, token: "session" }),
+  getValidSessionToken: async () => ({ ok: true, sessionToken: "session" }),
 }));
 
 jest.mock("../chat/discover", () => ({
@@ -87,11 +88,14 @@ jest.mock("../chat/anchor-connection", () => ({
   AnchorConnectionProvider: ({
     children,
     onInbox,
+    onDeliveryState,
   }: {
     children: unknown;
     onInbox?: (event: unknown) => void;
+    onDeliveryState?: (event: unknown) => void;
   }) => {
     anchorInbox = onInbox;
+    anchorDeliveryState = onDeliveryState;
     return children;
   },
   useAnchorStatus: () => ({ status: "connected", degraded: false }),
@@ -154,6 +158,7 @@ describe("App direct-message route", () => {
       publishedProfile: { anchors: ["localhost:4000"] },
     };
     anchorInbox = undefined;
+    anchorDeliveryState = undefined;
     serverScreenProps = undefined;
     mockAcceptPeerRequest.mockClear();
   });
@@ -344,9 +349,57 @@ describe("App direct-message route", () => {
       identity: { did: "did:yawp:alice" },
       input: { peerDid: "did:yawp:eve" },
       fields: ["did"],
+      headers: { Authorization: "Bearer session" },
     });
     expect(root.root.findAllByProps({ testID: "dm-message-request-card" })).toHaveLength(0);
     expect(root.root.findByProps({ testID: "dm-composer-input" })).toBeTruthy();
+
+    ReactTestRenderer.act(() => root.unmount());
+  });
+
+  test("merges delivery state updates into live direct messages", async () => {
+    let root!: ReactTestRenderer.ReactTestRenderer;
+    await ReactTestRenderer.act(async () => {
+      root = ReactTestRenderer.create(<App />);
+    });
+    await flush();
+
+    await ReactTestRenderer.act(async () => {
+      anchorInbox?.({
+        envelope_id: "inbox-state-1",
+        inbox_serial: 1,
+        is_request: false,
+        envelope: {
+          sender_did: "did:yawp:bob",
+          recipient_dids: ["did:yawp:alice"],
+          conversation_id: "conversation-bob-alice-state",
+          timestamp: "2026-06-05T00:00:00.000Z",
+          body: "stateful",
+        },
+      });
+    });
+
+    await ReactTestRenderer.act(async () => {
+      root.root.findByProps({ testID: "workspace-dm-tile" }).props.onPress();
+    });
+
+    await ReactTestRenderer.act(async () => {
+      root.root
+        .findAllByProps({ testID: "dm-conversation-conversation-bob-alice-state" })[0]
+        .props.onPress();
+    });
+
+    await ReactTestRenderer.act(async () => {
+      anchorDeliveryState?.({
+        envelope_id: "inbox-state-1",
+        recipient_did: "did:yawp:alice",
+        state: "read",
+      });
+    });
+
+    expect(
+      root.root.findByProps({ testID: "dm-delivery-indicator-inbox-state-1" }).props.children,
+    ).toEqual(["✓✓", " ", "Read"]);
 
     ReactTestRenderer.act(() => root.unmount());
   });
