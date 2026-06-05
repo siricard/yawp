@@ -185,6 +185,7 @@ describe('web passkey identity seal', () => {
     await ReactTestRenderer.act(async () => {
       const result = await handles.current!.enrollPasskey();
       expect(result).toEqual({ok: true});
+      await handles.current!.setDisplayNameOverride('Passkey After Rekey');
     });
     expect(handles.current!.passkeyEnrolled).toBe(true);
     const entry = await loadStoredEntry();
@@ -219,6 +220,25 @@ describe('web passkey identity seal', () => {
       });
       expect(result).toEqual({ok: true});
     });
+    await ReactTestRenderer.act(async () => {
+      root!.unmount();
+    });
+
+    const secondRemount = makeHarness();
+    const SecondRemountProbe = secondRemount.Probe;
+    await ReactTestRenderer.act(async () => {
+      root = ReactTestRenderer.create(
+        <IdentityProvider>
+          <SecondRemountProbe />
+        </IdentityProvider>,
+      );
+    });
+    await settle();
+    await ReactTestRenderer.act(async () => {
+      const result = await secondRemount.handles.current!.unlockWithPasskey();
+      expect(result).toEqual({ok: true});
+    });
+    expect(secondRemount.handles.current!.displayName).toBe('Passkey After Rekey');
     await ReactTestRenderer.act(async () => {
       root!.unmount();
     });

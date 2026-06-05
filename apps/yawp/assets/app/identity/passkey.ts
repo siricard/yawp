@@ -62,6 +62,26 @@ function passkeySealKey(prf: Uint8Array): Uint8Array {
   return sha256(prf);
 }
 
+async function getPasskeyWrappingKey(credentialId: string): Promise<Uint8Array> {
+  const challenge = randomBytes(32);
+  const credential = await (globalThis.navigator as any).credentials.get({
+    publicKey: {
+      challenge,
+      allowCredentials: [
+        {
+          type: 'public-key',
+          id: b64UrlToBytes(credentialId),
+        },
+      ],
+      userVerification: 'required',
+      extensions: {prf: {eval: {first: PRF_INPUT}}},
+      timeout: 60_000,
+    },
+  });
+  if (!credential) throw new Error('Passkey unlock was cancelled');
+  return passkeySealKey(prfOutput(credential));
+}
+
 function wrapSealKey(sealKey: Uint8Array, wrappingKey: Uint8Array) {
   if (sealKey.length !== 32) {
     throw new Error('Passkey seal key wrap requires a 32-byte seal key');
@@ -171,6 +191,23 @@ export async function enrollPasskeySeal(
   };
 }
 
+export async function rewrapPasskeySeal(
+  passkey: PasskeyWrappedSealV1,
+  sealKey: Uint8Array,
+  salt: Uint8Array,
+): Promise<PasskeyWrappedSealV1> {
+  if (!(await canUsePasskeyPrf())) {
+    throw new Error('Passkeys are not available on this browser');
+  }
+  const wrappingKey = await getPasskeyWrappingKey(passkey.credentialId);
+  return {
+    ...passkey,
+    salt: bytesToB64Url(salt),
+    wrappedSealKey: wrapSealKey(sealKey, wrappingKey),
+    envelope: undefined,
+  };
+}
+
 export async function unlockPasskeySeal(
   passkey: PasskeyWrappedSealV1,
   currentEnvelope?: SealedEnvelopeV2,
@@ -178,23 +215,7 @@ export async function unlockPasskeySeal(
   if (!(await canUsePasskeyPrf())) {
     throw new Error('Passkeys are not available on this browser');
   }
-  const challenge = randomBytes(32);
-  const credential = await (globalThis.navigator as any).credentials.get({
-    publicKey: {
-      challenge,
-      allowCredentials: [
-        {
-          type: 'public-key',
-          id: b64UrlToBytes(passkey.credentialId),
-        },
-      ],
-      userVerification: 'required',
-      extensions: {prf: {eval: {first: PRF_INPUT}}},
-      timeout: 60_000,
-    },
-  });
-  if (!credential) throw new Error('Passkey unlock was cancelled');
-  const wrappingKey = passkeySealKey(prfOutput(credential));
+  const wrappingKey = await getPasskeyWrappingKey(passkey.credentialId);
   if (passkey.wrappedSealKey) {
     if (!currentEnvelope) throw new Error('Passkey unlock needs a sealed envelope');
     return unsealEnvelopeWithKey(

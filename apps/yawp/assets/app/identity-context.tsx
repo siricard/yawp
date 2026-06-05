@@ -19,6 +19,7 @@ import {
   browserMaySupportPasskeyPrf,
   canUsePasskeyPrf,
   enrollPasskeySeal,
+  rewrapPasskeySeal,
   unlockPasskeySeal,
 } from './identity/passkey';
 import {
@@ -545,19 +546,6 @@ export function IdentityProvider({children}: {children: React.ReactNode}) {
     [setServersState, persistServers],
   );
 
-  /**
-   * single entry point for identity-scoped metadata
-   * mutations. Reads the in-memory unlocked bundle out of `stateRef`,
-   * applies `mut` to compute the next metadata map (we always pass a
-   * concrete object; the mutator returns the new one), and re-persists.
-   *
-   * Sealed identities are re-sealed under the cached `sealKey + salt`
-   * (no PBKDF2 — the user already paid that cost at unlock / set-
-   * passphrase time). Unsealed identities are written raw.
-   *
-   * Returns the new bundle so callers (display-name, nudge) can update
-   * their local state synchronously after the write.
-   */
   const mutateBundleMetadata = useCallback(
     async (
       mut: (
@@ -971,7 +959,10 @@ export function IdentityProvider({children}: {children: React.ReactNode}) {
           const salt = randomSaltBytes();
           const sealKey = deriveSealKey(next, salt);
           const envelope = sealBundleWithKey(bundle, sealKey, salt);
-          if (currentState.passkey) envelope.passkey = currentState.passkey;
+          const passkey = currentState.passkey
+            ? await rewrapPasskeySeal(currentState.passkey, sealKey, salt)
+            : null;
+          if (passkey) envelope.passkey = passkey;
           await saveSealedEnvelope(
             envelope,
             didPrefix(currentState.identity.didFull),
@@ -981,7 +972,7 @@ export function IdentityProvider({children}: {children: React.ReactNode}) {
             sealed: true,
             sealKey,
             sealSalt: salt,
-            passkey: currentState.passkey,
+            passkey,
           });
         } else {
           await saveIdentity(bundle);
