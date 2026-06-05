@@ -71,10 +71,18 @@ function AppShell() {
   const {metadata} = useBundleMetadata();
   const {servers, removeServer} = useWorkspaceServers();
   const anchorUrls = configuredAnchorUrls(metadata.publishedProfile?.anchors);
+  const dmPeers = dmAvailablePeers(
+    metadata,
+    identityState.status === 'ready' ? identityState.identity.didFull : null,
+  );
   const guestAnchors = guestAnchorHosts(servers, anchorUrls);
   const [screen, setScreen] = useState<Screen>({kind: 'home'});
   const [bindingUrl, setBindingUrl] = useState<string | null>(null);
   const [bindError, setBindError] = useState<string | null>(null);
+  const [dmConversation, setDmConversation] = useState<{
+    participants: Array<{did: string; label: string}>;
+    messages: [];
+  } | null>(null);
 
   function handleRemovedFromServer(serverUrl: string, reason: string) {
     if (reason === 'banned') {
@@ -116,6 +124,13 @@ function AppShell() {
     } finally {
       setBindingUrl(null);
     }
+  }
+
+  function handleStartDmConversation(recipientDids: string[]) {
+    if (recipientDids.length < 1) return;
+    const participants = dmPeers.filter(peer => recipientDids.includes(peer.did));
+    if (participants.length < 1) return;
+    setDmConversation({participants, messages: []});
   }
 
   if (identityState.status === 'onboarding') {
@@ -186,7 +201,14 @@ function AppShell() {
       );
       break;
     case 'dm':
-      body = <DmListScreen onBack={() => setScreen({kind: 'home'})} />;
+      body = (
+        <DmListScreen
+          onBack={() => setScreen({kind: 'home'})}
+          availablePeers={dmPeers}
+          conversation={dmConversation ?? undefined}
+          onStartConversation={handleStartDmConversation}
+        />
+      );
       break;
     case 'channel':
       body = (
@@ -261,4 +283,26 @@ function hostFromUrl(raw: string): string | null {
     const trimmed = raw.trim();
     return trimmed.length > 0 ? trimmed : null;
   }
+}
+
+export function dmAvailablePeers(
+  metadata: unknown,
+  currentDid: string | null,
+): Array<{did: string; label: string}> {
+  if (!metadata || typeof metadata !== 'object') return [];
+  const acceptedPeers = (metadata as {acceptedPeers?: unknown}).acceptedPeers;
+  if (!Array.isArray(acceptedPeers)) return [];
+  return Array.from(
+    new Set(
+      acceptedPeers.filter(
+        (did): did is string =>
+          typeof did === 'string' && did.length > 0 && did !== currentDid,
+      ),
+    ),
+  ).map(did => ({did, label: dmPeerLabel(did)}));
+}
+
+function dmPeerLabel(did: string): string {
+  const suffix = did.split(':').pop();
+  return suffix && suffix.length > 0 ? suffix : did;
 }

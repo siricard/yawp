@@ -78,6 +78,7 @@ export function DmListScreen({
   function handleSend() {
     const decision = decideDmSend(draft, degraded);
     if (!decision.accepted && decision.reason === 'empty') return;
+    if (!conversation && availablePeers.length > 0 && selectedPeers.length === 0) return;
     onStartConversation?.(selectedPeers);
     seq.current += 1;
     const item: DmThreadMessage = {
@@ -96,6 +97,7 @@ export function DmListScreen({
   }
 
   const isRequest = Boolean(conversation?.isRequest && !accepted);
+  const needsRecipient = !conversation && availablePeers.length > 0;
   const requestSender = conversation?.participants[0];
   const visibleConversations = conversations ?? (conversation ? [conversation] : []);
   const pinnedIds = new Set(metadataPinnedPeers(metadata));
@@ -289,7 +291,7 @@ export function DmListScreen({
               testID="dm-send-button"
               label={degraded ? 'Queue' : 'Send'}
               onPress={handleSend}
-              disabled={draft.trim().length === 0}
+              disabled={draft.trim().length === 0 || (needsRecipient && selectedPeers.length === 0)}
             />
           </View>
         )}
