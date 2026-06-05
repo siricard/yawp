@@ -62,7 +62,7 @@ defmodule Yawp.Federation.DeliveryBudget do
 
           {:reply, :ok, state}
         else
-          retry_after = max(1, ceil((1 - tokens) * @minute_ms / capacity))
+          retry_after = retry_after_seconds(tokens, capacity)
           {:reply, {:error, {:rate_limited, retry_after}}, state}
         end
 
@@ -94,6 +94,12 @@ defmodule Yawp.Federation.DeliveryBudget do
   defp refill(tokens, last_refill_ms, now_ms, capacity) do
     elapsed_ms = max(0, now_ms - last_refill_ms)
     min(capacity, tokens + elapsed_ms * capacity / @minute_ms)
+  end
+
+  defp retry_after_seconds(tokens, capacity) do
+    depleted_tokens = 1 - tokens
+    ms_until_next_token = Kernel./(Kernel.*(depleted_tokens, @minute_ms), capacity)
+    max(1, ceil(Kernel./(ms_until_next_token, 1_000)))
   end
 
   defp capacity(nil, _accepted_count, _now_ms), do: @base_capacity

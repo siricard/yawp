@@ -674,7 +674,7 @@ defmodule YawpWeb.FederationControllerTest do
       assert 100 == Enum.count(responses, &(&1.status == 200))
       limited = Enum.filter(responses, &(&1.status == 429))
       assert 100 == length(limited)
-      assert Enum.all?(limited, &(get_resp_header(&1, "retry-after") != []))
+      assert Enum.all?(limited, &(get_resp_header(&1, "retry-after") == ["1"]))
 
       assert_receive {:budget_hit, [:yawp, :federation, :delivery_budget, :rate_limited],
                       %{count: 1}, %{peer_anchor: @host}}
