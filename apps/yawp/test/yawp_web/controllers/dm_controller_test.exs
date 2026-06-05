@@ -1,0 +1,155 @@
+defmodule YawpWeb.DmControllerTest do
+  use YawpWeb.ConnCase, async: false
+
+  import Yawp.TestSupport.PubKey
+
+  alias Yawp.Federation
+  alias Yawp.Identity
+
+  setup do
+    Yawp.Federation.ensure_active_server_key!()
+
+    prev = Application.get_env(:yawp, Federation.Client)
+
+    Application.put_env(:yawp, Federation.Client,
+      anchor_id: "local.test",
+      req_options: [
+        plug: fn conn ->
+          send(self(), {:federation_http, conn.request_path})
+          Req.Test.json(conn, %{"status" => "appended"})
+        end
+      ]
+    )
+
+    on_exit(fn ->
+      if prev,
+        do: Application.put_env(:yawp, Federation.Client, prev),
+        else: Application.delete_env(:yawp, Federation.Client)
+    end)
+
+    :ok
+  end
+
+  test "same-anchor DM appends locally without federation HTTP", %{conn: conn} do
+    {sender_pub, sender_priv} = user_keypair()
+    {device_pub, device_priv} = user_keypair()
+    {recipient_pub, recipient_priv} = user_keypair()
+    sender_did = did_for(sender_pub)
+    recipient_did = did_for(recipient_pub)
+    device_id = "sender-device"
+    issued_at = "2026-06-05T00:00:00Z"
+
+    seed_ppe!(sender_did, sender_pub, sender_priv, "Alice", ["local.test"],
+      device: {device_id, device_pub, sender_priv, issued_at}
+    )
+
+    seed_ppe!(recipient_did, recipient_pub, recipient_priv, "Bob", ["local.test"])
+
+    envelope =
+      dm_envelope(sender_did, device_id, device_priv, [recipient_did], %{
+        "envelope_id" => "same-anchor-envelope",
+        "body" => "hello bob"
+      })
+
+    conn = post(conn, ~p"/api/dm/submit", envelope)
+
+    assert %{"status" => "accepted", "deliveries" => [%{"recipients" => [^recipient_did]}]} =
+             json_response(conn, 200)
+
+    assert {:ok, [entry]} = Federation.pull_inbox(recipient_did, 0, 10)
+    assert entry.envelope_id == "same-anchor-envelope"
+    assert entry.identity_id == recipient_did
+    assert entry.ciphertext_envelope["body"] == "hello bob"
+    refute_receive {:federation_http, _}
+  end
+
+  test "cross-anchor DM wraps and posts once for each remote recipient anchor", %{conn: conn} do
+    {sender_pub, sender_priv} = user_keypair()
+    {device_pub, device_priv} = user_keypair()
+    {recipient_pub, recipient_priv} = user_keypair()
+    sender_did = did_for(sender_pub)
+    recipient_did = did_for(recipient_pub)
+    device_id = "sender-device"
+    issued_at = "2026-06-05T00:00:00Z"
+
+    seed_ppe!(sender_did, sender_pub, sender_priv, "Alice", ["local.test"],
+      device: {device_id, device_pub, sender_priv, issued_at}
+    )
+
+    seed_ppe!(recipient_did, recipient_pub, recipient_priv, "Bob", ["remote.test"])
+
+    envelope =
+      dm_envelope(sender_did, device_id, device_priv, [recipient_did], %{
+        "envelope_id" => "remote-envelope"
+      })
+
+    conn = post(conn, ~p"/api/dm/submit", envelope)
+
+    assert %{"status" => "accepted"} = json_response(conn, 200)
+    assert_receive {:federation_http, "/federation/inbox/push"}
+    refute_receive {:federation_http, _}
+    assert {:ok, []} = Federation.pull_inbox(recipient_did, 0, 10)
+  end
+
+  defp user_keypair, do: :crypto.generate_key(:eddsa, :ed25519)
+
+  defp did_for(pub), do: "did:yawp:" <> Yawp.Identity.did_from_pubkey(pub)
+
+  defp seed_ppe!(did, pub, priv, name, anchors, opts \\ []) do
+    ppe =
+      %{
+        "did" => did,
+        ("public_" <> "key") => pubkey_b64(pub),
+        "profile_version" => System.unique_integer([:positive]),
+        "anchors" => anchors,
+        "display_name" => name,
+        "device_subkeys" => device_subkeys(Keyword.get(opts, :device))
+      }
+      |> sign_inner("signature", priv)
+
+    assert {:ok, :applied} = Identity.apply_ppe_if_newer(ppe)
+    ppe
+  end
+
+  defp device_subkeys(nil), do: []
+
+  defp device_subkeys({device_id, device_pub, master_priv, issued_at}) do
+    pk = pubkey_b64(device_pub)
+
+    signature =
+      %{"device_id" => device_id, "pk" => pk, "issued_at" => issued_at}
+      |> Yawp.CanonicalJson.encode()
+      |> then(&:crypto.sign(:eddsa, :none, &1, [master_priv, :ed25519]))
+      |> Base.url_encode64(padding: false)
+
+    [%{"device_id" => device_id, "pk" => pk, "issued_at" => issued_at, "signature" => signature}]
+  end
+
+  defp dm_envelope(sender_did, device_id, device_priv, recipients, overrides) do
+    envelope =
+      Map.merge(
+        %{
+          "envelope_id" => "env-#{System.unique_integer([:positive])}",
+          "sender_did" => sender_did,
+          "signed_by" => device_id,
+          "recipient_dids" => recipients,
+          "conversation_id" => Yawp.Federation.DmEnvelope.conversation_id(sender_did, recipients),
+          "timestamp" => "2026-06-05T00:00:01.000Z",
+          "body" => "hello",
+          "attachments" => [],
+          "reply_to" => nil,
+          "mentions" => [],
+          "kind" => "dm"
+        },
+        overrides
+      )
+
+    sign_inner(envelope, "sender_signature", device_priv)
+  end
+
+  defp sign_inner(payload, sig_field, priv) do
+    canonical = Yawp.CanonicalJson.encode(Map.delete(payload, sig_field))
+    sig = :crypto.sign(:eddsa, :none, canonical, [priv, :ed25519])
+    Map.put(payload, sig_field, Base.url_encode64(sig, padding: false))
+  end
+end

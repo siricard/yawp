@@ -48,6 +48,7 @@ defmodule YawpWeb.Router do
     pipe_through :api
 
     get "/version", VersionController, :show
+    post "/api/dm/submit", DmController, :submit
   end
 
   pipeline :well_known do
