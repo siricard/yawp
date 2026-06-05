@@ -112,7 +112,7 @@ describe('AddServerScreen (paste-first)', () => {
             data: {
               id: 'id-abc',
               did: 'did:yawp:abc',
-              anchorList: ['localhost:4000'],
+              anchorList: ['http://localhost:4000'],
               profileVersion: 1,
             },
             metadata: {
@@ -206,7 +206,7 @@ describe('AddServerScreen (paste-first)', () => {
             data: {
               id: 'id-abc',
               did: 'did:yawp:abc',
-              anchorList: ['localhost:4000'],
+              anchorList: ['http://localhost:4000'],
               profileVersion: 1,
             },
             metadata: {

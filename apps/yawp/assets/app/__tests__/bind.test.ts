@@ -45,7 +45,7 @@ describe('submitBindDevice — split issued_at', () => {
       data: {
         id: 'x',
         did: 'did:yawp:zZZZZZZ',
-        anchorList: ['localhost:4000'],
+        anchorList: ['http://localhost:4000'],
         profileVersion: 1,
       },
       metadata: {

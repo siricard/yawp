@@ -41,6 +41,18 @@ function normalizeServerUrl(raw: string): string {
   return raw.trim().replace(/\/+$/, '');
 }
 
+function normalizeAnchorHost(raw: string): string {
+  const trimmed = raw.trim().replace(/\/+$/, '');
+  if (/^https?:\/\//i.test(trimmed)) {
+    return new URL(trimmed).host;
+  }
+  return trimmed;
+}
+
+function normalizeAnchorList(anchors: string[]): string[] {
+  return anchors.map(normalizeAnchorHost);
+}
+
 export async function submitBindDevice(args: {
   serverUrl: string;
   identity: Identity;
@@ -128,9 +140,7 @@ export async function submitBindDevice(args: {
       session,
       profileVersion: data.profileVersion ?? 0,
       publishedProfile: {
-        anchors:
-          data.anchorList ??
-          [base.replace(/^https?:\/\//, '').replace(/\/+$/, '')],
+        anchors: normalizeAnchorList(data.anchorList ?? [base]),
       },
     };
   }

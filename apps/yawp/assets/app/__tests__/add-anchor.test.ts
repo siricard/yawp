@@ -100,6 +100,28 @@ describe('submitAddAnchor', () => {
     expect(typeof ppe.signature).toBe('string');
   });
 
+  test('signs PPE with bare hosts when bind metadata came from full server URLs', async () => {
+    addAnchorMock.mockResolvedValue({
+      success: true,
+      data: {id: 'x', did: 'did:yawp:zZZZZZZ', anchorList: [], profileVersion: 3},
+    });
+
+    await submitAddAnchor({
+      primaryAnchorUrl: 'http://localhost:4000',
+      newAnchorHost: 'http://localhost:4100',
+      identity: fakeIdentity(),
+      profile: fakeProfile({
+        profileVersion: 2,
+        anchors: ['http://localhost:4000'],
+      }),
+    });
+
+    const call = addAnchorMock.mock.calls[0][0];
+    const ppe = call.input.signedPpe as Record<string, unknown>;
+    expect(ppe.profile_version).toBe(3);
+    expect(ppe.anchors).toEqual(['localhost:4000', 'localhost:4100']);
+  });
+
   test('strips a scheme and trailing slash from the new anchor host', async () => {
     addAnchorMock.mockResolvedValue({
       success: true,

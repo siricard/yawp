@@ -44,10 +44,11 @@ function normalizeServerUrl(raw: string): string {
 }
 
 function normalizeHost(raw: string): string {
-  return raw
-    .trim()
-    .replace(/^https?:\/\//, '')
-    .replace(/\/+$/, '');
+  const trimmed = raw.trim().replace(/\/+$/, '');
+  if (/^https?:\/\//i.test(trimmed)) {
+    return new URL(trimmed).host;
+  }
+  return trimmed;
 }
 
 function bytesToBase64Url(bytes: Uint8Array): string {
@@ -67,9 +68,10 @@ function buildSignedPpe(args: {
   newAnchor: string;
 }): Record<string, unknown> {
   const {identity, did, profile, newAnchor} = args;
-  const anchors = profile.anchors.includes(newAnchor)
-    ? profile.anchors
-    : [...profile.anchors, newAnchor];
+  const profileAnchors = profile.anchors.map(normalizeHost);
+  const anchors = profileAnchors.includes(newAnchor)
+    ? profileAnchors
+    : [...profileAnchors, newAnchor];
 
   const ppe: Record<string, unknown> = {
     did,
