@@ -78,6 +78,30 @@ describe('submitAddAnchor', () => {
     }
   });
 
+  test('normalizes mixed add-anchor response anchors before persistence', async () => {
+    addAnchorMock.mockResolvedValue({
+      success: true,
+      data: {
+        id: 'x',
+        did: 'did:yawp:zZZZZZZ',
+        anchorList: ['http://localhost:4000', 'anchor-b.example'],
+        profileVersion: 2,
+      },
+    });
+
+    const result = await submitAddAnchor({
+      primaryAnchorUrl: 'http://localhost:4000',
+      newAnchorHost: 'anchor-b.example',
+      identity: fakeIdentity(),
+      profile: fakeProfile(),
+    });
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.anchorList).toEqual(['localhost:4000', 'anchor-b.example']);
+    }
+  });
+
   test('sends a signed PPE carrying the new anchor and a bumped profile_version', async () => {
     addAnchorMock.mockResolvedValue({
       success: true,

@@ -1,4 +1,5 @@
 import {addAnchor} from './ash_generated';
+import {normalizeAnchorHost, normalizeAnchorList} from './bind';
 import {canonicalJson} from './canonical-json';
 import {getValidSessionToken} from './session';
 import type {Identity} from './identity-context';
@@ -43,14 +44,6 @@ function normalizeServerUrl(raw: string): string {
   return raw.trim().replace(/\/+$/, '');
 }
 
-function normalizeHost(raw: string): string {
-  const trimmed = raw.trim().replace(/\/+$/, '');
-  if (/^https?:\/\//i.test(trimmed)) {
-    return new URL(trimmed).host;
-  }
-  return trimmed;
-}
-
 function bytesToBase64Url(bytes: Uint8Array): string {
   let bin = '';
   for (let i = 0; i < bytes.length; i++) {
@@ -68,7 +61,7 @@ function buildSignedPpe(args: {
   newAnchor: string;
 }): Record<string, unknown> {
   const {identity, did, profile, newAnchor} = args;
-  const profileAnchors = profile.anchors.map(normalizeHost);
+  const profileAnchors = normalizeAnchorList(profile.anchors);
   const anchors = profileAnchors.includes(newAnchor)
     ? profileAnchors
     : [...profileAnchors, newAnchor];
@@ -98,7 +91,7 @@ export async function submitAddAnchor(args: {
   const {identity, profile} = args;
   const baseFetch = args.fetchImpl ?? fetch;
   const base = normalizeServerUrl(args.primaryAnchorUrl);
-  const newAnchor = normalizeHost(args.newAnchorHost);
+  const newAnchor = normalizeAnchorHost(args.newAnchorHost);
 
   if (newAnchor === '') {
     return {
@@ -151,7 +144,7 @@ export async function submitAddAnchor(args: {
     };
     return {
       ok: true,
-      anchorList: data.anchorList ?? [newAnchor],
+      anchorList: normalizeAnchorList(data.anchorList ?? [newAnchor]),
       profileVersion: data.profileVersion ?? profile.profileVersion + 1,
     };
   }

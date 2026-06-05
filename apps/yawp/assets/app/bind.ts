@@ -41,7 +41,7 @@ function normalizeServerUrl(raw: string): string {
   return raw.trim().replace(/\/+$/, '');
 }
 
-function normalizeAnchorHost(raw: string): string {
+export function normalizeAnchorHost(raw: string): string {
   const trimmed = raw.trim().replace(/\/+$/, '');
   if (/^https?:\/\//i.test(trimmed)) {
     return new URL(trimmed).host;
@@ -49,7 +49,7 @@ function normalizeAnchorHost(raw: string): string {
   return trimmed;
 }
 
-function normalizeAnchorList(anchors: string[]): string[] {
+export function normalizeAnchorList(anchors: string[]): string[] {
   return anchors.map(normalizeAnchorHost);
 }
 
