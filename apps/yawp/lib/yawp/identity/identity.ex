@@ -113,6 +113,15 @@ defmodule Yawp.Identity.Identity do
       accept [:read_receipts_enabled]
     end
 
+    update :accept_peer_request do
+      require_atomic? false
+      accept []
+
+      argument :peer_did, :string, allow_nil?: false
+
+      change Yawp.Identity.Identity.Changes.AcceptPeerRequest
+    end
+
     update :revoke_device_sessions do
       description """
       revokes every session + refresh

@@ -94,6 +94,45 @@ defmodule YawpWeb.DmControllerTest do
     refute entry.is_request
   end
 
+  test "accepting a peer request persists where inbox classification reads" do
+    {sender_pub, _sender_priv} = user_keypair()
+    {_device_pub, device_priv} = user_keypair()
+    {recipient_pub, _recipient_priv} = user_keypair()
+    sender_did = did_for(sender_pub)
+    recipient_did = did_for(recipient_pub)
+
+    assert {:ok, recipient} =
+             Ash.create(
+               Yawp.Identity.Identity,
+               %{did: recipient_did, master_public_key: recipient_pub},
+               action: :upsert_via_invite,
+               authorize?: false
+             )
+
+    first =
+      dm_envelope(sender_did, "device", device_priv, [recipient_did], %{
+        "envelope_id" => "request-before-accept"
+      })
+
+    assert {:ok, before_accept} = Federation.append_inbox(recipient_did, first)
+    assert before_accept.is_request
+
+    assert {:ok, _} =
+             recipient
+             |> Ash.Changeset.for_update(:accept_peer_request, %{peer_did: sender_did},
+               actor: recipient
+             )
+             |> Ash.update(authorize?: false)
+
+    second =
+      dm_envelope(sender_did, "device", device_priv, [recipient_did], %{
+        "envelope_id" => "request-after-accept"
+      })
+
+    assert {:ok, after_accept} = Federation.append_inbox(recipient_did, second)
+    refute after_accept.is_request
+  end
+
   test "cross-anchor DM wraps and posts once for each remote recipient anchor", %{conn: conn} do
     {sender_pub, sender_priv} = user_keypair()
     {device_pub, device_priv} = user_keypair()

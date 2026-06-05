@@ -22,7 +22,7 @@ const monospace = Platform.select({
   default: 'monospace',
 });
 
-type DmParticipant = {
+export type DmParticipant = {
   did: string;
   label: string;
 };
@@ -34,7 +34,7 @@ type DmThreadMessage = DmOutboxItem & {
   replyToId?: string | null;
 };
 
-type DmConversation = {
+export type DmConversation = {
   conversationId?: string;
   participants: DmParticipant[];
   messages: DmThreadMessage[];
@@ -49,12 +49,16 @@ export function DmListScreen({
   conversation,
   conversations,
   onStartConversation,
+  onAcceptRequest,
+  onOpenConversation,
 }: {
   onBack: () => void;
   availablePeers?: DmParticipant[];
   conversation?: DmConversation;
   conversations?: DmConversation[];
   onStartConversation?: (recipientDids: string[]) => void;
+  onAcceptRequest?: (senderDid: string) => Promise<boolean>;
+  onOpenConversation?: (conversation: DmConversation) => void;
 }) {
   const {degraded} = useAnchorStatus();
   const {metadata, mutate} = useOptionalBundleMetadata();
@@ -104,6 +108,10 @@ export function DmListScreen({
 
   async function acceptRequest() {
     if (!requestSender) return;
+    if (onAcceptRequest) {
+      const persisted = await onAcceptRequest(requestSender.did);
+      if (!persisted) return;
+    }
     await mutate(prev => {
       const acceptedPeers = Array.from(new Set([...(prev.acceptedPeers ?? []), requestSender.did]));
       return {...prev, acceptedPeers};
@@ -123,27 +131,39 @@ export function DmListScreen({
   }
 
   if (!conversation && visibleConversations.length > 0) {
+    const requestConversations = visibleConversations.filter(item => item.isRequest);
+    const mainConversations = visibleConversations.filter(item => !item.isRequest);
     return (
       <View testID="dm-list-screen" className="flex-1 bg-bg">
         <DmHeader onBack={onBack} />
         <ScrollView className="flex-1 px-6 py-4">
           <DmSection
-            title="Pinned"
-            conversations={sortPinned(visibleConversations)}
+            title="Message Requests"
+            conversations={sortRecent(requestConversations)}
             pinnedIds={pinnedIds}
             onTogglePin={togglePin}
+            onOpenConversation={onOpenConversation}
+          />
+          <DmSection
+            title="Pinned"
+            conversations={sortPinned(mainConversations)}
+            pinnedIds={pinnedIds}
+            onTogglePin={togglePin}
+            onOpenConversation={onOpenConversation}
           />
           <DmSection
             title="Recent"
-            conversations={sortRecent(visibleConversations)}
+            conversations={sortRecent(mainConversations)}
             pinnedIds={pinnedIds}
             onTogglePin={togglePin}
+            onOpenConversation={onOpenConversation}
           />
           <DmSection
             title="All"
-            conversations={sortAll(visibleConversations)}
+            conversations={sortAll(mainConversations)}
             pinnedIds={pinnedIds}
             onTogglePin={togglePin}
+            onOpenConversation={onOpenConversation}
           />
         </ScrollView>
       </View>
@@ -327,11 +347,13 @@ function DmSection({
   conversations,
   pinnedIds,
   onTogglePin,
+  onOpenConversation,
 }: {
   title: string;
   conversations: DmConversation[];
   pinnedIds: Set<string>;
   onTogglePin: (conversation: DmConversation) => void;
+  onOpenConversation?: (conversation: DmConversation) => void;
 }) {
   return (
     <View testID={`dm-section-${title.toLowerCase()}`} className="mb-5">
@@ -343,9 +365,12 @@ function DmSection({
           const id = conversation.conversationId ?? conversation.participants.map(p => p.did).sort().join('|');
           const label = conversation.participants.map(p => p.label).join(', ');
           return (
-            <View
+            <Pressable
               key={id}
               testID={`dm-conversation-${id}`}
+              accessibilityRole="button"
+              onPress={() => onOpenConversation?.(conversation)}
+              style={pointerCursor}
               className="rounded-lg border border-border-soft bg-surface px-4 py-3 flex-row items-center justify-between">
               <View className="flex-1">
                 <Text className="text-sm font-bold text-text">{label}</Text>
@@ -364,7 +389,7 @@ function DmSection({
                   {pinnedIds.has(id) ? 'Unpin' : 'Pin'}
                 </Text>
               </Pressable>
-            </View>
+            </Pressable>
           );
         })}
       </View>

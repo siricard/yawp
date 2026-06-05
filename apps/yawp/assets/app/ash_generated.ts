@@ -201,6 +201,71 @@ export async function executeValidationRpcRequest<T>(
 
 
 
+export type AcceptPeerRequestInput = {
+  peerDid: string;
+};
+
+export type AcceptPeerRequestFields = UnifiedFieldSelection<IdentityResourceSchema>[];
+
+export type InferAcceptPeerRequestResult<
+  Fields extends AcceptPeerRequestFields | undefined,
+> = InferResult<IdentityResourceSchema, Fields>;
+
+export type AcceptPeerRequestResult<Fields extends AcceptPeerRequestFields | undefined = undefined> = | { success: true; data: InferAcceptPeerRequestResult<Fields>; }
+| { success: false; errors: AshRpcError[]; }
+
+;
+
+export async function acceptPeerRequest<Fields extends AcceptPeerRequestFields | undefined = undefined>(
+  config: {
+  tenant?: string;
+  identity: { did: string };
+  input: AcceptPeerRequestInput;
+  fields?: Fields;
+  headers?: Record<string, string>;
+  fetchOptions?: RequestInit;
+  customFetch?: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
+}
+): Promise<AcceptPeerRequestResult<Fields extends undefined ? [] : Fields>> {
+  const payload = {
+    action: "accept_peer_request",
+    ...(config.tenant !== undefined && { tenant: config.tenant }),
+    identity: config.identity,
+    input: config.input,
+    ...(config.fields !== undefined && { fields: config.fields })
+  };
+
+  return executeActionRpcRequest<AcceptPeerRequestResult<Fields extends undefined ? [] : Fields>>(
+    payload,
+    config
+  );
+}
+
+
+export async function validateAcceptPeerRequest(
+  config: {
+  tenant?: string;
+  identity: { did: string };
+  input: AcceptPeerRequestInput;
+  headers?: Record<string, string>;
+  fetchOptions?: RequestInit;
+  customFetch?: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
+}
+): Promise<ValidationResult> {
+  const payload = {
+    action: "accept_peer_request",
+    ...(config.tenant !== undefined && { tenant: config.tenant }),
+    identity: config.identity,
+    input: config.input
+  };
+
+  return executeValidationRpcRequest<ValidationResult>(
+    payload,
+    config
+  );
+}
+
+
 export type AddAnchorInput = {
   newAnchor: string;
   signedPpe?: Record<string, any> | null;

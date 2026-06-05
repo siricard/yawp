@@ -1,10 +1,11 @@
 
-import React, {useEffect, useState} from 'react';
+import React, {useCallback, useEffect, useState} from 'react';
 import {Platform, StatusBar, View} from 'react-native';
 import {SafeAreaProvider, SafeAreaView} from 'react-native-safe-area-context';
 
+import {acceptPeerRequest} from './ash_generated';
 import {submitBindDevice} from './bind';
-import {AnchorConnectionProvider} from './chat/anchor-connection';
+import {AnchorConnectionProvider, type InboxEvent} from './chat/anchor-connection';
 import {normalizeAnchorServerUrl} from './chat/anchor-url';
 import {discoverGeneralChannel} from './chat/discover';
 import {
@@ -17,7 +18,7 @@ import {
 } from './identity-context';
 import {AddAnchorScreen} from './screens/AddAnchorScreen';
 import {AddServerScreen} from './screens/AddServerScreen';
-import {DmListScreen} from './screens/DmListScreen';
+import {DmListScreen, type DmConversation} from './screens/DmListScreen';
 import {HomeScreen} from './screens/HomeScreen';
 import {ServerScreen} from './screens/ServerScreen';
 import {LockedScreen} from './screens/LockedScreen';
@@ -79,10 +80,8 @@ function AppShell() {
   const [screen, setScreen] = useState<Screen>({kind: 'home'});
   const [bindingUrl, setBindingUrl] = useState<string | null>(null);
   const [bindError, setBindError] = useState<string | null>(null);
-  const [dmConversation, setDmConversation] = useState<{
-    participants: Array<{did: string; label: string}>;
-    messages: [];
-  } | null>(null);
+  const [dmConversation, setDmConversation] = useState<DmConversation | null>(null);
+  const [inboxConversations, setInboxConversations] = useState<DmConversation[]>([]);
 
   function handleRemovedFromServer(serverUrl: string, reason: string) {
     if (reason === 'banned') {
@@ -132,6 +131,32 @@ function AppShell() {
     if (participants.length < 1) return;
     setDmConversation({participants, messages: []});
   }
+
+  async function handleAcceptDmRequest(senderDid: string): Promise<boolean> {
+    if (identityState.status !== 'ready') return false;
+    const result = await acceptPeerRequest({
+      identity: {did: identityState.identity.didFull},
+      input: {peerDid: senderDid},
+      fields: ['did'],
+    });
+    if (result.success) {
+      setInboxConversations(prev =>
+        prev.map(conversation =>
+          conversation.participants.some(participant => participant.did === senderDid)
+            ? {...conversation, isRequest: false}
+            : conversation,
+        ),
+      );
+      setDmConversation(prev => (prev ? {...prev, isRequest: false} : prev));
+    }
+    return result.success;
+  }
+
+  const handleInbox = useCallback((event: InboxEvent) => {
+    const conversation = conversationFromInboxEvent(event);
+    if (!conversation) return;
+    setInboxConversations(prev => mergeInboxConversation(prev, conversation));
+  }, []);
 
   if (identityState.status === 'onboarding') {
     return (
@@ -206,7 +231,10 @@ function AppShell() {
           onBack={() => setScreen({kind: 'home'})}
           availablePeers={dmPeers}
           conversation={dmConversation ?? undefined}
+          conversations={dmConversation ? undefined : inboxConversations}
           onStartConversation={handleStartDmConversation}
+          onAcceptRequest={handleAcceptDmRequest}
+          onOpenConversation={setDmConversation}
         />
       );
       break;
@@ -227,7 +255,10 @@ function AppShell() {
   }
 
   return (
-    <AnchorConnectionProvider anchorUrls={anchorUrls} guestAnchors={guestAnchors}>
+    <AnchorConnectionProvider
+      anchorUrls={anchorUrls}
+      guestAnchors={guestAnchors}
+      onInbox={handleInbox}>
       <SafeAreaView
         edges={['top', 'bottom']}
         className="flex-1 bg-bg"
@@ -250,6 +281,53 @@ function AppShell() {
       </SafeAreaView>
     </AnchorConnectionProvider>
   );
+}
+
+function conversationFromInboxEvent(event: InboxEvent): DmConversation | null {
+  const envelope = event.envelope;
+  const senderDid = typeof envelope.sender_did === 'string' ? envelope.sender_did : null;
+  const conversationId =
+    typeof envelope.conversation_id === 'string' ? envelope.conversation_id : event.envelope_id;
+  if (!senderDid) return null;
+  return {
+    conversationId,
+    participants: [{did: senderDid, label: dmPeerLabel(senderDid)}],
+    lastActivityAt: typeof envelope.timestamp === 'string' ? envelope.timestamp : new Date(0).toISOString(),
+    isRequest: event.is_request,
+    messages: [
+      {
+        id: event.envelope_id,
+        body: typeof envelope.body === 'string' ? envelope.body : '',
+        senderDid,
+        recipientDids: Array.isArray(envelope.recipient_dids)
+          ? envelope.recipient_dids.filter((did): did is string => typeof did === 'string')
+          : [],
+        delivery: 'delivered',
+      },
+    ],
+  };
+}
+
+function mergeInboxConversation(
+  conversations: DmConversation[],
+  incoming: DmConversation,
+): DmConversation[] {
+  const id = incoming.conversationId;
+  const existingIndex = conversations.findIndex(conversation => conversation.conversationId === id);
+  if (existingIndex < 0) return [incoming, ...conversations];
+  return conversations.map((conversation, index) => {
+    if (index !== existingIndex) return conversation;
+    const known = new Set(conversation.messages.map(message => message.id));
+    return {
+      ...conversation,
+      isRequest: incoming.isRequest,
+      lastActivityAt: incoming.lastActivityAt,
+      messages: [
+        ...conversation.messages,
+        ...incoming.messages.filter(message => !known.has(message.id)),
+      ],
+    };
+  });
 }
 
 export function configuredAnchorUrls(anchors: string[] | undefined): string[] {

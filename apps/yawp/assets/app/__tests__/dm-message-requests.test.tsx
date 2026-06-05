@@ -3,6 +3,7 @@ import ReactTestRenderer from 'react-test-renderer';
 
 const mockStatus = {value: {status: 'connected', degraded: false}};
 const mockMutate = jest.fn(async mut => mut({}));
+const mockAcceptRequest = jest.fn(async () => true);
 
 jest.mock('../chat/anchor-connection', () => ({
   useAnchorStatus: () => mockStatus.value,
@@ -21,6 +22,7 @@ import {DmListScreen} from '../screens/DmListScreen';
 describe('DmListScreen message requests', () => {
   beforeEach(() => {
     mockMutate.mockClear();
+    mockAcceptRequest.mockClear();
   });
 
   test('request conversations are read-only until accepted', () => {
@@ -36,6 +38,7 @@ describe('DmListScreen message requests', () => {
               {id: 'm1', senderDid: 'did:yawp:alice', body: 'hello', delivery: 'delivered'},
             ],
           }}
+          onAcceptRequest={mockAcceptRequest}
         />,
       );
     });
@@ -60,6 +63,7 @@ describe('DmListScreen message requests', () => {
               {id: 'm1', senderDid: 'did:yawp:alice', body: 'hello', delivery: 'delivered'},
             ],
           }}
+          onAcceptRequest={mockAcceptRequest}
         />,
       );
     });
@@ -72,6 +76,7 @@ describe('DmListScreen message requests', () => {
     expect(mockMutate.mock.calls[0][0]({acceptedPeers: ['did:yawp:bob']})).toEqual({
       acceptedPeers: ['did:yawp:bob', 'did:yawp:alice'],
     });
+    expect(mockAcceptRequest).toHaveBeenCalledWith('did:yawp:alice');
     expect(root.root.findAllByProps({testID: 'dm-message-request-card'})).toHaveLength(0);
     expect(root.root.findByProps({testID: 'dm-composer-input'})).toBeTruthy();
 

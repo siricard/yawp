@@ -38,6 +38,7 @@ defmodule Yawp.Identity do
 
       rpc_action :add_anchor, :add_anchor, identities: [:unique_did]
       rpc_action :set_read_receipts, :set_read_receipts, identities: [:unique_did]
+      rpc_action :accept_peer_request, :accept_peer_request, identities: [:unique_did]
     end
 
     resource Yawp.Identity.RefreshToken do
@@ -54,6 +55,7 @@ defmodule Yawp.Identity do
       define :bind_device, action: :bind_device
       define :add_anchor, action: :add_anchor
       define :set_read_receipts, action: :set_read_receipts
+      define :accept_peer_request, action: :accept_peer_request
     end
 
     resource Yawp.Identity.SessionToken do

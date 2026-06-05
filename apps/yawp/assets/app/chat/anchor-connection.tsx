@@ -18,6 +18,13 @@ export type AnchorConnection = {
   degraded: boolean;
 };
 
+export type InboxEvent = {
+  envelope_id: string;
+  envelope: Record<string, unknown>;
+  is_request: boolean;
+  inbox_serial: number;
+};
+
 const AnchorContext = createContext<AnchorConnection>({
   status: 'connecting',
   degraded: false,
@@ -27,6 +34,7 @@ export function useAnchorConnection(
   anchorUrls: string[],
   did: string,
   guestAnchors: string[] = [],
+  onInbox?: (event: InboxEvent) => void,
 ): AnchorConnection {
   const [status, setStatus] = useState<AnchorStatus>('connecting');
   const degradedTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -101,6 +109,10 @@ export function useAnchorConnection(
           reachable.set(url, true);
           recompute();
         });
+        channel.on('inbox', payload => {
+          if (cancelled || !isInboxEvent(payload)) return;
+          onInbox?.(payload);
+        });
         channel.join();
 
         cleanups.push(() => {
@@ -120,7 +132,7 @@ export function useAnchorConnection(
       clearDegradedTimer();
       cleanups.forEach(fn => fn());
     };
-  }, [anchorsKey, did, guestAnchorsKey]);
+  }, [anchorsKey, did, guestAnchorsKey, onInbox]);
 
   return {status, degraded: status === 'degraded'};
 }
@@ -128,10 +140,12 @@ export function useAnchorConnection(
 export function AnchorConnectionProvider({
   anchorUrls,
   guestAnchors = [],
+  onInbox,
   children,
 }: {
   anchorUrls: string[];
   guestAnchors?: string[];
+  onInbox?: (event: InboxEvent) => void;
   children: React.ReactNode;
 }) {
   const state = useIdentityState();
@@ -140,11 +154,24 @@ export function AnchorConnectionProvider({
     did ? anchorUrls : [],
     did,
     guestAnchors,
+    onInbox,
   );
   return (
     <AnchorContext.Provider value={connection}>
       {children}
     </AnchorContext.Provider>
+  );
+}
+
+function isInboxEvent(payload: unknown): payload is InboxEvent {
+  if (!payload || typeof payload !== 'object') return false;
+  const candidate = payload as Partial<InboxEvent>;
+  return (
+    typeof candidate.envelope_id === 'string' &&
+    typeof candidate.envelope === 'object' &&
+    candidate.envelope !== null &&
+    typeof candidate.is_request === 'boolean' &&
+    typeof candidate.inbox_serial === 'number'
   );
 }
 
