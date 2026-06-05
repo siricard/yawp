@@ -59,6 +59,40 @@ defmodule YawpWeb.AshTypescriptRpcControllerTest do
       conn = get(conn, "/rpc/run")
       assert conn.status == 404
     end
+
+    test "allows browser cross-origin bind-device calls", %{conn: conn} do
+      body = %{
+        "action" => "bind_device",
+        "identity" => %{"did" => "did:yawp:missing"},
+        "fields" => ["id"],
+        "input" => %{}
+      }
+
+      conn =
+        conn
+        |> put_req_header("origin", "http://localhost:4100")
+        |> put_req_header("content-type", "application/json")
+        |> post(~p"/rpc/run", body)
+
+      assert conn.status == 200
+      assert ["*"] = get_resp_header(conn, "access-control-allow-origin")
+    end
+
+    test "answers browser preflight for bind-device calls", %{conn: conn} do
+      conn =
+        conn
+        |> put_req_header("origin", "http://localhost:4100")
+        |> put_req_header("access-control-request-method", "POST")
+        |> put_req_header("access-control-request-headers", "content-type")
+        |> options(~p"/rpc/run")
+
+      assert conn.status == 204
+      assert ["*"] = get_resp_header(conn, "access-control-allow-origin")
+      assert ["GET, POST, OPTIONS"] = get_resp_header(conn, "access-control-allow-methods")
+
+      assert ["authorization, content-type, x-requested-with"] =
+               get_resp_header(conn, "access-control-allow-headers")
+    end
   end
 
   describe "POST /rpc/validate pipeline" do

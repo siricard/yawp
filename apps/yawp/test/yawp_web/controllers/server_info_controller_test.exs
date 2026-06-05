@@ -49,4 +49,14 @@ defmodule YawpWeb.ServerInfoControllerTest do
     assert ["public, max-age=30"] = get_resp_header(conn, "cache-control")
     assert ["application/json" <> _] = get_resp_header(conn, "content-type")
   end
+
+  test "allows browser cross-origin discovery fetches", %{conn: conn} do
+    conn =
+      conn
+      |> put_req_header("origin", "http://localhost:4100")
+      |> get("/.well-known/yawp/server-info")
+
+    assert ["*"] = get_resp_header(conn, "access-control-allow-origin")
+    assert ["GET, POST, OPTIONS"] = get_resp_header(conn, "access-control-allow-methods")
+  end
 end

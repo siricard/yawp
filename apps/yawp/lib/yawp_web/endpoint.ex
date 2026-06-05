@@ -52,6 +52,7 @@ defmodule YawpWeb.Endpoint do
 
   plug Plug.MethodOverride
   plug Plug.Head
+  plug YawpWeb.PublicCors
   plug Plug.Session, @session_options
   plug YawpWeb.Router
 end
