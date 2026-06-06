@@ -112,11 +112,7 @@ defmodule Yawp.Dev.DmFixtures do
   end
 
   defp bind_user(identity, user) do
-    if Enum.any?(identity.device_subkeys["subkeys"] || [], &(&1["device_id"] == user.device_id)) do
-      {:ok, identity}
-    else
-      Identity.bind_device(identity, bind_args(user))
-    end
+    Identity.bind_device(identity, bind_args(user))
   end
 
   defp publish_profiles(users, anchor_url, peer_anchor_url) do
@@ -162,6 +158,8 @@ defmodule Yawp.Dev.DmFixtures do
   defp write_artifact(anchor, users, anchor_url, peer_anchor_url, output_dir) do
     File.mkdir_p!(output_dir)
     anchor_urls = fixture_anchor_urls(anchor, anchor_url, peer_anchor_url)
+    path = Path.join(output_dir, "dm_cast.json")
+    existing = read_existing_artifact(path)
 
     artifact = %{
       "anchors" => %{"a" => anchor_urls.a, "b" => anchor_urls.b},
@@ -172,25 +170,66 @@ defmodule Yawp.Dev.DmFixtures do
       },
       "identities" =>
         Map.new(users, fn {name, user} ->
-          {Atom.to_string(name), browser_identity(user, anchor_urls.a, anchor_urls.b)}
+          key = Atom.to_string(name)
+
+          {key,
+           browser_identity(
+             anchor,
+             user,
+             anchor_urls.a,
+             anchor_urls.b,
+             get_in(existing, ["identities", key, "localStorage"]) || %{}
+           )}
         end)
     }
 
-    path = Path.join(output_dir, "dm_cast.json")
     File.write!(path, Jason.encode!(artifact, pretty: true))
     {:ok, Map.put(artifact, "path", path)}
   end
 
-  defp browser_identity(user, anchor_url, peer_anchor_url) do
+  defp read_existing_artifact(path) do
+    case File.read(path) do
+      {:ok, raw} -> Jason.decode!(raw)
+      {:error, _} -> %{}
+    end
+  end
+
+  defp browser_identity(anchor, user, anchor_url, peer_anchor_url, existing_storage) do
     server_url = if user.name == :alice, do: anchor_url, else: peer_anchor_url
     peers = if user.name == :alice, do: [:bob, :carol], else: [:alice]
+
+    local_storage =
+      if local_user?(anchor, user.name) do
+        Map.put(
+          existing_storage,
+          session_storage_key(server_url),
+          Jason.encode!(browser_session(user))
+        )
+      else
+        existing_storage
+      end
 
     %{
       "did" => user.did,
       "serverUrl" => server_url,
-      "bundle" => bundle(user, server_url, peers)
+      "bundle" => bundle(user, server_url, peers),
+      "localStorage" => local_storage
     }
   end
+
+  defp browser_session(user) do
+    {:ok, identity} = Identity.get_identity_by_did(user.did)
+    {:ok, bound} = bind_user(identity, user)
+
+    %{
+      "sessionToken" => Ash.Resource.get_metadata(bound, :session_token),
+      "refreshToken" => Ash.Resource.get_metadata(bound, :refresh_token),
+      "expiresAt" => bound |> Ash.Resource.get_metadata(:expires_at) |> DateTime.to_iso8601()
+    }
+  end
+
+  defp session_storage_key(server_url),
+    do: "yawp.session.v1." <> String.trim_trailing(server_url, "/")
 
   defp bundle(user, server_url, peer_names) do
     %{
@@ -366,6 +405,8 @@ defmodule Yawp.Dev.DmFixtures do
 
   defp local_names(:a), do: [:alice]
   defp local_names(:b), do: [:bob, :carol, :dave]
+
+  defp local_user?(anchor, name), do: name in local_names(anchor)
 
   defp fixture_anchor_urls(:a, anchor_url, peer_anchor_url),
     do: %{a: anchor_url, b: peer_anchor_url}

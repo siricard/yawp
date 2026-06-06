@@ -81,10 +81,10 @@ Optional, for native parity verification:
    just dm-fixtures
    ```
 
-   This writes browser identity bundles to `.cache/dm-fixtures/dm_cast.json`.
-   Load Alice from `http://localhost:4000` and Bob or Carol from
-   `http://localhost:4100` by importing the listed IndexedDB bundle before
-   opening the DM page.
+   This writes browser identity bundles and chat sessions to
+   `.cache/dm-fixtures/dm_cast.json`. Load Alice from `http://localhost:4000`
+   and Bob or Carol from `http://localhost:4100` by importing the listed
+   IndexedDB bundle and localStorage entries before opening the DM page.
 
 5. **Browse the component library.** In another terminal, serve the shared
    `app/ui/` library on port `:61000`:
