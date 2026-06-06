@@ -20,6 +20,8 @@ export async function submitDm(args: {
   identity: Identity;
   recipientDids: string[];
   body: string;
+  senderAnchors?: string[];
+  senderProfileVersion?: number;
   attachments?: Record<string, unknown>[];
   replyTo?: string | null;
   mentions?: Array<Record<string, unknown>>;
@@ -44,6 +46,11 @@ export async function submitDm(args: {
   const unsigned: DmEnvelope = {
     envelope_id: generateEnvelopeId(args.randomBytes),
     sender_did: args.identity.didFull,
+    signed_by: args.identity.deviceId,
+    sender_anchors: normalizeSenderAnchors(args.senderAnchors),
+    ...(typeof args.senderProfileVersion === 'number'
+      ? {sender_profile_version: args.senderProfileVersion}
+      : {}),
     recipient_dids: recipientDids,
     conversation_id: conversationId(args.identity.didFull, recipientDids),
     timestamp: (args.now ?? (() => new Date()))().toISOString(),
@@ -84,4 +91,27 @@ export async function submitDm(args: {
   }
 
   return {ok: false, error: 'server_rejected', message: 'The anchor rejected this direct message.'};
+}
+
+function normalizeSenderAnchors(anchors: string[] | undefined): string[] {
+  return Array.from(
+    new Set(
+      (anchors ?? [])
+        .map(anchor => normalizeAnchorHost(anchor))
+        .filter((anchor): anchor is string => Boolean(anchor)),
+    ),
+  );
+}
+
+function normalizeAnchorHost(raw: string): string | null {
+  const trimmed = raw.trim().replace(/^\/+|\/+$/g, '');
+  try {
+    const parsed = new URL(trimmed);
+    if (parsed.protocol === 'http:' || parsed.protocol === 'https:') {
+      return parsed.host;
+    }
+    return trimmed.length > 0 ? trimmed : null;
+  } catch {
+    return trimmed.length > 0 ? trimmed : null;
+  }
 }

@@ -159,6 +159,8 @@ function AppShell() {
       identity: identityState.identity,
       recipientDids: uniqueRecipientDids,
       body: trimmedBody,
+      senderAnchors: metadata.publishedProfile?.anchors,
+      senderProfileVersion: metadata.profileVersion,
     });
     if (!result.ok) {
       setDmConversation(prev =>
@@ -231,6 +233,8 @@ function AppShell() {
       identity: identityState.identity,
       recipientDids: normalizeRecipientDids(recipientDids, identityState.identity.didFull),
       body,
+      senderAnchors: metadata.publishedProfile?.anchors,
+      senderProfileVersion: metadata.profileVersion,
     });
     if (!result.ok) return null;
     const message = {

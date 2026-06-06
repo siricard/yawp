@@ -50,6 +50,9 @@ describe('dm envelope', () => {
     const envelope = {
       envelope_id: generateEnvelopeId(() => new Uint8Array(16).fill(1)),
       sender_did: 'did:yawp:alice',
+      signed_by: deviceId,
+      sender_anchors: ['localhost:4000'],
+      sender_profile_version: 1,
       recipient_dids: ['did:yawp:bob'],
       conversation_id: conversationId('did:yawp:alice', ['did:yawp:bob']),
       timestamp: '2026-06-04T12:00:01.000Z',

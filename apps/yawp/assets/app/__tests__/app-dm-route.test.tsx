@@ -25,6 +25,7 @@ function mockFakeIdentity(): Identity {
 
 let mockMetadata = {
   acceptedPeers: ["did:yawp:bob", "did:yawp:carol"],
+  profileVersion: 1,
   publishedProfile: { anchors: ["localhost:4000"] },
 };
 const servers = [{url: "localhost:4000", label: "Local"}];
@@ -151,6 +152,7 @@ describe("App direct-message route", () => {
   beforeEach(() => {
     mockMetadata = {
       acceptedPeers: ["did:yawp:bob", "did:yawp:carol"],
+      profileVersion: 1,
       publishedProfile: { anchors: ["localhost:4000"] },
     };
     anchorInbox = undefined;
@@ -215,6 +217,7 @@ describe("App direct-message route", () => {
   test("rejects sending a new direct message when no peers are available", async () => {
     mockMetadata = {
       acceptedPeers: [],
+      profileVersion: 1,
       publishedProfile: { anchors: ["localhost:4000"] },
     };
     let root!: ReactTestRenderer.ReactTestRenderer;
@@ -328,6 +331,9 @@ describe("App direct-message route", () => {
     expect(envelope).toEqual(
       expect.objectContaining({
         sender_did: "did:yawp:alice",
+        signed_by: "fake-device-id",
+        sender_anchors: ["localhost:4000"],
+        sender_profile_version: 1,
         recipient_dids: ["did:yawp:bob"],
         body: "signed over the wire",
         attachments: [],
@@ -346,6 +352,7 @@ describe("App direct-message route", () => {
   test("starts a first direct message to a typed DID outside accepted peers", async () => {
     mockMetadata = {
       acceptedPeers: ["did:yawp:bob"],
+      profileVersion: 1,
       publishedProfile: { anchors: ["localhost:4000"] },
     };
     let root!: ReactTestRenderer.ReactTestRenderer;

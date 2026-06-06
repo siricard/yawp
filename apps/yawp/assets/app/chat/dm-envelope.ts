@@ -5,6 +5,9 @@ import {bytesToB64Url, b64UrlToBytes} from '../identity/bundle';
 export type DmEnvelope = {
   envelope_id: string;
   sender_did: string;
+  signed_by: string;
+  sender_anchors?: string[];
+  sender_profile_version?: number;
   recipient_dids: string[];
   conversation_id: string;
   timestamp: string;
@@ -67,12 +70,13 @@ export async function verify(
   ) => boolean | Promise<boolean>,
 ): Promise<boolean> {
   if (!envelope.sender_signature) return false;
+  if (!envelope.signed_by) return false;
   if (envelope.conversation_id !== conversationId(envelope.sender_did, envelope.recipient_dids)) {
     return false;
   }
   const signature = b64UrlToBytes(envelope.sender_signature);
   const message = signingInput(envelope);
-  const keys = delegatedDevicePublicKeys(ppe, verifySignature);
+  const keys = delegatedDevicePublicKeys(ppe, envelope.signed_by, verifySignature);
 
   for await (const key of keys) {
     if (await verifySignature(signature, message, key)) return true;
@@ -83,6 +87,7 @@ export async function verify(
 
 async function* delegatedDevicePublicKeys(
   ppe: SenderPpe,
+  signedBy: string,
   verifySignature: (
     signature: Uint8Array,
     message: Uint8Array,
@@ -95,6 +100,7 @@ async function* delegatedDevicePublicKeys(
     : ppe.device_subkeys?.subkeys ?? [];
 
   for (const subkey of subkeys) {
+    if (subkey.device_id !== signedBy) continue;
     const devicePk = b64UrlToBytes(subkey.pk);
     const delegationSignature = b64UrlToBytes(subkey.signature);
     const delegationMessage = new TextEncoder().encode(

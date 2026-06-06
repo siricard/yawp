@@ -83,6 +83,33 @@ defmodule Yawp.Federation.DeviceSignatureTest do
     assert :ok = DeviceSignature.verify(env)
   end
 
+  test "accepts a client envelope whose device id and sender anchors are covered by the signature" do
+    {master_pub, master_priv} = keypair()
+    {device_pub, device_priv} = keypair()
+    device_id = "client-device-1"
+
+    seed_ppe(master_pub, master_priv, device_pub, device_id, version: 7)
+
+    env =
+      envelope(master_pub, device_priv, device_id, %{
+        "recipient_dids" => ["did:yawp:recipient"],
+        "conversation_id" => "conv-client",
+        "timestamp" => "2026-06-06T00:00:00.000Z",
+        "attachments" => [],
+        "reply_to" => nil,
+        "mentions" => [],
+        "sender_anchors" => ["localhost:4000"],
+        "sender_profile_version" => 7
+      })
+
+    assert :ok = DeviceSignature.verify(env)
+
+    assert {:error, :invalid_inner_signature} =
+             env
+             |> Map.put("signed_by", "client-device-2")
+             |> DeviceSignature.verify()
+  end
+
   test "rejects a DM signed by the master key rather than a device subkey" do
     {master_pub, master_priv} = keypair()
     {device_pub, _device_priv} = keypair()
