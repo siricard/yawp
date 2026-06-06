@@ -74,7 +74,19 @@ Optional, for native parity verification:
 3. **Chat in real time.** With both sessions on `#general`, send a message from
    one — it appears in the other without a refresh.
 
-4. **Browse the component library.** In another terminal, serve the shared
+4. **Optional: stage direct-message browser fixtures.** For a local two-anchor
+   DM smoke run, provision the standard development cast:
+
+   ```bash
+   just dm-fixtures
+   ```
+
+   This writes browser identity bundles to `.cache/dm-fixtures/dm_cast.json`.
+   Load Alice from `http://localhost:4000` and Bob or Carol from
+   `http://localhost:4100` by importing the listed IndexedDB bundle before
+   opening the DM page.
+
+5. **Browse the component library.** In another terminal, serve the shared
    `app/ui/` library on port `:61000`:
 
    ```bash
@@ -87,7 +99,7 @@ Optional, for native parity verification:
    tokens the production bundle uses; what you see here is what you get in the
    app.
 
-5. **Optional: confirm native parity.** Start Metro, then launch a native
+6. **Optional: confirm native parity.** Start Metro, then launch a native
    target:
 
    ```bash

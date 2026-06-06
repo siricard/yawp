@@ -16,6 +16,10 @@ dev:
 dev-anchor-b:
     nix develop -c bash -c 'cd apps/yawp && DATABASE=yawp_anchor_b_dev mix ecto.create && PORT=4100 DATABASE=yawp_anchor_b_dev mix phx.server'
 
+dm-fixtures:
+    nix develop -c bash -c 'cd apps/yawp && mix ecto.migrate && mix yawp.dm_fixtures --anchor a --anchor-url http://localhost:4000 --peer-anchor-url http://localhost:4100'
+    nix develop -c bash -c 'cd apps/yawp && DATABASE=yawp_anchor_b_dev mix ecto.migrate && DATABASE=yawp_anchor_b_dev PORT=4100 mix yawp.dm_fixtures --anchor b --anchor-url http://localhost:4100 --peer-anchor-url http://localhost:4000'
+
 # Open IEx shell with the app loaded
 iex:
     nix develop -c bash -c 'cd apps/yawp && iex -S mix phx.server'
