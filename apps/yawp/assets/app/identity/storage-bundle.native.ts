@@ -107,16 +107,34 @@ async function readStoredEntry(
   return parseStoredEntry(creds.password);
 }
 
+async function saveSealedEnvelopeFallback(entry: StoredIdentityEntry): Promise<void> {
+  if (entry.kind !== 'sealed') return;
+  await Keychain.setGenericPassword(STORAGE_KEY_V1, stringifyStoredEntry(entry), {
+    service: sealedFallbackService,
+    accessible: Keychain.ACCESSIBLE?.WHEN_UNLOCKED_THIS_DEVICE_ONLY,
+  });
+}
+
+async function readPrimaryStoredEntry(
+  options: Parameters<typeof Keychain.getGenericPassword>[0],
+): Promise<StoredIdentityEntry | null> {
+  const entry = await readStoredEntry(options);
+  if (entry?.kind === 'sealed') {
+    await saveSealedEnvelopeFallback(entry);
+  }
+  return entry;
+}
+
 export async function loadStoredEntry(): Promise<StoredIdentityEntry | null> {
-  return readStoredEntry(keychainOptions);
+  return readPrimaryStoredEntry(keychainOptions);
 }
 
 export async function loadStoredEntryWithBiometrics(): Promise<StoredIdentityEntry | null> {
-  return readStoredEntry(biometricOnlyOptions);
+  return readPrimaryStoredEntry(biometricOnlyOptions);
 }
 
 export async function loadStoredEntryWithDevicePasscode(): Promise<StoredIdentityEntry | null> {
-  return readStoredEntry(devicePasscodeOptions);
+  return readPrimaryStoredEntry(devicePasscodeOptions);
 }
 
 export async function saveStoredEntry(entry: StoredIdentityEntry): Promise<void> {
@@ -147,10 +165,7 @@ export async function saveSealedEnvelope(
 ): Promise<void> {
   const entry: StoredIdentityEntry = {kind: 'sealed', envelope, didPrefix};
   await saveStoredEntry(entry);
-  await Keychain.setGenericPassword(STORAGE_KEY_V1, stringifyStoredEntry(entry), {
-    service: sealedFallbackService,
-    accessible: Keychain.ACCESSIBLE?.WHEN_UNLOCKED_THIS_DEVICE_ONLY,
-  });
+  await saveSealedEnvelopeFallback(entry);
 }
 
 export async function clearIdentityBundle(): Promise<void> {

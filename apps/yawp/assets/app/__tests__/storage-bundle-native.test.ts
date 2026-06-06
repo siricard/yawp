@@ -7,7 +7,7 @@ import {
   saveSealedEnvelope,
   saveIdentity,
 } from '../identity/storage-bundle.native';
-import type {IdentityBundleV1} from '../identity/bundle';
+import {STORAGE_KEY_V1, type IdentityBundleV1} from '../identity/bundle';
 
 function bundle(): IdentityBundleV1 {
   return {
@@ -91,6 +91,41 @@ describe('native identity keychain policy', () => {
     expect(entry).toMatchObject({
       kind: 'sealed',
       didPrefix: 'did:yawp:z6MkNative',
+    });
+    expect(Keychain.setGenericPassword).toHaveBeenLastCalledWith(
+      expect.any(String),
+      expect.any(String),
+      expect.objectContaining({
+        service: expect.stringContaining('.sealed'),
+        accessible: Keychain.ACCESSIBLE.WHEN_UNLOCKED_THIS_DEVICE_ONLY,
+      }),
+    );
+  });
+
+  test('backfills the passphrase fallback service after reading an existing sealed keychain item', async () => {
+    await Keychain.setGenericPassword(
+      STORAGE_KEY_V1,
+      JSON.stringify({
+        version: 2,
+        sealed: true,
+        salt: 'AAAAAAAAAAAAAAAAAAAAAA',
+        nonce: 'AAAAAAAAAAAAAAAA',
+        ciphertext: 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA',
+        didPrefix: 'did:yawp:z6MkUpgraded',
+      }),
+      {
+        service: STORAGE_KEY_V1,
+        accessControl:
+          Keychain.ACCESS_CONTROL.BIOMETRY_CURRENT_SET_OR_DEVICE_PASSCODE,
+      },
+    );
+
+    await loadStoredEntryWithBiometrics();
+    const fallback = await loadSealedEnvelopeFallback();
+
+    expect(fallback).toMatchObject({
+      kind: 'sealed',
+      didPrefix: 'did:yawp:z6MkUpgraded',
     });
     expect(Keychain.setGenericPassword).toHaveBeenLastCalledWith(
       expect.any(String),
