@@ -197,6 +197,10 @@ defmodule YawpWeb.DmControllerTest do
       assert {:ok, [entry]} = Federation.pull_inbox(recipient, 0, 10)
       assert entry.conversation_id == expected_conversation_id
     end
+
+    assert {:ok, states} = Federation.delivery_states_for_envelope("group-envelope")
+    assert Enum.sort(Enum.map(states, & &1.recipient_did)) == Enum.sort(recipients)
+    assert Enum.all?(states, &(&1.state == :sent))
   end
 
   test "conversation participant mutation endpoints reject immutable rosters", %{conn: conn} do
@@ -256,7 +260,9 @@ defmodule YawpWeb.DmControllerTest do
           "attachments" => [],
           "reply_to" => nil,
           "mentions" => [],
-          "kind" => "dm"
+          "kind" => "dm",
+          "sender_anchors" => ["local.test"],
+          "sender_profile_version" => 1
         },
         overrides
       )
