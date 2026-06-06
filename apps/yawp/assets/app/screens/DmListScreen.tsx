@@ -50,6 +50,7 @@ export function DmListScreen({
   conversation,
   conversations,
   onStartConversation,
+  onSendMessage,
   onAcceptRequest,
   onOpenConversation,
 }: {
@@ -57,7 +58,19 @@ export function DmListScreen({
   availablePeers?: DmParticipant[];
   conversation?: DmConversation;
   conversations?: DmConversation[];
-  onStartConversation?: (recipientDids: string[], body: string) => void;
+  onStartConversation?: (recipientDids: string[], body: string) => unknown;
+  onSendMessage?: (
+    recipientDids: string[],
+    body: string,
+    conversationId?: string,
+  ) => Promise<{
+    id: string;
+    conversationId: string;
+    delivery: 'sent';
+    senderDid: string;
+    recipientDids: string[];
+    createdAt: string;
+  } | null>;
   onAcceptRequest?: (senderDid: string) => Promise<boolean>;
   onOpenConversation?: (conversation: DmConversation) => void;
 }) {
@@ -67,6 +80,7 @@ export function DmListScreen({
   const [items, setItems] = useState<DmThreadMessage[]>(conversation?.messages ?? []);
   const [accepted, setAccepted] = useState(false);
   const [selectedPeers, setSelectedPeers] = useState<string[]>([]);
+  const [manualDid, setManualDid] = useState('');
   const [creatingConversation, setCreatingConversation] = useState(false);
   const seq = useRef(0);
   const wasDegraded = useRef(degraded);
@@ -89,24 +103,67 @@ export function DmListScreen({
     const decision = decideDmSend(draft, degraded);
     if (!decision.accepted && decision.reason === 'empty') return;
     if (!conversation && onStartConversation && selectedPeers.length === 0) return;
-    if (!conversation) {
-      onStartConversation?.(selectedPeers, draft.trim());
+    const trimmed = draft.trim();
+    const recipientDids = conversation
+      ? conversation.participants
+          .map(participant => participant.did)
+          .filter(did => did !== items[0]?.senderDid)
+      : selectedPeers;
+    if (!conversation && onStartConversation && decision.accepted) {
+      onStartConversation?.(recipientDids, trimmed);
       setCreatingConversation(false);
+      setDraft('');
+      return;
     }
     seq.current += 1;
+    const localId = `dm-${seq.current}`;
     const item: DmThreadMessage = {
-      id: `dm-${seq.current}`,
-      body: draft.trim(),
-      delivery: decision.accepted ? 'sent' : 'queued',
+      id: localId,
+      body: trimmed,
+      delivery: decision.accepted ? 'sending' : 'queued',
+      recipientDids,
     };
     setItems(prev => appendDmItem(prev, item));
     setDraft('');
+    if (decision.accepted && onSendMessage) {
+      onSendMessage(recipientDids, trimmed, conversation?.conversationId).then(result => {
+        if (!result) {
+          setItems(prev =>
+            prev.map(existing =>
+              existing.id === localId ? {...existing, delivery: 'queued'} : existing,
+            ),
+          );
+          return;
+        }
+        setItems(prev =>
+          prev.map(existing =>
+            existing.id === localId
+              ? {
+                  ...existing,
+                  id: result.id,
+                  delivery: result.delivery,
+                  senderDid: result.senderDid,
+                  recipientDids: result.recipientDids,
+                  createdAt: result.createdAt,
+                }
+              : existing,
+          ),
+        );
+      });
+    }
   }
 
   function togglePeer(did: string) {
     setSelectedPeers(prev =>
       prev.includes(did) ? prev.filter(existing => existing !== did) : [...prev, did],
     );
+  }
+
+  function addManualDid() {
+    const did = manualDid.trim();
+    if (!did || did === 'did:yawp:' || selectedPeers.includes(did)) return;
+    setSelectedPeers(prev => [...prev, did]);
+    setManualDid('');
   }
 
   const isRequest = Boolean(conversation?.isRequest && !accepted);
@@ -243,6 +300,36 @@ export function DmListScreen({
             })}
           </View>
         ) : null}
+        {!conversation && selectedPeers.length > 0 ? (
+          <View testID="dm-selected-peer-list" className="mb-4 flex-row flex-wrap" style={{gap: 6}}>
+            {selectedPeers.map(did => (
+              <View
+                key={did}
+                testID={`dm-selected-peer-${did}`}
+                className="rounded-pill border border-primary bg-primary-soft px-2 py-1">
+                <Text className="text-xs text-text">{participantLabels.get(did) ?? did}</Text>
+              </View>
+            ))}
+          </View>
+        ) : null}
+        {!conversation ? (
+          <View testID="dm-manual-did-entry" className="mb-4 flex-row items-end" style={{gap: 8}}>
+            <View className="flex-1">
+              <Input
+                testID="dm-manual-did-input"
+                placeholder="Enter a DID"
+                value={manualDid}
+                onChangeText={setManualDid}
+              />
+            </View>
+            <Button
+              testID="dm-manual-did-add-button"
+              label="Add"
+              onPress={addManualDid}
+              disabled={manualDid.trim().length === 0}
+            />
+          </View>
+        ) : null}
         {items.length === 0 ? (
           <View className="flex-1 items-center justify-center">
             <Text className="text-text-secondary text-sm text-center">
@@ -291,6 +378,12 @@ export function DmListScreen({
                     testID={`dm-queued-indicator-${item.id}`}
                     className="text-xs text-warning mt-1">
                     Queued — will send when you reconnect
+                  </Text>
+                ) : item.delivery === 'sending' ? (
+                  <Text
+                    testID={`dm-sending-indicator-${item.id}`}
+                    className="text-xs text-text-tertiary mt-1">
+                    Sending…
                   </Text>
                 ) : (
                   <DeliveryIndicator item={item} />

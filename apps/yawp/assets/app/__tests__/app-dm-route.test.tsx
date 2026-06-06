@@ -2,6 +2,9 @@ import React from "react";
 import ReactTestRenderer from "react-test-renderer";
 
 import type { Identity } from "../identity-context";
+import {signingInput} from "../chat/dm-envelope";
+
+const mockSignDevice = jest.fn((bytes: Uint8Array) => new Uint8Array(64));
 
 function mockFakeIdentity(): Identity {
   const stubBytes = new Uint8Array(32);
@@ -16,7 +19,7 @@ function mockFakeIdentity(): Identity {
     deviceIssuedAt: "2026-01-01T00:00:00.000Z",
     fingerprint: "yp:0000 · 0000 · 0000 · 0000",
     sign: () => stubSig,
-    signDevice: () => stubSig,
+    signDevice: mockSignDevice,
   };
 }
 
@@ -153,10 +156,19 @@ describe("App direct-message route", () => {
     anchorInbox = undefined;
     anchorDeliveryState = undefined;
     serverScreenProps = undefined;
+    mockSignDevice.mockClear();
     mockFetch.mockReset();
-    mockFetch.mockResolvedValue({
-      ok: true,
-      json: async () => ({ success: true, data: { did: "did:yawp:alice" } }),
+    mockFetch.mockImplementation(async (url: string) => {
+      if (url.endsWith("/api/dm/submit")) {
+        return {
+          ok: true,
+          json: async () => ({ status: "accepted", deliveries: [] }),
+        };
+      }
+      return {
+        ok: true,
+        json: async () => ({ success: true, data: { did: "did:yawp:alice" } }),
+      };
     });
     global.fetch = mockFetch as unknown as typeof fetch;
   });
@@ -269,6 +281,114 @@ describe("App direct-message route", () => {
       .flat(Infinity)
       .join(" ");
     expect(bodyText).toContain("hello group");
+
+    ReactTestRenderer.act(() => root.unmount());
+  });
+
+  test("pressing send posts a signed direct-message envelope to the sender anchor", async () => {
+    let root!: ReactTestRenderer.ReactTestRenderer;
+    await ReactTestRenderer.act(async () => {
+      root = ReactTestRenderer.create(<App />);
+    });
+    await flush();
+
+    await ReactTestRenderer.act(async () => {
+      root.root.findByProps({ testID: "workspace-dm-tile" }).props.onPress();
+    });
+
+    await ReactTestRenderer.act(async () => {
+      root.root
+        .findByProps({ testID: "dm-peer-toggle-did:yawp:bob" })
+        .props.onPress();
+      root.root
+        .findByProps({ testID: "dm-composer-input" })
+        .props.onChangeText("signed over the wire");
+    });
+
+    await ReactTestRenderer.act(async () => {
+      root.root.findByProps({ testID: "dm-send-button" }).props.onPress();
+    });
+    await flush();
+
+    const submitCall = mockFetch.mock.calls.find(([url]) =>
+      String(url).endsWith("/api/dm/submit"),
+    );
+    expect(submitCall).toBeTruthy();
+    expect(submitCall?.[0]).toBe("http://localhost:4000/api/dm/submit");
+    expect(submitCall?.[1]).toEqual(
+      expect.objectContaining({
+        method: "POST",
+        headers: expect.objectContaining({
+          Authorization: "Bearer session",
+          "Content-Type": "application/json",
+        }),
+      }),
+    );
+    const {envelope} = JSON.parse((submitCall?.[1] as RequestInit).body as string);
+    expect(envelope).toEqual(
+      expect.objectContaining({
+        sender_did: "did:yawp:alice",
+        recipient_dids: ["did:yawp:bob"],
+        body: "signed over the wire",
+        attachments: [],
+        reply_to: null,
+        mentions: [],
+      }),
+    );
+    expect(envelope.sender_signature).toBe(
+      "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+    );
+    expect(mockSignDevice).toHaveBeenCalledWith(signingInput(envelope));
+
+    ReactTestRenderer.act(() => root.unmount());
+  });
+
+  test("starts a first direct message to a typed DID outside accepted peers", async () => {
+    mockMetadata = {
+      acceptedPeers: ["did:yawp:bob"],
+      publishedProfile: { anchors: ["localhost:4000"] },
+    };
+    let root!: ReactTestRenderer.ReactTestRenderer;
+    await ReactTestRenderer.act(async () => {
+      root = ReactTestRenderer.create(<App />);
+    });
+    await flush();
+
+    await ReactTestRenderer.act(async () => {
+      root.root.findByProps({ testID: "workspace-dm-tile" }).props.onPress();
+    });
+
+    await ReactTestRenderer.act(async () => {
+      root.root
+        .findByProps({ testID: "dm-manual-did-input" })
+        .props.onChangeText("did:yawp:dave");
+    });
+
+    await ReactTestRenderer.act(async () => {
+      root.root.findByProps({ testID: "dm-manual-did-add-button" }).props.onPress();
+    });
+
+    await ReactTestRenderer.act(async () => {
+      root.root
+        .findByProps({ testID: "dm-composer-input" })
+        .props.onChangeText("hello dave");
+    });
+
+    expect(root.root.findByProps({ testID: "dm-selected-peer-did:yawp:dave" })).toBeTruthy();
+
+    await ReactTestRenderer.act(async () => {
+      root.root.findByProps({ testID: "dm-send-button" }).props.onPress();
+    });
+    await flush();
+
+    const submitCall = mockFetch.mock.calls.find(call => {
+      const body = (call[1] as RequestInit | undefined)?.body;
+      return typeof body === "string" && body.includes("did:yawp:dave");
+    });
+    expect(submitCall).toBeTruthy();
+    const {envelope} = JSON.parse((submitCall?.[1] as RequestInit).body as string);
+    expect(envelope.recipient_dids).toEqual(["did:yawp:dave"]);
+    expect(root.root.findByProps({ testID: "dm-participant-did:yawp:dave" })).toBeTruthy();
 
     ReactTestRenderer.act(() => root.unmount());
   });

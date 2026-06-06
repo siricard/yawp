@@ -1,4 +1,4 @@
-export type DmDelivery = 'sent' | 'delivered' | 'read' | 'queued';
+export type DmDelivery = 'sending' | 'sent' | 'delivered' | 'read' | 'queued';
 
 export type DmOutboxItem = {
   id: string;
@@ -35,7 +35,7 @@ export function hasQueued(items: DmOutboxItem[]): boolean {
 
 export type PerRecipientDelivery = {
   recipientDid: string;
-  state: Exclude<DmDelivery, 'queued'>;
+  state: Exclude<DmDelivery, 'queued' | 'sending'>;
 };
 
 export function aggregateDelivery(

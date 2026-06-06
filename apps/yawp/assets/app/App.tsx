@@ -12,6 +12,7 @@ import {
 } from './chat/anchor-connection';
 import {normalizeAnchorServerUrl} from './chat/anchor-url';
 import {discoverGeneralChannel} from './chat/discover';
+import {submitDm} from './chat/dm-submit';
 import type {RecentDm} from './chat/TabRow';
 import {
   IdentityProvider,
@@ -130,27 +131,134 @@ function AppShell() {
     }
   }
 
-  function handleStartDmConversation(recipientDids: string[], body: string) {
-    if (recipientDids.length < 1) return;
+  async function handleStartDmConversation(recipientDids: string[], body: string) {
+    if (identityState.status !== 'ready') return;
+    const uniqueRecipientDids = normalizeRecipientDids(recipientDids, identityState.identity.didFull);
+    if (uniqueRecipientDids.length < 1) return;
     const trimmedBody = body.trim();
     if (trimmedBody.length < 1) return;
-    const participants = dmPeers.filter(peer => recipientDids.includes(peer.did));
-    if (participants.length < 1) return;
+    const participants = participantsFromDids(uniqueRecipientDids, dmPeers);
     const createdAt = new Date().toISOString();
+    const localId = `local-${createdAt}`;
     setDmConversation({
       participants,
       lastActivityAt: createdAt,
       messages: [
         {
-          id: `local-${createdAt}`,
+          id: localId,
           body: trimmedBody,
-          delivery: 'sent',
-          senderDid: identityState.status === 'ready' ? identityState.identity.didFull : undefined,
-          recipientDids,
+          delivery: 'sending',
+          senderDid: identityState.identity.didFull,
+          recipientDids: uniqueRecipientDids,
           createdAt,
         },
       ],
     });
+    const result = await submitDm({
+      serverUrl: primaryAnchorUrl(anchorUrls),
+      identity: identityState.identity,
+      recipientDids: uniqueRecipientDids,
+      body: trimmedBody,
+    });
+    if (!result.ok) {
+      setDmConversation(prev =>
+        prev
+          ? {
+              ...prev,
+              messages: prev.messages.map(message =>
+                message.id === localId ? {...message, delivery: 'queued'} : message,
+              ),
+            }
+          : prev,
+      );
+      return;
+    }
+    setDmConversation(prev =>
+      prev
+        ? {
+            ...prev,
+            conversationId: result.envelope.conversation_id,
+            lastActivityAt: result.envelope.timestamp,
+            messages: prev.messages.map(message =>
+              message.id === localId
+                ? {
+                    ...message,
+                    id: result.envelope.envelope_id,
+                    delivery: result.delivery,
+                    senderDid: result.envelope.sender_did,
+                    recipientDids: result.envelope.recipient_dids,
+                    createdAt: result.envelope.timestamp,
+                  }
+                : message,
+            ),
+          }
+        : prev,
+    );
+    setInboxConversations(prev =>
+      mergeInboxConversation(prev, {
+        conversationId: result.envelope.conversation_id,
+        participants,
+        lastActivityAt: result.envelope.timestamp,
+        messages: [
+          {
+            id: result.envelope.envelope_id,
+            body: result.envelope.body,
+            delivery: result.delivery,
+            senderDid: result.envelope.sender_did,
+            recipientDids: result.envelope.recipient_dids,
+            createdAt: result.envelope.timestamp,
+          },
+        ],
+      }),
+    );
+  }
+
+  async function handleSendDmMessage(
+    recipientDids: string[],
+    body: string,
+    conversationId?: string,
+  ): Promise<{
+    id: string;
+    conversationId: string;
+    delivery: 'sent';
+    senderDid: string;
+    recipientDids: string[];
+    createdAt: string;
+  } | null> {
+    if (identityState.status !== 'ready') return null;
+    const result = await submitDm({
+      serverUrl: primaryAnchorUrl(anchorUrls),
+      identity: identityState.identity,
+      recipientDids: normalizeRecipientDids(recipientDids, identityState.identity.didFull),
+      body,
+    });
+    if (!result.ok) return null;
+    const message = {
+      id: result.envelope.envelope_id,
+      conversationId: result.envelope.conversation_id,
+      delivery: result.delivery,
+      senderDid: result.envelope.sender_did,
+      recipientDids: result.envelope.recipient_dids,
+      createdAt: result.envelope.timestamp,
+    };
+    setInboxConversations(prev =>
+      mergeInboxConversation(prev, {
+        conversationId: conversationId ?? result.envelope.conversation_id,
+        participants: participantsFromDids(result.envelope.recipient_dids, dmPeers),
+        lastActivityAt: result.envelope.timestamp,
+        messages: [
+          {
+            id: result.envelope.envelope_id,
+            body: result.envelope.body,
+            delivery: result.delivery,
+            senderDid: result.envelope.sender_did,
+            recipientDids: result.envelope.recipient_dids,
+            createdAt: result.envelope.timestamp,
+          },
+        ],
+      }),
+    );
+    return message;
   }
 
   function handleSelectRecentDm(dm: RecentDm) {
@@ -284,6 +392,7 @@ function AppShell() {
           conversation={dmConversation ?? undefined}
           conversations={dmConversation ? undefined : inboxConversations}
           onStartConversation={handleStartDmConversation}
+          onSendMessage={handleSendDmMessage}
           onAcceptRequest={handleAcceptDmRequest}
           onOpenConversation={setDmConversation}
         />
@@ -339,6 +448,23 @@ function AppShell() {
 
 function primaryAnchorUrl(anchorUrls: string[]): string {
   return anchorUrls[0] ?? '';
+}
+
+function normalizeRecipientDids(recipientDids: string[], currentDid: string): string[] {
+  return Array.from(
+    new Set(
+      recipientDids
+        .map(did => did.trim())
+        .filter(did => did.length > 0 && did !== currentDid),
+    ),
+  );
+}
+
+function participantsFromDids(
+  recipientDids: string[],
+  knownPeers: Array<{did: string; label: string}>,
+): Array<{did: string; label: string}> {
+  return recipientDids.map(did => knownPeers.find(peer => peer.did === did) ?? {did, label: dmPeerLabel(did)});
 }
 
 function conversationFromInboxEvent(event: InboxEvent): DmConversation | null {
