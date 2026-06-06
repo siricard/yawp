@@ -549,7 +549,7 @@ describe("App direct-message route", () => {
     });
 
     expect(serverScreenProps?.recentDms).toEqual([
-      { id: "conversation-bob-alice", label: "bob" },
+      { id: "conversation-bob-alice", label: "bob, alice" },
     ]);
 
     await ReactTestRenderer.act(async () => {
@@ -577,6 +577,68 @@ describe("App direct-message route", () => {
     });
 
     expect(root.root.findByProps({ testID: "dm-message-inbox-recent-2" })).toBeTruthy();
+
+    ReactTestRenderer.act(() => root.unmount());
+  });
+
+  test("renders inbound group DM participants and attributes recipient replies", async () => {
+    let root!: ReactTestRenderer.ReactTestRenderer;
+    await ReactTestRenderer.act(async () => {
+      root = ReactTestRenderer.create(<App />);
+    });
+    await flush();
+
+    await ReactTestRenderer.act(async () => {
+      anchorInbox?.({
+        envelope_id: "inbox-group-1",
+        inbox_serial: 1,
+        is_request: false,
+        envelope: {
+          sender_did: "did:yawp:bob",
+          recipient_dids: ["did:yawp:alice", "did:yawp:carol"],
+          conversation_id: "conversation-alice-bob-carol",
+          timestamp: "2026-06-05T00:00:00.000Z",
+          body: "hello group",
+        },
+      });
+    });
+
+    await ReactTestRenderer.act(async () => {
+      root.root.findByProps({ testID: "workspace-dm-tile" }).props.onPress();
+    });
+
+    await ReactTestRenderer.act(async () => {
+      root.root
+        .findAllByProps({ testID: "dm-conversation-conversation-alice-bob-carol" })[0]
+        .props.onPress();
+    });
+
+    expect(root.root.findByProps({ testID: "dm-participant-did:yawp:bob" })).toBeTruthy();
+    expect(root.root.findByProps({ testID: "dm-participant-did:yawp:alice" })).toBeTruthy();
+    expect(root.root.findByProps({ testID: "dm-participant-did:yawp:carol" })).toBeTruthy();
+
+    await ReactTestRenderer.act(async () => {
+      anchorInbox?.({
+        envelope_id: "inbox-group-2",
+        inbox_serial: 2,
+        is_request: false,
+        envelope: {
+          sender_did: "did:yawp:carol",
+          recipient_dids: ["did:yawp:alice", "did:yawp:bob"],
+          conversation_id: "conversation-alice-bob-carol",
+          timestamp: "2026-06-05T00:01:00.000Z",
+          body: "reply from carol",
+        },
+      });
+    });
+
+    expect(root.root.findByProps({ testID: "dm-message-inbox-group-2" })).toBeTruthy();
+    expect(
+      root.root.findByProps({ testID: "dm-message-sender-inbox-group-2" }).props.children,
+    ).toBe("carol");
+    expect(root.root.findByProps({ testID: "dm-participant-did:yawp:bob" })).toBeTruthy();
+    expect(root.root.findByProps({ testID: "dm-participant-did:yawp:alice" })).toBeTruthy();
+    expect(root.root.findByProps({ testID: "dm-participant-did:yawp:carol" })).toBeTruthy();
 
     ReactTestRenderer.act(() => root.unmount());
   });

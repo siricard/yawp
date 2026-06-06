@@ -347,9 +347,16 @@ function conversationFromInboxEvent(event: InboxEvent): DmConversation | null {
   const conversationId =
     typeof envelope.conversation_id === 'string' ? envelope.conversation_id : event.envelope_id;
   if (!senderDid) return null;
+  const recipientDids = Array.isArray(envelope.recipient_dids)
+    ? envelope.recipient_dids.filter((did): did is string => typeof did === 'string')
+    : [];
+  const participants = Array.from(new Set([senderDid, ...recipientDids])).map(did => ({
+    did,
+    label: dmPeerLabel(did),
+  }));
   return {
     conversationId,
-    participants: [{did: senderDid, label: dmPeerLabel(senderDid)}],
+    participants,
     lastActivityAt: typeof envelope.timestamp === 'string' ? envelope.timestamp : new Date(0).toISOString(),
     isRequest: event.is_request,
     messages: [
@@ -357,9 +364,7 @@ function conversationFromInboxEvent(event: InboxEvent): DmConversation | null {
         id: event.envelope_id,
         body: typeof envelope.body === 'string' ? envelope.body : '',
         senderDid,
-        recipientDids: Array.isArray(envelope.recipient_dids)
-          ? envelope.recipient_dids.filter((did): did is string => typeof did === 'string')
-          : [],
+        recipientDids,
         delivery: 'delivered',
         createdAt: typeof envelope.timestamp === 'string' ? envelope.timestamp : undefined,
       },
@@ -401,8 +406,13 @@ function mergeInboxConversation(
   return conversations.map((conversation, index) => {
     if (index !== existingIndex) return conversation;
     const known = new Set(conversation.messages.map(message => message.id));
+    const participantDids = new Set(conversation.participants.map(participant => participant.did));
     return {
       ...conversation,
+      participants: [
+        ...conversation.participants,
+        ...incoming.participants.filter(participant => !participantDids.has(participant.did)),
+      ],
       isRequest: incoming.isRequest,
       lastActivityAt: incoming.lastActivityAt,
       messages: [
