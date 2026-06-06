@@ -93,4 +93,29 @@ defmodule Yawp.Dev.DmFixturesTest do
     assert {:ok, entry} = Federation.append_inbox(alice, envelope)
     refute entry.is_request
   end
+
+  test "anchor :b publishes local users' PPE anchors on its own host" do
+    dir = Path.join(System.tmp_dir!(), "yawp-dm-fixtures-b-#{System.unique_integer([:positive])}")
+
+    assert {:ok, artifact} =
+             DmFixtures.provision(%{
+               anchor: :b,
+               anchor_url: "http://localhost:4100",
+               peer_anchor_url: "http://localhost:4000",
+               output_dir: dir
+             })
+
+    bob = artifact["identities"]["bob"]["did"]
+    carol = artifact["identities"]["carol"]["did"]
+    alice = artifact["identities"]["alice"]["did"]
+
+    assert {:ok, bob_ppe} = Identity.get_ppe_by_did(bob)
+    assert bob_ppe.envelope["anchors"] == ["localhost:4100"]
+
+    assert {:ok, carol_ppe} = Identity.get_ppe_by_did(carol)
+    assert carol_ppe.envelope["anchors"] == ["localhost:4100"]
+
+    assert {:ok, alice_ppe} = Identity.get_ppe_by_did(alice)
+    assert alice_ppe.envelope["anchors"] == ["localhost:4000"]
+  end
 end

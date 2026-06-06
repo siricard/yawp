@@ -438,9 +438,16 @@ defmodule Yawp.Federation do
     url = Application.get_env(:yawp, YawpWeb.Endpoint, [])[:url] || []
     host = Keyword.get(url, :host, "localhost")
 
-    case Keyword.get(url, :port) do
+    case Keyword.get(url, :port) || endpoint_http_port() do
       nil -> host
       port -> "#{host}:#{port}"
+    end
+  end
+
+  defp endpoint_http_port do
+    case Application.get_env(:yawp, YawpWeb.Endpoint, [])[:http] do
+      nil -> nil
+      http -> Keyword.get(http, :port)
     end
   end
 end

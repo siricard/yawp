@@ -203,6 +203,56 @@ defmodule YawpWeb.DmControllerTest do
     assert Enum.all?(states, &(&1.state == :sent))
   end
 
+  test "DM accepts sender whose anchor is the host:port the endpoint listens on", %{conn: conn} do
+    prev = Application.get_env(:yawp, Federation.Client)
+
+    Application.put_env(:yawp, Federation.Client,
+      req_options: [
+        plug: fn conn ->
+          send(self(), {:federation_http, conn.request_path})
+          Req.Test.json(conn, %{"status" => "appended"})
+        end
+      ]
+    )
+
+    on_exit(fn ->
+      if prev,
+        do: Application.put_env(:yawp, Federation.Client, prev),
+        else: Application.delete_env(:yawp, Federation.Client)
+    end)
+
+    http_port = Application.get_env(:yawp, YawpWeb.Endpoint)[:http][:port]
+    anchor = "localhost:#{http_port}"
+
+    {sender_pub, sender_priv} = user_keypair()
+    {device_pub, device_priv} = user_keypair()
+    {recipient_pub, recipient_priv} = user_keypair()
+    sender_did = did_for(sender_pub)
+    recipient_did = did_for(recipient_pub)
+    device_id = "sender-device"
+    issued_at = "2026-06-05T00:00:00Z"
+
+    seed_ppe!(sender_did, sender_pub, sender_priv, "Alice", [anchor],
+      device: {device_id, device_pub, sender_priv, issued_at}
+    )
+
+    seed_ppe!(recipient_did, recipient_pub, recipient_priv, "Bob", [anchor])
+
+    envelope =
+      dm_envelope(sender_did, device_id, device_priv, [recipient_did], %{
+        "envelope_id" => "endpoint-anchor-envelope",
+        "sender_anchors" => [anchor]
+      })
+
+    conn = post(conn, ~p"/api/dm/submit", envelope)
+
+    assert %{"status" => "accepted", "deliveries" => [%{"recipients" => [^recipient_did]}]} =
+             json_response(conn, 200)
+
+    assert {:ok, [entry]} = Federation.pull_inbox(recipient_did, 0, 10)
+    assert entry.envelope_id == "endpoint-anchor-envelope"
+  end
+
   test "conversation participant mutation endpoints reject immutable rosters", %{conn: conn} do
     conn =
       post(conn, ~p"/api/dm/conversations/conv-immutable/participants", %{

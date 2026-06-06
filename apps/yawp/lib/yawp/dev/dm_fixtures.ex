@@ -34,7 +34,7 @@ defmodule Yawp.Dev.DmFixtures do
     with {:ok, _local_primary} <- ensure_owner(Map.fetch!(users, owner_name)),
          {:ok, mint_actor} <- Identity.get_chat_owner(),
          {:ok, _members} <- ensure_members(local_names -- [owner_name], users, mint_actor),
-         :ok <- publish_profiles(users, anchor_url, peer_anchor_url),
+         :ok <- publish_profiles(anchor, users, anchor_url, peer_anchor_url),
          :ok <- accept_standard_peers(anchor, users),
          {:ok, artifact} <- write_artifact(anchor, users, anchor_url, peer_anchor_url, output_dir) do
       {:ok, artifact}
@@ -115,9 +115,10 @@ defmodule Yawp.Dev.DmFixtures do
     Identity.bind_device(identity, bind_args(user))
   end
 
-  defp publish_profiles(users, anchor_url, peer_anchor_url) do
-    a_host = host(anchor_url)
-    b_host = host(peer_anchor_url)
+  defp publish_profiles(anchor, users, anchor_url, peer_anchor_url) do
+    anchor_urls = fixture_anchor_urls(anchor, anchor_url, peer_anchor_url)
+    a_host = host(anchor_urls.a)
+    b_host = host(anchor_urls.b)
 
     Enum.reduce_while(users, :ok, fn {name, user}, :ok ->
       anchors = if name == :alice, do: [a_host], else: [b_host]
