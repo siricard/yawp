@@ -1,5 +1,6 @@
 import React, {
   createContext,
+  useCallback,
   useContext,
   useEffect,
   useRef,
@@ -9,6 +10,7 @@ import type {Channel, Socket} from 'phoenix';
 
 import {useIdentityState} from '../identity-context';
 import {anchorReconnectAfterMs, DEGRADED_AFTER_MS} from './anchor-backoff';
+import type {ReadMarker} from './read-marker';
 import {getSocket} from './socket';
 
 export type AnchorStatus = 'connecting' | 'connected' | 'degraded';
@@ -16,6 +18,7 @@ export type AnchorStatus = 'connecting' | 'connected' | 'degraded';
 export type AnchorConnection = {
   status: AnchorStatus;
   degraded: boolean;
+  emitReadMarker: (marker: ReadMarker) => void;
 };
 
 export type InboxEvent = {
@@ -35,6 +38,7 @@ export type DeliveryStateEvent = {
 const AnchorContext = createContext<AnchorConnection>({
   status: 'connecting',
   degraded: false,
+  emitReadMarker: () => {},
 });
 
 export function useAnchorConnection(
@@ -46,8 +50,18 @@ export function useAnchorConnection(
 ): AnchorConnection {
   const [status, setStatus] = useState<AnchorStatus>('connecting');
   const degradedTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const joinedChannels = useRef<Channel[]>([]);
   const anchorsKey = anchorUrls.join('|');
   const guestAnchorsKey = guestAnchors.join('|');
+
+  const emitReadMarker = useCallback((marker: ReadMarker) => {
+    const channel = joinedChannels.current[0];
+    if (!channel) return;
+    try {
+      channel.push('read_marker', marker);
+    } catch {
+    }
+  }, []);
 
   useEffect(() => {
     if (anchorUrls.length === 0 || !did) {
@@ -59,6 +73,7 @@ export function useAnchorConnection(
     const reachable = new Map<string, boolean>();
     anchorUrls.forEach(url => reachable.set(url, false));
     const cleanups: Array<() => void> = [];
+    joinedChannels.current = [];
 
     function clearDegradedTimer() {
       if (degradedTimer.current !== null) {
@@ -126,8 +141,12 @@ export function useAnchorConnection(
           onDeliveryState?.(payload);
         });
         channel.join();
+        joinedChannels.current = [...joinedChannels.current, channel];
 
         cleanups.push(() => {
+          joinedChannels.current = joinedChannels.current.filter(
+            existing => existing !== channel,
+          );
           if (socketRefs.length > 0) socket.off(socketRefs);
           try {
             channel.leave();
@@ -143,10 +162,11 @@ export function useAnchorConnection(
       cancelled = true;
       clearDegradedTimer();
       cleanups.forEach(fn => fn());
+      joinedChannels.current = [];
     };
   }, [anchorsKey, did, guestAnchorsKey, onInbox, onDeliveryState]);
 
-  return {status, degraded: status === 'degraded'};
+  return {status, degraded: status === 'degraded', emitReadMarker};
 }
 
 export function AnchorConnectionProvider({

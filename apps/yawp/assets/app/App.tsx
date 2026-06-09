@@ -1,5 +1,5 @@
 
-import React, {useCallback, useEffect, useState} from 'react';
+import React, {useCallback, useEffect, useRef, useState} from 'react';
 import {Platform, StatusBar, View} from 'react-native';
 import {SafeAreaProvider, SafeAreaView} from 'react-native-safe-area-context';
 
@@ -7,6 +7,7 @@ import {acceptPeerRequest} from './ash_generated';
 import {submitBindDevice} from './bind';
 import {
   AnchorConnectionProvider,
+  useAnchorStatus,
   type DeliveryStateEvent,
   type InboxEvent,
 } from './chat/anchor-connection';
@@ -14,6 +15,7 @@ import {normalizeAnchorServerUrl} from './chat/anchor-url';
 import {discoverGeneralChannel} from './chat/discover';
 import {submitDm} from './chat/dm-submit';
 import {mergeDeliveryStateMap, type DeliveryStateMap} from './chat/dm-outbox';
+import {buildReadMarker} from './chat/read-marker';
 import {fingerprintFromDid} from './identity/did';
 import type {RecentDm} from './chat/TabRow';
 import {
@@ -422,12 +424,21 @@ function AppShell() {
       break;
   }
 
+  const readReceiptsEnabled = metadata.readReceiptsEnabled !== false;
+
   return (
     <AnchorConnectionProvider
       anchorUrls={anchorUrls}
       guestAnchors={guestAnchors}
       onInbox={handleInbox}
       onDeliveryState={handleDeliveryState}>
+      {identityState.status === 'ready' && screen.kind === 'dm' ? (
+        <ReadMarkerEmitter
+          conversation={dmConversation}
+          identity={identityState.identity}
+          readReceiptsEnabled={readReceiptsEnabled}
+        />
+      ) : null}
       <SafeAreaView
         edges={['top', 'bottom']}
         className="flex-1 bg-bg"
@@ -450,6 +461,46 @@ function AppShell() {
       </SafeAreaView>
     </AnchorConnectionProvider>
   );
+}
+
+function ReadMarkerEmitter({
+  conversation,
+  identity,
+  readReceiptsEnabled,
+}: {
+  conversation: DmConversation | null;
+  identity: Identity;
+  readReceiptsEnabled: boolean;
+}) {
+  const {emitReadMarker} = useAnchorStatus();
+  const sentMarkers = useRef<Set<string>>(new Set());
+
+  useEffect(() => {
+    if (!readReceiptsEnabled || !conversation) return;
+    const conversationId = conversation.conversationId;
+    if (!conversationId) return;
+    for (const message of conversation.messages) {
+      if (!message.id || message.id.startsWith('dm-') || message.id.startsWith('local-')) continue;
+      if (!message.senderDid || message.senderDid === identity.didFull) continue;
+      if (message.delivery === 'sending' || message.delivery === 'queued') continue;
+      const anchor = (message.senderAnchors ?? [])[0];
+      if (!anchor) continue;
+      if (sentMarkers.current.has(message.id)) continue;
+      sentMarkers.current.add(message.id);
+      emitReadMarker(
+        buildReadMarker({
+          conversationId,
+          lastReadEnvelopeId: message.id,
+          senderAnchor: anchor,
+          readerDidFull: identity.didFull,
+          signedBy: identity.deviceId,
+          signDevice: identity.signDevice,
+        }),
+      );
+    }
+  }, [conversation, identity, readReceiptsEnabled, emitReadMarker]);
+
+  return null;
 }
 
 function primaryAnchorUrl(anchorUrls: string[]): string {
@@ -482,6 +533,9 @@ function conversationFromInboxEvent(event: InboxEvent): DmConversation | null {
   const recipientDids = Array.isArray(envelope.recipient_dids)
     ? envelope.recipient_dids.filter((did): did is string => typeof did === 'string')
     : [];
+  const senderAnchors = Array.isArray(envelope.sender_anchors)
+    ? envelope.sender_anchors.filter((anchor): anchor is string => typeof anchor === 'string')
+    : [];
   const senderDisplayName =
     typeof event.sender_display_name === 'string' ? event.sender_display_name : null;
   const participants = Array.from(new Set([senderDid, ...recipientDids])).map(did => ({
@@ -498,6 +552,7 @@ function conversationFromInboxEvent(event: InboxEvent): DmConversation | null {
         id: event.envelope_id,
         body: typeof envelope.body === 'string' ? envelope.body : '',
         senderDid,
+        senderAnchors,
         recipientDids,
         delivery: 'delivered',
         createdAt: typeof envelope.timestamp === 'string' ? envelope.timestamp : undefined,

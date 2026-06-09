@@ -23,7 +23,12 @@ function mockFakeIdentity(): Identity {
   };
 }
 
-let mockMetadata = {
+let mockMetadata: {
+  acceptedPeers: string[];
+  profileVersion: number;
+  publishedProfile: { anchors: string[] };
+  readReceiptsEnabled?: boolean;
+} = {
   acceptedPeers: ["did:yawp:bob", "did:yawp:carol"],
   profileVersion: 1,
   publishedProfile: { anchors: ["localhost:4000"] },
@@ -32,6 +37,7 @@ const servers = [{url: "localhost:4000", label: "Local"}];
 let anchorInbox: ((event: unknown) => void) | undefined;
 let anchorDeliveryState: ((event: unknown) => void) | undefined;
 let serverScreenProps: Record<string, unknown> | undefined;
+const mockEmitReadMarker = jest.fn();
 const mockFetch = jest.fn();
 
 jest.mock("../session", () => ({
@@ -95,7 +101,11 @@ jest.mock("../chat/anchor-connection", () => ({
     anchorDeliveryState = onDeliveryState;
     return children;
   },
-  useAnchorStatus: () => ({ status: "connected", degraded: false }),
+  useAnchorStatus: () => ({
+    status: "connected",
+    degraded: false,
+    emitReadMarker: mockEmitReadMarker,
+  }),
 }));
 
 jest.mock("../screens/HomeScreen", () => ({
@@ -159,6 +169,7 @@ describe("App direct-message route", () => {
     anchorDeliveryState = undefined;
     serverScreenProps = undefined;
     mockSignDevice.mockClear();
+    mockEmitReadMarker.mockClear();
     mockFetch.mockReset();
     mockFetch.mockImplementation(async (url: string) => {
       if (url.endsWith("/api/dm/submit")) {
@@ -864,6 +875,103 @@ describe("App direct-message route", () => {
     expect(root.root.findByProps({ testID: "dm-participant-did:yawp:bob" })).toBeTruthy();
     expect(root.root.findByProps({ testID: "dm-participant-did:yawp:alice" })).toBeTruthy();
     expect(root.root.findByProps({ testID: "dm-participant-did:yawp:carol" })).toBeTruthy();
+
+    ReactTestRenderer.act(() => root.unmount());
+  });
+
+  // BUG B regression: opening a delivered inbound message emits a signed
+  // read_marker on the reader's user socket, addressed back to the original
+  // sender's anchor, so the sender's read state can advance.
+  test("opening a delivered inbound message emits a read_marker to the sender anchor", async () => {
+    let root!: ReactTestRenderer.ReactTestRenderer;
+    await ReactTestRenderer.act(async () => {
+      root = ReactTestRenderer.create(<App />);
+    });
+    await flush();
+
+    await ReactTestRenderer.act(async () => {
+      anchorInbox?.({
+        envelope_id: "inbox-read-1",
+        inbox_serial: 1,
+        is_request: false,
+        envelope: {
+          sender_did: "did:yawp:bob",
+          sender_anchors: ["localhost:4100"],
+          recipient_dids: ["did:yawp:alice"],
+          conversation_id: "conversation-read",
+          timestamp: "2026-06-05T00:00:00.000Z",
+          body: "did you read this?",
+        },
+      });
+    });
+
+    await ReactTestRenderer.act(async () => {
+      root.root.findByProps({ testID: "workspace-dm-tile" }).props.onPress();
+    });
+
+    await ReactTestRenderer.act(async () => {
+      root.root
+        .findAllByProps({ testID: "dm-conversation-conversation-read" })[0]
+        .props.onPress();
+    });
+    await flush();
+
+    expect(mockEmitReadMarker).toHaveBeenCalledTimes(1);
+    expect(mockEmitReadMarker).toHaveBeenCalledWith(
+      expect.objectContaining({
+        conversation_id: "conversation-read",
+        last_read_envelope_id: "inbox-read-1",
+        sender_anchor: "localhost:4100",
+        sender_did: "did:yawp:alice",
+        signed_by: "fake-device-id",
+      }),
+    );
+
+    ReactTestRenderer.act(() => root.unmount());
+  });
+
+  test("does not emit a read_marker when read receipts are disabled", async () => {
+    mockMetadata = {
+      acceptedPeers: ["did:yawp:bob"],
+      profileVersion: 1,
+      publishedProfile: { anchors: ["localhost:4000"] },
+      readReceiptsEnabled: false,
+    };
+
+    let root!: ReactTestRenderer.ReactTestRenderer;
+    await ReactTestRenderer.act(async () => {
+      root = ReactTestRenderer.create(<App />);
+    });
+    await flush();
+
+    await ReactTestRenderer.act(async () => {
+      anchorInbox?.({
+        envelope_id: "inbox-read-2",
+        inbox_serial: 1,
+        is_request: false,
+        envelope: {
+          sender_did: "did:yawp:bob",
+          sender_anchors: ["localhost:4100"],
+          recipient_dids: ["did:yawp:alice"],
+          conversation_id: "conversation-read-off",
+          timestamp: "2026-06-05T00:00:00.000Z",
+          body: "secretly read",
+        },
+      });
+    });
+
+    await ReactTestRenderer.act(async () => {
+      root.root.findByProps({ testID: "workspace-dm-tile" }).props.onPress();
+    });
+
+    await ReactTestRenderer.act(async () => {
+      root.root
+        .findAllByProps({ testID: "dm-conversation-conversation-read-off" })[0]
+        .props.onPress();
+    });
+    await flush();
+
+    expect(mockEmitReadMarker).not.toHaveBeenCalled();
 
     ReactTestRenderer.act(() => root.unmount());
   });

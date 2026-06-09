@@ -32,6 +32,7 @@ export type DmParticipant = {
 
 type DmThreadMessage = DmOutboxItem & {
   senderDid?: string;
+  senderAnchors?: string[];
   recipientDids?: string[];
   deliveryStates?: PerRecipientDelivery[];
   replyToId?: string | null;
@@ -114,23 +115,24 @@ export function DmListScreen({
           .map(participant => participant.did)
           .filter(did => did !== items[0]?.senderDid)
       : selectedPeers;
-    if (!conversation && onStartConversation && decision.accepted) {
-      onStartConversation?.(recipientDids, trimmed);
+    if (!conversation && onStartConversation) {
+      onStartConversation(recipientDids, trimmed);
       setCreatingConversation(false);
       setDraft('');
       return;
     }
     seq.current += 1;
     const localId = `dm-${seq.current}`;
+    const willSubmit = Boolean(onSendMessage);
     const item: DmThreadMessage = {
       id: localId,
       body: trimmed,
-      delivery: decision.accepted ? 'sending' : 'queued',
+      delivery: willSubmit || decision.accepted ? 'sending' : 'queued',
       recipientDids,
     };
     setItems(prev => appendDmItem(prev, item));
     setDraft('');
-    if (decision.accepted && onSendMessage) {
+    if (onSendMessage) {
       onSendMessage(recipientDids, trimmed, conversation?.conversationId).then(result => {
         if (!result) {
           setItems(prev =>
@@ -499,31 +501,34 @@ function DmSection({
           const id = conversationKey(conversation);
           const label = conversation.participants.map(p => p.label).join(', ');
           return (
-            <Pressable
+            <View
               key={id}
-              testID={`dm-conversation-${id}`}
-              accessibilityRole="button"
-              onPress={() => onOpenConversation?.(conversation)}
-              style={pointerCursor}
               className="rounded-lg border border-border-soft bg-surface px-4 py-3 flex-row items-center justify-between">
-              <View className="flex-1">
-                <Text className="text-sm font-bold text-text">{label}</Text>
-                <Text className="text-xs text-text-tertiary" style={{fontFamily: monospace}}>
-                  {id}
-                </Text>
-              </View>
+              <Pressable
+                testID={`dm-conversation-${id}`}
+                accessibilityRole="button"
+                onPress={() => onOpenConversation?.(conversation)}
+                style={pointerCursor}
+                className="flex-1 flex-row items-center">
+                <View className="flex-1">
+                  <Text className="text-sm font-bold text-text">{label}</Text>
+                  <Text className="text-xs text-text-tertiary" style={{fontFamily: monospace}}>
+                    {id}
+                  </Text>
+                </View>
+              </Pressable>
               <Pressable
                 testID={`dm-pin-${id}`}
                 accessibilityRole="button"
                 accessibilityLabel={pinnedIds.has(id) ? 'unpin peer' : 'pin peer'}
                 onPress={() => onTogglePin(conversation)}
                 style={pointerCursor}
-                className="px-3 py-1 rounded-pill bg-surface-2">
+                className="ml-2 px-3 py-1 rounded-pill bg-surface-2">
                 <Text className="text-xs text-text-secondary">
                   {pinnedIds.has(id) ? 'Unpin' : 'Pin'}
                 </Text>
               </Pressable>
-            </Pressable>
+            </View>
           );
         })}
       </View>
