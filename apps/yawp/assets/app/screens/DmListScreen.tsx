@@ -4,15 +4,18 @@ import {Platform, Pressable, ScrollView, Text, View} from 'react-native';
 import {useAnchorStatus} from '../chat/anchor-connection';
 import {
   appendDmItem,
+  applyDeliveryState,
   decideDmSend,
   flushQueued,
   aggregateDelivery,
   hasQueued,
+  type DeliveryStateMap,
   type DmOutboxItem,
   type PerRecipientDelivery,
 } from '../chat/dm-outbox';
 import {Banner, Button, Input} from '../ui';
 import {pointerCursor} from '../ui/cursor';
+import {fingerprintFromDid} from '../identity/did';
 import {useOptionalBundleMetadata} from '../identity-context';
 
 const monospace = Platform.select({
@@ -49,6 +52,7 @@ export function DmListScreen({
   availablePeers = [],
   conversation,
   conversations,
+  deliveryStates,
   onStartConversation,
   onSendMessage,
   onAcceptRequest,
@@ -58,6 +62,7 @@ export function DmListScreen({
   availablePeers?: DmParticipant[];
   conversation?: DmConversation;
   conversations?: DmConversation[];
+  deliveryStates?: DeliveryStateMap;
   onStartConversation?: (recipientDids: string[], body: string) => unknown;
   onSendMessage?: (
     recipientDids: string[],
@@ -269,14 +274,25 @@ export function DmListScreen({
         ) : null}
         {conversation ? (
           <View testID="dm-participant-list" className="mb-4 flex-row flex-wrap" style={{gap: 6}}>
-            {conversation.participants.map(participant => (
+            {conversation.participants.map(participant => {
+              const fingerprint = fingerprintFromDid(participant.did);
+              return (
               <View
                 key={participant.did}
                 testID={`dm-participant-${participant.did}`}
                 className="rounded-pill border border-border-soft bg-surface-2 px-2 py-1">
                 <Text className="text-xs text-text">{participant.label}</Text>
+                {fingerprint && fingerprint !== participant.label ? (
+                  <Text
+                    testID={`dm-participant-fingerprint-${participant.did}`}
+                    className="text-xs text-text-tertiary"
+                    style={{fontFamily: monospace}}>
+                    {fingerprint}
+                  </Text>
+                ) : null}
               </View>
-            ))}
+              );
+            })}
           </View>
         ) : null}
         {!conversation && availablePeers.length > 0 ? (
@@ -341,15 +357,17 @@ export function DmListScreen({
           </View>
         ) : (
           <View testID="dm-message-list" style={{gap: 8}}>
-            {items.map((item, index) => {
-              const previous = items[index - 1];
+            {items
+              .map(item => (deliveryStates ? applyDeliveryState(item, deliveryStates) : item))
+              .map((item, index, renderItems) => {
+              const previous = renderItems[index - 1];
               const showHeader =
                 !previous ||
                 previous.senderDid !== item.senderDid ||
                 item.senderDid === undefined ||
                 !withinGroupedWindow(previous, item);
               const replyTo = item.replyToId
-                ? items.find(existing => existing.id === item.replyToId) ?? null
+                ? renderItems.find(existing => existing.id === item.replyToId) ?? null
                 : null;
               return (
               <View

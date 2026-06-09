@@ -23,6 +23,7 @@ export type InboxEvent = {
   envelope: Record<string, unknown>;
   is_request: boolean;
   inbox_serial: number;
+  sender_display_name?: string | null;
 };
 
 export type DeliveryStateEvent = {

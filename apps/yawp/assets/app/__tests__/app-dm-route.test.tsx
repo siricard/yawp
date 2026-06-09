@@ -646,6 +646,104 @@ describe("App direct-message route", () => {
     ReactTestRenderer.act(() => root.unmount());
   });
 
+  test("renders an inbound sender by their resolved display name, not the raw DID", async () => {
+    let root!: ReactTestRenderer.ReactTestRenderer;
+    await ReactTestRenderer.act(async () => {
+      root = ReactTestRenderer.create(<App />);
+    });
+    await flush();
+
+    const senderDid =
+      "did:yawp:" + "z".repeat(40);
+
+    await ReactTestRenderer.act(async () => {
+      anchorInbox?.({
+        envelope_id: "inbox-name-1",
+        inbox_serial: 1,
+        is_request: false,
+        sender_display_name: "Bob Sender",
+        envelope: {
+          sender_did: senderDid,
+          recipient_dids: ["did:yawp:alice"],
+          conversation_id: "conversation-named",
+          timestamp: "2026-06-05T00:00:00.000Z",
+          body: "hello",
+        },
+      });
+    });
+
+    await ReactTestRenderer.act(async () => {
+      root.root.findByProps({ testID: "workspace-dm-tile" }).props.onPress();
+    });
+
+    await ReactTestRenderer.act(async () => {
+      root.root
+        .findAllByProps({ testID: "dm-conversation-conversation-named" })[0]
+        .props.onPress();
+    });
+
+    expect(
+      root.root.findByProps({ testID: `dm-participant-${senderDid}` }),
+    ).toBeTruthy();
+    const text = root.root
+      .findAllByType(require("react-native").Text)
+      .map(node => node.props.children)
+      .flat(Infinity)
+      .join(" ");
+    expect(text).toContain("Bob Sender");
+    expect(text).not.toContain(senderDid);
+
+    ReactTestRenderer.act(() => root.unmount());
+  });
+
+  test("falls back to the yp: fingerprint when no display name resolves", async () => {
+    let root!: ReactTestRenderer.ReactTestRenderer;
+    await ReactTestRenderer.act(async () => {
+      root = ReactTestRenderer.create(<App />);
+    });
+    await flush();
+
+    const {didFromPubkey, fingerprintFromDid} = require("../identity/did");
+    const senderDid = didFromPubkey(new Uint8Array(32).fill(9));
+    const expectedFingerprint = fingerprintFromDid(senderDid);
+
+    await ReactTestRenderer.act(async () => {
+      anchorInbox?.({
+        envelope_id: "inbox-fp-1",
+        inbox_serial: 1,
+        is_request: false,
+        sender_display_name: null,
+        envelope: {
+          sender_did: senderDid,
+          recipient_dids: ["did:yawp:alice"],
+          conversation_id: "conversation-fp",
+          timestamp: "2026-06-05T00:00:00.000Z",
+          body: "hello",
+        },
+      });
+    });
+
+    await ReactTestRenderer.act(async () => {
+      root.root.findByProps({ testID: "workspace-dm-tile" }).props.onPress();
+    });
+
+    await ReactTestRenderer.act(async () => {
+      root.root
+        .findAllByProps({ testID: "dm-conversation-conversation-fp" })[0]
+        .props.onPress();
+    });
+
+    const text = root.root
+      .findAllByType(require("react-native").Text)
+      .map(node => node.props.children)
+      .flat(Infinity)
+      .join(" ");
+    expect(text).toContain(expectedFingerprint);
+    expect(text).not.toContain(senderDid);
+
+    ReactTestRenderer.act(() => root.unmount());
+  });
+
   test("wires live conversations into the channel tab row and opens recent DMs in place", async () => {
     let root!: ReactTestRenderer.ReactTestRenderer;
     await ReactTestRenderer.act(async () => {

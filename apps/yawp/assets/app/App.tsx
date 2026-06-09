@@ -13,6 +13,8 @@ import {
 import {normalizeAnchorServerUrl} from './chat/anchor-url';
 import {discoverGeneralChannel} from './chat/discover';
 import {submitDm} from './chat/dm-submit';
+import {mergeDeliveryStateMap, type DeliveryStateMap} from './chat/dm-outbox';
+import {fingerprintFromDid} from './identity/did';
 import type {RecentDm} from './chat/TabRow';
 import {
   IdentityProvider,
@@ -88,6 +90,7 @@ function AppShell() {
   const [bindError, setBindError] = useState<string | null>(null);
   const [dmConversation, setDmConversation] = useState<DmConversation | null>(null);
   const [inboxConversations, setInboxConversations] = useState<DmConversation[]>([]);
+  const [deliveryStates, setDeliveryStates] = useState<DeliveryStateMap>({});
 
   function handleRemovedFromServer(serverUrl: string, reason: string) {
     if (reason === 'banned') {
@@ -316,9 +319,7 @@ function AppShell() {
 
   const handleDeliveryState = useCallback((event: DeliveryStateEvent) => {
     setInboxConversations(prev => mergeDeliveryState(prev, event));
-    setDmConversation(prev =>
-      prev ? mergeDeliveryState([prev], event)[0] ?? prev : prev,
-    );
+    setDeliveryStates(prev => mergeDeliveryStateMap(prev, event));
   }, []);
 
   if (identityState.status === 'onboarding') {
@@ -395,6 +396,7 @@ function AppShell() {
           availablePeers={dmPeers}
           conversation={dmConversation ?? undefined}
           conversations={dmConversation ? undefined : inboxConversations}
+          deliveryStates={deliveryStates}
           onStartConversation={handleStartDmConversation}
           onSendMessage={handleSendDmMessage}
           onAcceptRequest={handleAcceptDmRequest}
@@ -480,9 +482,11 @@ function conversationFromInboxEvent(event: InboxEvent): DmConversation | null {
   const recipientDids = Array.isArray(envelope.recipient_dids)
     ? envelope.recipient_dids.filter((did): did is string => typeof did === 'string')
     : [];
+  const senderDisplayName =
+    typeof event.sender_display_name === 'string' ? event.sender_display_name : null;
   const participants = Array.from(new Set([senderDid, ...recipientDids])).map(did => ({
     did,
-    label: dmPeerLabel(did),
+    label: dmParticipantLabel(did, did === senderDid ? senderDisplayName : null),
   }));
   return {
     conversationId,
@@ -628,6 +632,13 @@ export function dmAvailablePeers(
 }
 
 function dmPeerLabel(did: string): string {
+  return dmParticipantLabel(did, null);
+}
+
+function dmParticipantLabel(did: string, displayName: string | null): string {
+  if (displayName && displayName.trim().length > 0) return displayName.trim();
+  const fingerprint = fingerprintFromDid(did);
+  if (fingerprint) return fingerprint;
   const suffix = did.split(':').pop();
   return suffix && suffix.length > 0 ? suffix : did;
 }

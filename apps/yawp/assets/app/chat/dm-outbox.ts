@@ -38,6 +38,59 @@ export type PerRecipientDelivery = {
   state: Exclude<DmDelivery, 'queued' | 'sending'>;
 };
 
+export type DeliveryStateMap = Record<string, PerRecipientDelivery[]>;
+
+const DELIVERY_RANK: Record<'sent' | 'delivered' | 'read', number> = {
+  sent: 0,
+  delivered: 1,
+  read: 2,
+};
+
+export function mergeDeliveryStateMap(
+  map: DeliveryStateMap,
+  event: {envelope_id: string; recipient_did: string; state: 'sent' | 'delivered' | 'read'},
+): DeliveryStateMap {
+  const existing = map[event.envelope_id] ?? [];
+  const withoutRecipient = existing.filter(state => state.recipientDid !== event.recipient_did);
+  return {
+    ...map,
+    [event.envelope_id]: [
+      ...withoutRecipient,
+      {recipientDid: event.recipient_did, state: event.state},
+    ],
+  };
+}
+
+/**
+ * Overlays retained per-recipient delivery state (keyed by envelope id) onto a
+ * thread message. Retaining the state in a map lets a `delivery_state` event
+ * that races ahead of the optimistic→server id swap still land once the
+ * message adopts its server envelope id.
+ */
+export function applyDeliveryState<
+  T extends {
+    id: string;
+    delivery: DmDelivery;
+    recipientDids?: string[];
+    deliveryStates?: PerRecipientDelivery[];
+  },
+>(item: T, map: DeliveryStateMap): T {
+  const incoming = map[item.id];
+  if (!incoming || incoming.length === 0) return item;
+  if (item.delivery === 'queued' || item.delivery === 'sending') return item;
+
+  const byRecipient = new Map<string, PerRecipientDelivery>();
+  for (const state of item.deliveryStates ?? []) byRecipient.set(state.recipientDid, state);
+  for (const state of incoming) byRecipient.set(state.recipientDid, state);
+  const merged = Array.from(byRecipient.values());
+
+  const highest = merged.reduce<PerRecipientDelivery['state']>((acc, state) => {
+    return DELIVERY_RANK[state.state] > DELIVERY_RANK[acc] ? state.state : acc;
+  }, 'sent');
+
+  return {...item, deliveryStates: merged, delivery: highest};
+}
+
 export function aggregateDelivery(
   states: PerRecipientDelivery[],
   recipientDids: string[],

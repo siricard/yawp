@@ -318,7 +318,8 @@ defmodule Yawp.Federation do
   end
 
   defp publish_delivery_state(envelope_id, recipient_did, state) do
-    topic = "user:" <> bare_did(sender_did_for_envelope(envelope_id))
+    topic =
+      YawpWeb.UserChannel.inbox_topic(bare_did(sender_did_for_envelope(envelope_id)))
 
     Phoenix.PubSub.broadcast(Yawp.PubSub, topic, {
       :delivery_state,

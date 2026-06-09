@@ -21,8 +21,28 @@ export function didPrefix(did: string, len: number = DID_PREFIX_LEN): string {
  * yp:8f3a · d21c · 47ee · 0b91
  */
 export function fingerprintFromPubkey(pk: Uint8Array): string {
-  const hash = sha256(pk);
-  const first16 = hash.slice(0, 16);
+  return formatFingerprint(sha256(pk));
+}
+
+/**
+ * The same peer-verification fingerprint, derived from a `did:yawp:` string.
+ * A DID is `did:yawp:<base58(sha256(master_pk))>`, so decoding the suffix
+ * recovers the digest the fingerprint is built from — no public key needed.
+ * Returns null when the suffix is not decodable to at least 16 bytes.
+ */
+export function fingerprintFromDid(did: string): string | null {
+  const suffix = did.startsWith('did:yawp:') ? did.slice('did:yawp:'.length) : did;
+  try {
+    const digest = bs58.decode(suffix);
+    if (digest.length < 16) return null;
+    return formatFingerprint(digest);
+  } catch {
+    return null;
+  }
+}
+
+function formatFingerprint(digest: Uint8Array): string {
+  const first16 = digest.slice(0, 16);
   let hex = '';
   for (let i = 0; i < first16.length; i++) {
     hex += first16[i].toString(16).padStart(2, '0');

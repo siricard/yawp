@@ -136,6 +136,38 @@ defmodule YawpWeb.UserChannelTest do
       assert pushed.envelope == envelope
     end
 
+    test "the pushed inbox event carries the sender's resolved PPE display name" do
+      sender = seed_identity()
+      recipient = seed_identity()
+
+      {:ok, _} =
+        Yawp.Identity.Ppe
+        |> Ash.Changeset.for_create(:upsert, %{
+          did: sender.did,
+          display_name: "Bob Sender",
+          profile_version: 2,
+          envelope: %{"did" => sender.did, "display_name" => "Bob Sender"}
+        })
+        |> Ash.create(authorize?: false)
+
+      assert {:ok, _reply, _socket} = join_user(recipient, recipient.did)
+      assert_push "presence_state", _
+
+      envelope = %{
+        "envelope_id" => Ecto.UUID.generate(),
+        "conversation_id" => "conv-name",
+        "kind" => "dm",
+        "sender_did" => sender.did,
+        "recipient_did" => recipient.did,
+        "body" => "hello"
+      }
+
+      {:ok, _entry} = Federation.append_inbox(recipient.did, envelope)
+
+      assert_push "inbox", pushed
+      assert pushed.sender_display_name == "Bob Sender"
+    end
+
     test "an envelope for a different recipient is not pushed to this user" do
       actor = seed_identity()
       other = seed_identity()
@@ -171,6 +203,65 @@ defmodule YawpWeb.UserChannelTest do
 
       {:ok, _entry} = Federation.append_inbox(actor.did, envelope)
       refute_push "inbox", _
+    end
+  end
+
+  describe "delivery_state push" do
+    test "a delivery ack applied for the sender is pushed to the joined sender channel" do
+      sender = seed_identity()
+      recipient = seed_identity()
+      assert {:ok, _reply, _socket} = join_user(sender, sender.did)
+      assert_push "presence_state", _
+
+      envelope_id = Ecto.UUID.generate()
+      :persistent_term.put({Federation, :envelope_sender, envelope_id}, sender.did)
+
+      {:ok, _} =
+        Federation.upsert_delivery_state(%{
+          envelope_id: envelope_id,
+          recipient_did: recipient.did,
+          state: :sent,
+          updated_at: DateTime.utc_now()
+        })
+
+      assert :ok =
+               Federation.apply_delivery_ack(%{
+                 "envelope_id" => envelope_id,
+                 "recipient_did" => recipient.did
+               })
+
+      assert_push "delivery_state", pushed
+      assert pushed.envelope_id == envelope_id
+      assert pushed.recipient_did == recipient.did
+      assert pushed.state == "delivered"
+    end
+
+    test "a read marker applied for the sender pushes a read delivery_state" do
+      sender = seed_identity()
+      recipient = seed_identity()
+      assert {:ok, _reply, _socket} = join_user(sender, sender.did)
+      assert_push "presence_state", _
+
+      envelope_id = Ecto.UUID.generate()
+      :persistent_term.put({Federation, :envelope_sender, envelope_id}, sender.did)
+
+      {:ok, _} =
+        Federation.upsert_delivery_state(%{
+          envelope_id: envelope_id,
+          recipient_did: recipient.did,
+          state: :delivered,
+          updated_at: DateTime.utc_now()
+        })
+
+      assert :ok =
+               Federation.apply_read_marker(%{
+                 "recipient_did" => recipient.did,
+                 "last_read_envelope_id" => envelope_id
+               })
+
+      assert_push "delivery_state", pushed
+      assert pushed.envelope_id == envelope_id
+      assert pushed.state == "read"
     end
   end
 

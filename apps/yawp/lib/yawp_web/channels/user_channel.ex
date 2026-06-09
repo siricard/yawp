@@ -53,6 +53,7 @@ defmodule YawpWeb.UserChannel do
       kind: entry.kind,
       is_request: entry.is_request,
       inbox_serial: entry.inbox_serial,
+      sender_display_name: sender_display_name(entry.envelope),
       envelope: entry.envelope
     })
 
@@ -103,6 +104,15 @@ defmodule YawpWeb.UserChannel do
 
   @spec inbox_topic(String.t()) :: String.t()
   def inbox_topic(bare_did), do: "user_inbox:#{bare_did}"
+
+  defp sender_display_name(%{"sender_did" => did}) when is_binary(did) do
+    case Identity.get_ppe_by_did(did) do
+      {:ok, %Identity.Ppe{display_name: name}} when is_binary(name) and name != "" -> name
+      _ -> nil
+    end
+  end
+
+  defp sender_display_name(_), do: nil
 
   defp valid_delivery_ack?(%{
          "envelope_id" => env,
