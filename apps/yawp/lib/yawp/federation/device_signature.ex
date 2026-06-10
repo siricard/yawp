@@ -32,9 +32,36 @@ defmodule Yawp.Federation.DeviceSignature do
         maybe_refresh_cached_ppe(sender_did, cached, envelope)
 
       _ ->
-        fetch_sender_ppe(sender_did, sender_anchors(envelope))
+        # A sender anchored on this server is authoritative locally: its
+        # master key and device delegations live on the Identity row even
+        # before a signed PPE has been published/replicated. Prefer that row
+        # so a freshly bound sender verifies without a (self-directed) PPE
+        # fetch, and only fall back to federation when no local row exists.
+        case local_identity_ppe(sender_did) do
+          {:ok, ppe} -> {:ok, ppe}
+          {:error, _} -> fetch_sender_ppe(sender_did, sender_anchors(envelope))
+        end
     end
   end
+
+  defp local_identity_ppe(sender_did) do
+    case Identity.get_identity_by_did(sender_did) do
+      {:ok, %Identity.Identity{master_public_key: master_pk, device_subkeys: subkeys}}
+      when is_binary(master_pk) ->
+        {:ok,
+         %{
+           "did" => sender_did,
+           "public_key" => Base.url_encode64(master_pk, padding: false),
+           "device_subkeys" => device_subkey_records(subkeys)
+         }}
+
+      _ ->
+        {:error, :unresolvable_sender}
+    end
+  end
+
+  defp device_subkey_records(%{"subkeys" => subkeys}) when is_list(subkeys), do: subkeys
+  defp device_subkey_records(_), do: []
 
   defp maybe_refresh_cached_ppe(sender_did, cached, envelope) do
     signed_by = Map.get(envelope, "signed_by")

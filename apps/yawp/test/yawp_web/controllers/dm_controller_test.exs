@@ -64,6 +64,46 @@ defmodule YawpWeb.DmControllerTest do
     refute_receive {:federation_http, _}
   end
 
+  test "a freshly bound sender with no published PPE can still send a same-anchor DM", %{
+    conn: conn
+  } do
+    {sender_pub, sender_priv} = user_keypair()
+    {device_pub, device_priv} = user_keypair()
+    {recipient_pub, _recipient_priv} = user_keypair()
+    sender_did = did_for(sender_pub)
+    recipient_did = did_for(recipient_pub)
+    device_id = "fresh-device"
+    issued_at = "2026-06-05T00:00:00Z"
+
+    # Mirror the real onboard+bind state: the Identity row carries the
+    # device delegation and anchor_list, but NO PPE has been published or
+    # replicated yet. Previously this made the sender unresolvable and the
+    # DM submit returned 422 ("Queued — will send when you reconnect").
+    seed_bound_identity!(sender_did, sender_pub, sender_priv,
+      device: {device_id, device_pub, issued_at},
+      anchors: ["http://local.test"]
+    )
+
+    seed_bound_identity!(recipient_did, recipient_pub, nil, anchors: ["http://local.test"])
+
+    envelope =
+      dm_envelope(sender_did, device_id, device_priv, [recipient_did], %{
+        "envelope_id" => "no-ppe-envelope",
+        "body" => "hello from a fresh bind",
+        "sender_anchors" => ["local.test"]
+      })
+
+    conn = post(conn, ~p"/api/dm/submit", envelope)
+
+    assert %{"status" => "accepted", "deliveries" => [%{"recipients" => [^recipient_did]}]} =
+             json_response(conn, 200)
+
+    assert {:ok, [entry]} = Federation.pull_inbox(recipient_did, 0, 10)
+    assert entry.envelope_id == "no-ppe-envelope"
+    assert entry.ciphertext_envelope["body"] == "hello from a fresh bind"
+    refute_receive {:federation_http, _}
+  end
+
   test "accepted private blob peers bypass message requests" do
     {sender_pub, _sender_priv} = user_keypair()
     {recipient_pub, _recipient_priv} = user_keypair()
@@ -280,6 +320,24 @@ defmodule YawpWeb.DmControllerTest do
 
     assert {:ok, :applied} = Identity.apply_ppe_if_newer(ppe)
     ppe
+  end
+
+  defp seed_bound_identity!(did, pub, master_priv, opts) do
+    subkeys =
+      case Keyword.get(opts, :device) do
+        {device_id, device_pub, issued_at} ->
+          device_subkeys({device_id, device_pub, master_priv, issued_at})
+
+        nil ->
+          []
+      end
+
+    Ash.Seed.seed!(Yawp.Identity.Identity, %{
+      did: did,
+      master_public_key: pub,
+      anchor_list: Keyword.get(opts, :anchors, []),
+      device_subkeys: %{"subkeys" => subkeys}
+    })
   end
 
   defp device_subkeys(nil), do: []

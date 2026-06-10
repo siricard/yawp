@@ -364,14 +364,31 @@ defmodule Yawp.Federation do
   defp anchors_for_recipient(did) do
     case Identity.get_ppe_by_did(did) do
       {:ok, %Identity.Ppe{envelope: %{"anchors" => anchors}}} when is_list(anchors) ->
-        anchors
-        |> Enum.filter(&(is_binary(&1) and &1 != ""))
-        |> Enum.map(&AnchorHost.normalize/1)
-        |> Enum.uniq()
+        normalize_anchor_hosts(anchors)
+
+      _ ->
+        local_identity_anchors(did)
+    end
+  end
+
+  # A locally bound identity records its anchors on the Identity row's
+  # `anchor_list` before (or without) a published PPE. Fall back to that
+  # list so a freshly bound sender/recipient still resolves to its anchors.
+  defp local_identity_anchors(did) do
+    case Identity.get_identity_by_did(did) do
+      {:ok, %Identity.Identity{anchor_list: anchors}} when is_list(anchors) ->
+        normalize_anchor_hosts(anchors)
 
       _ ->
         []
     end
+  end
+
+  defp normalize_anchor_hosts(anchors) do
+    anchors
+    |> Enum.filter(&(is_binary(&1) and &1 != ""))
+    |> Enum.map(&AnchorHost.normalize/1)
+    |> Enum.uniq()
   end
 
   defp sender_anchored_here(%{"sender_did" => sender_did}) when is_binary(sender_did) do
