@@ -48,6 +48,8 @@ defmodule YawpWeb.Router do
     pipe_through :api
 
     get "/version", VersionController, :show
+    post "/api/uploads", AttachmentController, :upload
+    get "/api/downloads/:upload_id", AttachmentController, :download
     post "/api/dm/submit", DmController, :submit
     post "/api/dm/conversations/:conversation_id/participants", DmController, :immutable_roster
 

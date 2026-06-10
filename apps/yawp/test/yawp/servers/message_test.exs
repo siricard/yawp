@@ -169,6 +169,25 @@ defmodule Yawp.Servers.MessageTest do
       assert reply.mentions == [ctx.sender.did]
       assert [%{"url" => "https://example.com/a.png"}] = reply.attachments
     end
+
+    test "rejects messages with more attachments than configured", ctx do
+      previous = Application.get_env(:yawp, :attachments, [])
+
+      Application.put_env(
+        :yawp,
+        :attachments,
+        Keyword.put(previous, :max_attachments_per_message, 1)
+      )
+
+      on_exit(fn -> Application.put_env(:yawp, :attachments, previous) end)
+
+      assert {:error, error} =
+               send_message(ctx.channel_a, ctx.sender, "too many",
+                 attachments: [%{"upload_id" => "u1"}, %{"upload_id" => "u2"}]
+               )
+
+      assert Exception.message(error) =~ "too_many_attachments"
+    end
   end
 
   describe "edit" do

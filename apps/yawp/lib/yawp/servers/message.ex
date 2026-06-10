@@ -59,6 +59,7 @@ defmodule Yawp.Servers.Message do
       argument :signature, :string, allow_nil?: false
       argument :ts, :integer, allow_nil?: false
 
+      change Yawp.Servers.Message.Changes.EnforceAttachmentCaps
       change Yawp.Servers.Message.Changes.VerifySendSignature
       change Yawp.Servers.Message.Changes.AssignServerSerial
       change set_attribute(:server_inserted_at, &DateTime.utc_now/0)

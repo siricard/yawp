@@ -143,6 +143,11 @@ defmodule Yawp.Servers do
     resource Yawp.Servers.ArchivedMessageBody do
       define :list_archived_bodies_for_message, action: :list_for_message, args: [:message_id]
     end
+
+    resource Yawp.Servers.Attachment do
+      define :record_attachment_upload, action: :record_upload
+      define :get_attachment_by_upload_id, action: :get_by_upload_id, args: [:upload_id]
+    end
   end
 
   @doc """

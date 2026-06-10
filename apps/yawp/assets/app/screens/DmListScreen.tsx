@@ -469,6 +469,24 @@ export function DmListScreen({
                   </Text>
                 ) : null}
                 <Text className="text-sm text-text">{item.body}</Text>
+                {item.attachments?.map((attachment, attachmentIndex) => (
+                  <View
+                    key={`${item.id}-attachment-${attachmentIndex}`}
+                    testID={`dm-attachment-${item.id}-${attachmentIndex}`}
+                    className="mt-2 rounded-md border border-border-soft bg-surface px-3 py-2">
+                    {attachment.integrity_failed === true ? (
+                      <Text
+                        testID={`dm-attachment-integrity-failed-${item.id}-${attachmentIndex}`}
+                        className="text-xs text-danger">
+                        attachment integrity failed
+                      </Text>
+                    ) : (
+                      <Text className="text-xs text-text-secondary">
+                        {attachmentLabel(attachment)}
+                      </Text>
+                    )}
+                  </View>
+                ))}
                 {item.delivery === 'queued' ? (
                   <Text
                     testID={`dm-queued-indicator-${item.id}`}
@@ -689,6 +707,17 @@ function metadataPinnedPeers(meta: unknown): string[] {
   if (!meta || typeof meta !== 'object') return [];
   const peers = (meta as {pinnedPeers?: unknown}).pinnedPeers;
   return Array.isArray(peers) ? peers.filter((peer): peer is string => typeof peer === 'string') : [];
+}
+
+function attachmentLabel(attachment: Record<string, unknown>): string {
+  const mime = typeof attachment.mime === 'string' ? attachment.mime : 'attachment';
+  const size =
+    typeof attachment.size === 'number'
+      ? attachment.size
+      : typeof attachment.size_bytes === 'number'
+        ? attachment.size_bytes
+        : null;
+  return size === null ? mime : `${mime} · ${size} bytes`;
 }
 
 function withinGroupedWindow(previous: DmThreadMessage, next: DmThreadMessage): boolean {

@@ -4,6 +4,7 @@ export type DmOutboxItem = {
   id: string;
   body: string;
   delivery: DmDelivery;
+  attachments?: Record<string, unknown>[];
 };
 
 export type DmSendDecision =
