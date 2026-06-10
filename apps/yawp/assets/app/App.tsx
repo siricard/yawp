@@ -17,6 +17,7 @@ import {submitDm} from './chat/dm-submit';
 import {mergeDeliveryStateMap, type DeliveryStateMap} from './chat/dm-outbox';
 import {buildReadMarker} from './chat/read-marker';
 import {fingerprintFromDid} from './identity/did';
+import {detectKeyChanged, peerVerificationRecords} from './identity/verification';
 import type {RecentDm} from './chat/TabRow';
 import {
   IdentityProvider,
@@ -79,7 +80,7 @@ export default function App() {
 
 function AppShell() {
   const identityState = useIdentityState();
-  const {metadata} = useBundleMetadata();
+  const {metadata, mutate} = useBundleMetadata();
   const {servers, removeServer} = useWorkspaceServers();
   const anchorUrls = configuredAnchorUrls(metadata.publishedProfile?.anchors);
   const dmPeers = dmAvailablePeers(
@@ -310,6 +311,18 @@ function AppShell() {
   const handleInbox = useCallback((event: InboxEvent) => {
     const conversation = conversationFromInboxEvent(event);
     if (!conversation) return;
+    const senderDid = conversation.messages[0]?.senderDid;
+    if (senderDid) {
+      const masterPk =
+        event.envelope.master_pk ??
+        event.envelope.sender_master_pk ??
+        event.envelope.sender_public_key;
+      const currentRecords = peerVerificationRecords(metadata);
+      const nextRecords = detectKeyChanged(currentRecords, senderDid, masterPk);
+      if (nextRecords !== currentRecords) {
+        mutate(prev => ({...prev, peerVerification: nextRecords}));
+      }
+    }
     setInboxConversations(prev => mergeInboxConversation(prev, conversation));
     setDmConversation(prev => {
       if (!prev) return prev;
@@ -317,7 +330,7 @@ function AppShell() {
         ? mergeInboxConversation([prev], conversation)[0]
         : prev;
     });
-  }, []);
+  }, [metadata, mutate]);
 
   const handleDeliveryState = useCallback((event: DeliveryStateEvent) => {
     setInboxConversations(prev => mergeDeliveryState(prev, event));

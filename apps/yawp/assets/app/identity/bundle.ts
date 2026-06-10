@@ -50,6 +50,12 @@ export type IdentityBundleV1 = {
     acceptedPeers?: string[];
     pinnedPeers?: string[];
     readReceiptsEnabled?: boolean;
+    peerVerification?: Array<{
+      peer_did: string;
+      status: 'verified' | 'key_changed';
+      fingerprint_at_verification: string;
+      verified_at: string;
+    }>;
   };
 };
 
@@ -164,6 +170,20 @@ export function isIdentityBundleV1(value: unknown): value is IdentityBundleV1 {
     if ('pinnedPeers' in meta && meta.pinnedPeers !== undefined) {
       if (!Array.isArray(meta.pinnedPeers)) return false;
       if (!meta.pinnedPeers.every(peer => typeof peer === 'string')) return false;
+    }
+    if ('peerVerification' in meta && meta.peerVerification !== undefined) {
+      if (!Array.isArray(meta.peerVerification)) return false;
+      const ok = meta.peerVerification.every(record => {
+        if (!record || typeof record !== 'object') return false;
+        const r = record as Record<string, unknown>;
+        return (
+          typeof r.peer_did === 'string' &&
+          (r.status === 'verified' || r.status === 'key_changed') &&
+          typeof r.fingerprint_at_verification === 'string' &&
+          typeof r.verified_at === 'string'
+        );
+      });
+      if (!ok) return false;
     }
     if ('servers' in meta && meta.servers !== undefined) {
       if (!Array.isArray(meta.servers)) return false;

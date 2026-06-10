@@ -17,6 +17,11 @@ import {Banner, Button, Input} from '../ui';
 import {pointerCursor} from '../ui/cursor';
 import {fingerprintFromDid} from '../identity/did';
 import {useOptionalBundleMetadata} from '../identity-context';
+import {
+  peerVerificationRecord,
+  peerVerificationRecords,
+  upsertVerifiedPeer,
+} from '../identity/verification';
 
 const monospace = Platform.select({
   ios: 'Menlo',
@@ -88,6 +93,8 @@ export function DmListScreen({
   const [selectedPeers, setSelectedPeers] = useState<string[]>([]);
   const [manualDid, setManualDid] = useState('');
   const [creatingConversation, setCreatingConversation] = useState(false);
+  const [verifyingPeer, setVerifyingPeer] = useState<DmParticipant | null>(null);
+  const [cameraState, setCameraState] = useState<'idle' | 'ready' | 'unavailable'>('idle');
   const seq = useRef(0);
   const wasDegraded = useRef(degraded);
   const participantLabels = new Map(
@@ -203,6 +210,40 @@ export function DmListScreen({
     });
   }
 
+  async function confirmPeer(peer: DmParticipant) {
+    const fingerprint = fingerprintFromDid(peer.did);
+    if (!fingerprint) return;
+    await mutate(prev => ({
+      ...prev,
+      peerVerification: upsertVerifiedPeer(
+        peerVerificationRecords(prev),
+        peer.did,
+        fingerprint,
+        new Date().toISOString(),
+      ),
+    }));
+    setVerifyingPeer(null);
+  }
+
+  async function startQrScan() {
+    if (Platform.OS !== 'web') {
+      setCameraState('ready');
+      return;
+    }
+    const devices = globalThis.navigator?.mediaDevices;
+    if (!devices?.getUserMedia) {
+      setCameraState('unavailable');
+      return;
+    }
+    try {
+      const stream = await devices.getUserMedia({video: true});
+      stream.getTracks().forEach(track => track.stop());
+      setCameraState('ready');
+    } catch {
+      setCameraState('unavailable');
+    }
+  }
+
   if (!conversation && visibleConversations.length > 0 && !creatingConversation) {
     const requestConversations = visibleConversations.filter(item => item.isRequest);
     const mainConversations = visibleConversations.filter(item => !item.isRequest);
@@ -278,12 +319,23 @@ export function DmListScreen({
           <View testID="dm-participant-list" className="mb-4 flex-row flex-wrap" style={{gap: 6}}>
             {conversation.participants.map(participant => {
               const fingerprint = fingerprintFromDid(participant.did);
+              const verification = peerVerificationRecord(metadata, participant.did);
               return (
               <View
                 key={participant.did}
                 testID={`dm-participant-${participant.did}`}
                 className="rounded-pill border border-border-soft bg-surface-2 px-2 py-1">
-                <Text className="text-xs text-text">{participant.label}</Text>
+                <View className="flex-row items-center" style={{gap: 4}}>
+                  <Text className="text-xs text-text">{participant.label}</Text>
+                  {verification?.status === 'verified' ? (
+                    <Text
+                      testID={`dm-peer-verified-${participant.did}`}
+                      accessibilityLabel="verified peer"
+                      className="text-xs text-primary">
+                      🛡✓
+                    </Text>
+                  ) : null}
+                </View>
                 {fingerprint && fingerprint !== participant.label ? (
                   <Text
                     testID={`dm-participant-fingerprint-${participant.did}`}
@@ -292,9 +344,33 @@ export function DmListScreen({
                     {fingerprint}
                   </Text>
                 ) : null}
+                {fingerprint ? (
+                  <Pressable
+                    testID={`dm-verify-peer-${participant.did}`}
+                    accessibilityRole="button"
+                    onPress={() => {
+                      setVerifyingPeer(participant);
+                      setCameraState('idle');
+                    }}
+                    style={pointerCursor}
+                    className="mt-1">
+                    <Text className="text-xs text-primary">Verify identity</Text>
+                  </Pressable>
+                ) : null}
               </View>
               );
             })}
+          </View>
+        ) : null}
+        {conversation?.participants.some(
+          participant =>
+            peerVerificationRecord(metadata, participant.did)?.status === 'key_changed',
+        ) ? (
+          <View testID="dm-key-changed-banner" className="mb-4">
+            <Banner
+              kind="warning"
+              message="This peer's identity key changed. Compare fingerprints before trusting new messages."
+            />
           </View>
         ) : null}
         {!conversation && availablePeers.length > 0 ? (
@@ -414,6 +490,48 @@ export function DmListScreen({
           </View>
         )}
       </View>
+
+      {verifyingPeer ? (
+        <View
+          testID="dm-verify-modal"
+          className="absolute inset-0 items-center justify-center bg-overlay px-6">
+          <View className="w-full max-w-lg rounded-xl border border-border-soft bg-surface px-5 py-5">
+            <Text className="text-lg font-bold text-text">Verify identity</Text>
+            <Text className="mt-2 text-sm text-text-secondary">
+              Scan their QR code or compare this fingerprint out of band.
+            </Text>
+            <Text
+              testID="dm-verify-fingerprint"
+              className="mt-4 text-2xl text-primary"
+              style={{fontFamily: monospace}}>
+              {fingerprintFromDid(verifyingPeer.did)}
+            </Text>
+            <View className="mt-5" style={{gap: 10}}>
+              <Button testID="dm-verify-qr-button" label="QR scan" onPress={startQrScan} />
+              {cameraState === 'ready' ? (
+                <Text testID="dm-qr-camera-ready" className="text-xs text-text-secondary">
+                  Camera ready. Point it at the peer's identity QR code.
+                </Text>
+              ) : cameraState === 'unavailable' ? (
+                <Text testID="dm-qr-camera-unavailable" className="text-xs text-warning">
+                  Camera access is unavailable on this device.
+                </Text>
+              ) : null}
+              <Button
+                testID="dm-verify-oob-match-button"
+                label="It matches"
+                onPress={() => confirmPeer(verifyingPeer)}
+              />
+              <Button
+                testID="dm-verify-cancel-button"
+                label="Cancel"
+                variant="secondary"
+                onPress={() => setVerifyingPeer(null)}
+              />
+            </View>
+          </View>
+        </View>
+      ) : null}
 
       <View className="px-6 pb-4 pt-2 border-t border-border-soft bg-surface">
         {isRequest ? (

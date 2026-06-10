@@ -2,7 +2,11 @@ import React from 'react';
 import ReactTestRenderer from 'react-test-renderer';
 
 const mockStatus = {value: {status: 'connected', degraded: false}};
-const mockMutate = jest.fn(async mut => mut({}));
+const mockMetadata = {value: {} as Record<string, unknown>};
+const mockMutate = jest.fn(async mut => {
+  mockMetadata.value = mut(mockMetadata.value);
+  return {version: 1, master: {sk: ''}, device: {deviceId: '', sk: '', pk: '', signature: '', issuedAt: ''}, metadata: mockMetadata.value};
+});
 
 jest.mock('../chat/anchor-connection', () => ({
   useAnchorStatus: () => mockStatus.value,
@@ -10,7 +14,7 @@ jest.mock('../chat/anchor-connection', () => ({
 
 jest.mock('../identity-context', () => ({
   useOptionalBundleMetadata: () => ({
-    metadata: {},
+    metadata: mockMetadata.value,
     ready: true,
     mutate: mockMutate,
   }),
@@ -29,6 +33,11 @@ function indicatorText(
 }
 
 describe('DmListScreen delivery-state overlay', () => {
+  beforeEach(() => {
+    mockMetadata.value = {};
+    mockMutate.mockClear();
+  });
+
   test('applies a retained overlay to the settled-envelope bubble at render', () => {
     const deliveryStates: DeliveryStateMap = {
       'env-1': [{recipientDid: 'did:yawp:bob', state: 'delivered'}],
@@ -162,6 +171,74 @@ describe('DmListScreen delivery-state overlay', () => {
       testID: `dm-participant-fingerprint-${did}`,
     });
     expect(fingerprint.props.children).toBe(expected);
+
+    ReactTestRenderer.act(() => root.unmount());
+  });
+
+  test('opens verification modal and stores the verified peer record', async () => {
+    const did = didFromPubkey(new Uint8Array(32).fill(9));
+    const expected = fingerprintFromDid(did);
+    let root!: ReactTestRenderer.ReactTestRenderer;
+    ReactTestRenderer.act(() => {
+      root = ReactTestRenderer.create(
+        <DmListScreen
+          onBack={() => {}}
+          conversation={{
+            participants: [{did, label: 'Bob'}],
+            messages: [{id: 'm1', senderDid: did, body: 'hello', delivery: 'delivered'}],
+          }}
+        />,
+      );
+    });
+
+    ReactTestRenderer.act(() => {
+      root.root.findByProps({testID: `dm-verify-peer-${did}`}).props.onPress();
+    });
+
+    expect(root.root.findByProps({testID: 'dm-verify-fingerprint'}).props.children).toBe(expected);
+
+    await ReactTestRenderer.act(async () => {
+      await root.root.findByProps({testID: 'dm-verify-oob-match-button'}).props.onPress();
+    });
+
+    expect(mockMetadata.value.peerVerification).toEqual([
+      {
+        peer_did: did,
+        status: 'verified',
+        fingerprint_at_verification: expected,
+        verified_at: expect.any(String),
+      },
+    ]);
+
+    ReactTestRenderer.act(() => root.unmount());
+  });
+
+  test('shows the key changed banner for verified peers only', () => {
+    const did = didFromPubkey(new Uint8Array(32).fill(10));
+    mockMetadata.value = {
+      peerVerification: [
+        {
+          peer_did: did,
+          status: 'key_changed',
+          fingerprint_at_verification: 'yp:0000 · 0000 · 0000 · 0000',
+          verified_at: 'now',
+        },
+      ],
+    };
+    let root!: ReactTestRenderer.ReactTestRenderer;
+    ReactTestRenderer.act(() => {
+      root = ReactTestRenderer.create(
+        <DmListScreen
+          onBack={() => {}}
+          conversation={{
+            participants: [{did, label: 'Bob'}],
+            messages: [{id: 'm1', senderDid: did, body: 'hello', delivery: 'delivered'}],
+          }}
+        />,
+      );
+    });
+
+    expect(root.root.findByProps({testID: 'dm-key-changed-banner'})).toBeTruthy();
 
     ReactTestRenderer.act(() => root.unmount());
   });
