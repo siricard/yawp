@@ -150,7 +150,7 @@ describe('DmListScreen delivery-state overlay', () => {
     ReactTestRenderer.act(() => root.unmount());
   });
 
-  test('renders the yp: fingerprint for a participant whose DID decodes', () => {
+  test('renders the yp: fingerprint in the peer profile sheet', () => {
     const did = didFromPubkey(new Uint8Array(32).fill(7));
     const expected = fingerprintFromDid(did);
     expect(expected).not.toBeNull();
@@ -167,9 +167,11 @@ describe('DmListScreen delivery-state overlay', () => {
       );
     });
 
-    const fingerprint = root.root.findByProps({
-      testID: `dm-participant-fingerprint-${did}`,
+    ReactTestRenderer.act(() => {
+      root.root.findByProps({testID: `dm-open-profile-${did}`}).props.onPress();
     });
+
+    const fingerprint = root.root.findByProps({testID: `dm-profile-fingerprint-${did}`});
     expect(fingerprint.props.children).toBe(expected);
 
     ReactTestRenderer.act(() => root.unmount());
@@ -189,6 +191,10 @@ describe('DmListScreen delivery-state overlay', () => {
           }}
         />,
       );
+    });
+
+    ReactTestRenderer.act(() => {
+      root.root.findByProps({testID: `dm-open-profile-${did}`}).props.onPress();
     });
 
     ReactTestRenderer.act(() => {
@@ -239,6 +245,39 @@ describe('DmListScreen delivery-state overlay', () => {
     });
 
     expect(root.root.findByProps({testID: 'dm-key-changed-banner'})).toBeTruthy();
+
+    ReactTestRenderer.act(() => root.unmount());
+  });
+
+  test('renders verified ticks in direct-message list rows', () => {
+    const did = didFromPubkey(new Uint8Array(32).fill(11));
+    mockMetadata.value = {
+      peerVerification: [
+        {
+          peer_did: did,
+          status: 'verified',
+          fingerprint_at_verification: fingerprintFromDid(did),
+          verified_at: 'now',
+        },
+      ],
+    };
+    let root!: ReactTestRenderer.ReactTestRenderer;
+    ReactTestRenderer.act(() => {
+      root = ReactTestRenderer.create(
+        <DmListScreen
+          onBack={() => {}}
+          conversations={[
+            {
+              conversationId: 'conv-bob',
+              participants: [{did, label: 'Bob'}],
+              messages: [{id: 'm1', senderDid: did, body: 'hello', delivery: 'delivered'}],
+            },
+          ]}
+        />,
+      );
+    });
+
+    expect(root.root.findAllByProps({testID: `dm-peer-row-verified-${did}`}).length).toBeGreaterThan(0);
 
     ReactTestRenderer.act(() => root.unmount());
   });

@@ -405,9 +405,19 @@ defmodule YawpWeb.FederationController do
       "kind" => entry.kind,
       "is_request" => entry.is_request,
       "inbox_serial" => entry.inbox_serial,
+      "sender_public_key" => sender_public_key(entry.envelope),
       "envelope" => entry.envelope
     }
   end
+
+  defp sender_public_key(%{"sender_did" => did}) when is_binary(did) do
+    case Identity.get_ppe_by_did(did) do
+      {:ok, %Identity.Ppe{envelope: %{"public_key" => pk}}} when is_binary(pk) -> pk
+      _ -> nil
+    end
+  end
+
+  defp sender_public_key(_), do: nil
 
   defp with_inner(conn, params, fun) do
     case Wrapper.unwrap(params, include_signature: true) do

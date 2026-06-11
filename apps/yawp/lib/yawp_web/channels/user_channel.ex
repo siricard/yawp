@@ -55,6 +55,7 @@ defmodule YawpWeb.UserChannel do
       is_request: entry.is_request,
       inbox_serial: entry.inbox_serial,
       sender_display_name: sender_display_name(entry.envelope),
+      sender_public_key: sender_public_key(entry.envelope),
       envelope: entry.envelope
     })
 
@@ -123,6 +124,15 @@ defmodule YawpWeb.UserChannel do
   end
 
   defp sender_display_name(_), do: nil
+
+  defp sender_public_key(%{"sender_did" => did}) when is_binary(did) do
+    case Identity.get_ppe_by_did(did) do
+      {:ok, %Identity.Ppe{envelope: %{"public_key" => pk}}} when is_binary(pk) -> pk
+      _ -> nil
+    end
+  end
+
+  defp sender_public_key(_), do: nil
 
   defp valid_delivery_ack?(%{
          "envelope_id" => env,

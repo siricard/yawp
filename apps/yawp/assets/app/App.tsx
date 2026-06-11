@@ -313,12 +313,8 @@ function AppShell() {
     if (!conversation) return;
     const senderDid = conversation.messages[0]?.senderDid;
     if (senderDid) {
-      const masterPk =
-        event.envelope.master_pk ??
-        event.envelope.sender_master_pk ??
-        event.envelope.sender_public_key;
       const currentRecords = peerVerificationRecords(metadata);
-      const nextRecords = detectKeyChanged(currentRecords, senderDid, masterPk);
+      const nextRecords = detectKeyChanged(currentRecords, senderDid, event.sender_public_key);
       if (nextRecords !== currentRecords) {
         mutate(prev => ({...prev, peerVerification: nextRecords}));
       }

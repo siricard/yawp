@@ -3,6 +3,8 @@ import ReactTestRenderer from "react-test-renderer";
 
 import type { Identity } from "../identity-context";
 import {signingInput} from "../chat/dm-envelope";
+import {bytesToB64Url} from "../identity/bundle";
+import {didFromPubkey, fingerprintFromPubkey} from "../identity/did";
 
 const mockSignDevice = jest.fn((bytes: Uint8Array) => new Uint8Array(64));
 
@@ -28,6 +30,7 @@ let mockMetadata: {
   profileVersion: number;
   publishedProfile: { anchors: string[] };
   readReceiptsEnabled?: boolean;
+  peerVerification?: Array<Record<string, unknown>>;
 } = {
   acceptedPeers: ["did:yawp:bob", "did:yawp:carol"],
   profileVersion: 1,
@@ -73,12 +76,16 @@ jest.mock("../identity-context", () => ({
   useBundleMetadata: () => ({
     metadata: mockMetadata,
     ready: true,
-    mutate: async () => undefined,
+    mutate: async (updater: (metadata: typeof mockMetadata) => typeof mockMetadata) => {
+      mockMetadata = updater(mockMetadata);
+    },
   }),
   useOptionalBundleMetadata: () => ({
     metadata: mockMetadata,
     ready: true,
-    mutate: async () => undefined,
+    mutate: async (updater: (metadata: typeof mockMetadata) => typeof mockMetadata) => {
+      mockMetadata = updater(mockMetadata);
+    },
   }),
   usePassphrase: () => ({
     sealed: false,
@@ -875,6 +882,61 @@ describe("App direct-message route", () => {
     expect(root.root.findByProps({ testID: "dm-participant-did:yawp:bob" })).toBeTruthy();
     expect(root.root.findByProps({ testID: "dm-participant-did:yawp:alice" })).toBeTruthy();
     expect(root.root.findByProps({ testID: "dm-participant-did:yawp:carol" })).toBeTruthy();
+
+    ReactTestRenderer.act(() => root.unmount());
+  });
+
+  test("marks verified peers as key changed from the real inbox event sender public key", async () => {
+    const oldPk = new Uint8Array(32).fill(12);
+    const newPk = new Uint8Array(32).fill(13);
+    const did = didFromPubkey(oldPk);
+    mockMetadata = {
+      acceptedPeers: [did],
+      profileVersion: 1,
+      publishedProfile: { anchors: ["localhost:4000"] },
+      peerVerification: [
+        {
+          peer_did: did,
+          status: "verified",
+          fingerprint_at_verification: fingerprintFromPubkey(oldPk),
+          verified_at: "now",
+        },
+      ],
+    };
+    let root!: ReactTestRenderer.ReactTestRenderer;
+    await ReactTestRenderer.act(async () => {
+      root = ReactTestRenderer.create(<App />);
+    });
+    await flush();
+
+    await ReactTestRenderer.act(async () => {
+      anchorInbox?.({
+        envelope_id: "inbox-key-change-1",
+        inbox_serial: 1,
+        is_request: false,
+        sender_public_key: bytesToB64Url(newPk),
+        envelope: {
+          sender_did: did,
+          recipient_dids: ["did:yawp:alice"],
+          conversation_id: "conversation-key-change",
+          timestamp: "2026-06-05T00:00:00.000Z",
+          body: "new master key",
+        },
+      });
+    });
+    await flush();
+
+    await ReactTestRenderer.act(async () => {
+      root.root.findByProps({ testID: "workspace-dm-tile" }).props.onPress();
+    });
+    await ReactTestRenderer.act(async () => {
+      root.root.findAllByProps({ testID: "dm-conversation-conversation-key-change" })[0].props.onPress();
+    });
+
+    expect(root.root.findByProps({ testID: "dm-key-changed-banner" })).toBeTruthy();
+    expect(mockMetadata.peerVerification?.[0]).toEqual(
+      expect.objectContaining({peer_did: did, status: "key_changed"}),
+    );
 
     ReactTestRenderer.act(() => root.unmount());
   });

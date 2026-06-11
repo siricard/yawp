@@ -27,6 +27,7 @@ export type InboxEvent = {
   is_request: boolean;
   inbox_serial: number;
   sender_display_name?: string | null;
+  sender_public_key?: string | null;
 };
 
 export type DeliveryStateEvent = {

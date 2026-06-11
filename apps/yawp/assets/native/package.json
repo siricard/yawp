@@ -18,6 +18,7 @@
     "@react-native-clipboard/clipboard": "^1.16.3",
     "@react-native/new-app-screen": "0.81.6",
     "bs58": "^6.0.0",
+    "jsqr": "^1.4.0",
     "nativewind": "^4.2.3",
     "phoenix": "1.8.7",
     "react": "19.1.4",

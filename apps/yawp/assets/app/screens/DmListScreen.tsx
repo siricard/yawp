@@ -1,5 +1,6 @@
 import React, {useEffect, useRef, useState} from 'react';
 import {Platform, Pressable, ScrollView, Text, View} from 'react-native';
+import jsQR from 'jsqr';
 
 import {useAnchorStatus} from '../chat/anchor-connection';
 import {
@@ -15,7 +16,8 @@ import {
 } from '../chat/dm-outbox';
 import {Banner, Button, Input} from '../ui';
 import {pointerCursor} from '../ui/cursor';
-import {fingerprintFromDid} from '../identity/did';
+import {fingerprintFromDid, fingerprintFromPubkey} from '../identity/did';
+import {b64UrlToBytes} from '../identity/bundle';
 import {useOptionalBundleMetadata} from '../identity-context';
 import {
   peerVerificationRecord,
@@ -93,8 +95,11 @@ export function DmListScreen({
   const [selectedPeers, setSelectedPeers] = useState<string[]>([]);
   const [manualDid, setManualDid] = useState('');
   const [creatingConversation, setCreatingConversation] = useState(false);
+  const [profilePeer, setProfilePeer] = useState<DmParticipant | null>(null);
   const [verifyingPeer, setVerifyingPeer] = useState<DmParticipant | null>(null);
-  const [cameraState, setCameraState] = useState<'idle' | 'ready' | 'unavailable'>('idle');
+  const [cameraState, setCameraState] = useState<
+    'idle' | 'scanning' | 'matched' | 'mismatch' | 'unavailable'
+  >('idle');
   const seq = useRef(0);
   const wasDegraded = useRef(degraded);
   const participantLabels = new Map(
@@ -210,8 +215,8 @@ export function DmListScreen({
     });
   }
 
-  async function confirmPeer(peer: DmParticipant) {
-    const fingerprint = fingerprintFromDid(peer.did);
+  async function confirmPeer(peer: DmParticipant, scannedFingerprint?: string) {
+    const fingerprint = scannedFingerprint ?? fingerprintFromDid(peer.did);
     if (!fingerprint) return;
     await mutate(prev => ({
       ...prev,
@@ -223,22 +228,54 @@ export function DmListScreen({
       ),
     }));
     setVerifyingPeer(null);
+    setProfilePeer(null);
   }
 
-  async function startQrScan() {
+  async function startQrScan(peer: DmParticipant) {
     if (Platform.OS !== 'web') {
-      setCameraState('ready');
+      setCameraState('unavailable');
       return;
     }
+    const doc = globalThis.document;
     const devices = globalThis.navigator?.mediaDevices;
+    if (!doc) {
+      setCameraState('unavailable');
+      return;
+    }
     if (!devices?.getUserMedia) {
       setCameraState('unavailable');
       return;
     }
     try {
+      setCameraState('scanning');
       const stream = await devices.getUserMedia({video: true});
+      const video = doc.createElement('video');
+      video.playsInline = true;
+      video.muted = true;
+      video.srcObject = stream;
+      await video.play();
+      const canvas = doc.createElement('canvas');
+      canvas.width = video.videoWidth || 640;
+      canvas.height = video.videoHeight || 480;
+      const context = canvas.getContext('2d');
+      if (!context) {
+        stream.getTracks().forEach(track => track.stop());
+        setCameraState('unavailable');
+        return;
+      }
+      context.drawImage(video, 0, 0, canvas.width, canvas.height);
+      const image = context.getImageData(0, 0, canvas.width, canvas.height);
       stream.getTracks().forEach(track => track.stop());
-      setCameraState('ready');
+      const result = jsQR(image.data, image.width, image.height);
+      const payload = parseIdentityQrPayload(result?.data);
+      const fingerprint =
+        payload?.did === peer.did ? fingerprintFromQrMasterPk(payload.master_pk) : null;
+      if (!fingerprint) {
+        setCameraState('mismatch');
+        return;
+      }
+      await confirmPeer(peer, fingerprint);
+      setCameraState('matched');
     } catch {
       setCameraState('unavailable');
     }
@@ -268,6 +305,7 @@ export function DmListScreen({
             title="Message Requests"
             conversations={sortRecent(requestConversations)}
             pinnedIds={pinnedIds}
+            verifiedPeerDids={verifiedPeerDids(metadata)}
             onTogglePin={togglePin}
             onOpenConversation={onOpenConversation}
           />
@@ -275,6 +313,7 @@ export function DmListScreen({
             title="Pinned"
             conversations={pinnedConversations}
             pinnedIds={pinnedIds}
+            verifiedPeerDids={verifiedPeerDids(metadata)}
             onTogglePin={togglePin}
             onOpenConversation={onOpenConversation}
           />
@@ -282,6 +321,7 @@ export function DmListScreen({
             title="Recent"
             conversations={sortRecent(unpinnedConversations)}
             pinnedIds={pinnedIds}
+            verifiedPeerDids={verifiedPeerDids(metadata)}
             onTogglePin={togglePin}
             onOpenConversation={onOpenConversation}
           />
@@ -289,6 +329,7 @@ export function DmListScreen({
             title="All"
             conversations={sortAll(mainConversations)}
             pinnedIds={pinnedIds}
+            verifiedPeerDids={verifiedPeerDids(metadata)}
             onTogglePin={togglePin}
             onOpenConversation={onOpenConversation}
           />
@@ -318,14 +359,18 @@ export function DmListScreen({
         {conversation ? (
           <View testID="dm-participant-list" className="mb-4 flex-row flex-wrap" style={{gap: 6}}>
             {conversation.participants.map(participant => {
-              const fingerprint = fingerprintFromDid(participant.did);
               const verification = peerVerificationRecord(metadata, participant.did);
               return (
               <View
                 key={participant.did}
                 testID={`dm-participant-${participant.did}`}
                 className="rounded-pill border border-border-soft bg-surface-2 px-2 py-1">
-                <View className="flex-row items-center" style={{gap: 4}}>
+                <Pressable
+                  testID={`dm-open-profile-${participant.did}`}
+                  accessibilityRole="button"
+                  onPress={() => setProfilePeer(participant)}
+                  style={pointerCursor}
+                  className="flex-row items-center">
                   <Text className="text-xs text-text">{participant.label}</Text>
                   {verification?.status === 'verified' ? (
                     <Text
@@ -335,28 +380,7 @@ export function DmListScreen({
                       🛡✓
                     </Text>
                   ) : null}
-                </View>
-                {fingerprint && fingerprint !== participant.label ? (
-                  <Text
-                    testID={`dm-participant-fingerprint-${participant.did}`}
-                    className="text-xs text-text-tertiary"
-                    style={{fontFamily: monospace}}>
-                    {fingerprint}
-                  </Text>
-                ) : null}
-                {fingerprint ? (
-                  <Pressable
-                    testID={`dm-verify-peer-${participant.did}`}
-                    accessibilityRole="button"
-                    onPress={() => {
-                      setVerifyingPeer(participant);
-                      setCameraState('idle');
-                    }}
-                    style={pointerCursor}
-                    className="mt-1">
-                    <Text className="text-xs text-primary">Verify identity</Text>
-                  </Pressable>
-                ) : null}
+                </Pressable>
               </View>
               );
             })}
@@ -509,6 +533,40 @@ export function DmListScreen({
         )}
       </View>
 
+      {profilePeer ? (
+        <View
+          testID="dm-profile-sheet"
+          className="absolute inset-0 items-end justify-end bg-overlay">
+          <View className="w-full rounded-t-2xl border border-border-soft bg-surface px-6 py-5">
+            <Text testID="dm-profile-name" className="text-xl font-bold text-text">
+              {profilePeer.label}
+            </Text>
+            <Text
+              testID={`dm-profile-fingerprint-${profilePeer.did}`}
+              className="mt-3 text-sm text-text-secondary"
+              style={{fontFamily: monospace}}>
+              {fingerprintFromDid(profilePeer.did)}
+            </Text>
+            <View className="mt-5" style={{gap: 10}}>
+              <Button
+                testID={`dm-verify-peer-${profilePeer.did}`}
+                label="Verify identity"
+                onPress={() => {
+                  setVerifyingPeer(profilePeer);
+                  setCameraState('idle');
+                }}
+              />
+              <Button
+                testID="dm-profile-close-button"
+                label="Close"
+                variant="secondary"
+                onPress={() => setProfilePeer(null)}
+              />
+            </View>
+          </View>
+        </View>
+      ) : null}
+
       {verifyingPeer ? (
         <View
           testID="dm-verify-modal"
@@ -525,10 +583,22 @@ export function DmListScreen({
               {fingerprintFromDid(verifyingPeer.did)}
             </Text>
             <View className="mt-5" style={{gap: 10}}>
-              <Button testID="dm-verify-qr-button" label="QR scan" onPress={startQrScan} />
-              {cameraState === 'ready' ? (
-                <Text testID="dm-qr-camera-ready" className="text-xs text-text-secondary">
-                  Camera ready. Point it at the peer's identity QR code.
+              <Button
+                testID="dm-verify-qr-button"
+                label="QR scan"
+                onPress={() => startQrScan(verifyingPeer)}
+              />
+              {cameraState === 'scanning' ? (
+                <Text testID="dm-qr-camera-scanning" className="text-xs text-text-secondary">
+                  Scanning the peer's identity QR code.
+                </Text>
+              ) : cameraState === 'matched' ? (
+                <Text testID="dm-qr-camera-matched" className="text-xs text-primary">
+                  Identity QR matched.
+                </Text>
+              ) : cameraState === 'mismatch' ? (
+                <Text testID="dm-qr-camera-mismatch" className="text-xs text-warning">
+                  That QR code does not match this peer.
                 </Text>
               ) : cameraState === 'unavailable' ? (
                 <Text testID="dm-qr-camera-unavailable" className="text-xs text-warning">
@@ -618,12 +688,14 @@ function DmSection({
   title,
   conversations,
   pinnedIds,
+  verifiedPeerDids,
   onTogglePin,
   onOpenConversation,
 }: {
   title: string;
   conversations: DmConversation[];
   pinnedIds: Set<string>;
+  verifiedPeerDids: Set<string>;
   onTogglePin: (conversation: DmConversation) => void;
   onOpenConversation?: (conversation: DmConversation) => void;
 }) {
@@ -635,7 +707,6 @@ function DmSection({
       <View style={{gap: 8}}>
         {conversations.map(conversation => {
           const id = conversationKey(conversation);
-          const label = conversation.participants.map(p => p.label).join(', ');
           return (
             <View
               key={id}
@@ -647,7 +718,27 @@ function DmSection({
                 style={pointerCursor}
                 className="flex-1 flex-row items-center">
                 <View className="flex-1">
-                  <Text className="text-sm font-bold text-text">{label}</Text>
+                  <View className="flex-row flex-wrap items-center" style={{gap: 4}}>
+                    {conversation.participants.map((participant, index) => (
+                      <View
+                        key={participant.did}
+                        testID={`dm-conversation-peer-${id}-${participant.did}`}
+                        className="flex-row items-center"
+                        style={{gap: 3}}>
+                        <Text className="text-sm font-bold text-text">
+                          {index === 0 ? participant.label : `, ${participant.label}`}
+                        </Text>
+                        {verifiedPeerDids.has(participant.did) ? (
+                          <Text
+                            testID={`dm-peer-row-verified-${participant.did}`}
+                            accessibilityLabel="verified peer"
+                            className="text-xs text-primary">
+                            🛡✓
+                          </Text>
+                        ) : null}
+                      </View>
+                    ))}
+                  </View>
                   <Text className="text-xs text-text-tertiary" style={{fontFamily: monospace}}>
                     {id}
                   </Text>
@@ -707,6 +798,48 @@ function metadataPinnedPeers(meta: unknown): string[] {
   if (!meta || typeof meta !== 'object') return [];
   const peers = (meta as {pinnedPeers?: unknown}).pinnedPeers;
   return Array.isArray(peers) ? peers.filter((peer): peer is string => typeof peer === 'string') : [];
+}
+
+function verifiedPeerDids(meta: unknown): Set<string> {
+  return new Set(
+    peerVerificationRecords(meta)
+      .filter(record => record.status === 'verified')
+      .map(record => record.peer_did),
+  );
+}
+
+function parseIdentityQrPayload(
+  data: string | undefined,
+): {did: string; master_pk: string; nonce: string} | null {
+  if (!data) return null;
+  try {
+    const parsed = JSON.parse(data) as Record<string, unknown>;
+    const did = typeof parsed.did === 'string' ? parsed.did : null;
+    const masterPk =
+      typeof parsed.master_pk === 'string'
+        ? parsed.master_pk
+        : typeof parsed.masterPk === 'string'
+          ? parsed.masterPk
+          : null;
+    const nonce = typeof parsed.nonce === 'string' ? parsed.nonce : null;
+    if (!did || !masterPk || !nonce) return null;
+    return {did, master_pk: masterPk, nonce};
+  } catch {
+    const params = new URLSearchParams(data);
+    const did = params.get('did');
+    const masterPk = params.get('master_pk') ?? params.get('masterPk');
+    const nonce = params.get('nonce');
+    if (!did || !masterPk || !nonce) return null;
+    return {did, master_pk: masterPk, nonce};
+  }
+}
+
+function fingerprintFromQrMasterPk(masterPk: string): string | null {
+  try {
+    return fingerprintFromPubkey(b64UrlToBytes(masterPk));
+  } catch {
+    return null;
+  }
 }
 
 function attachmentLabel(attachment: Record<string, unknown>): string {
