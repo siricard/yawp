@@ -59,6 +59,12 @@ export function useServerUnread(args: {
             [channelId]: (prev[channelId] ?? 0) + 1,
           }));
         });
+        chan.on('read_marker', () => {
+          if (cancelled) return;
+          setUnreadByChannel(prev =>
+            prev[channelId] ? {...prev, [channelId]: 0} : prev,
+          );
+        });
         chan.join();
         joined.push(chan);
       }

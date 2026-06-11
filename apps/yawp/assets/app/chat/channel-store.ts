@@ -1,5 +1,6 @@
 
-import {useEffect, useRef, useState} from 'react';
+import {useCallback, useEffect, useRef, useState} from 'react';
+import {AppState, Platform} from 'react-native';
 import type {Channel, Socket} from 'phoenix';
 
 import {useIdentity} from '../identity-context';
@@ -9,11 +10,6 @@ import {signDelete, signEdit, signSend} from './sign-message';
 export type ChannelMessage = {
   id: string;
   channel_id: string;
-  /**
-   * Bare base58 DID (i.e. `did:yawp:<base58>` with the `did:yawp:`
-   * prefix stripped on the wire). Matches every other use of
-   * `identity.did` — the client prefixes `did:yawp:` for display.
-   */
   sender_did: string;
   sender_display_name?: string | null;
   body: string | null;
@@ -54,6 +50,7 @@ export type UseChannelResult = {
   send: (body: string, replyToMessageId?: string | null) => void;
   edit: (messageId: string, body: string) => void;
   remove: (messageId: string) => void;
+  markRead: () => void;
 };
 
 function sortBySerial(list: ChannelMessage[]): ChannelMessage[] {
@@ -72,6 +69,17 @@ export function useChannel(
   const [messages, setMessages] = useState<ChannelMessage[]>([]);
   const [effectiveBits, setEffectiveBits] = useState(0);
   const channelRef = useRef<Channel | null>(null);
+  const messagesRef = useRef<ChannelMessage[]>([]);
+  const lastReadRef = useRef<string | null>(null);
+  messagesRef.current = messages;
+
+  const markRead = useCallback((): void => {
+    const channel = channelRef.current;
+    const latest = messagesRef.current[messagesRef.current.length - 1];
+    if (!channel || !latest || latest.id === lastReadRef.current) return;
+    lastReadRef.current = latest.id;
+    channel.push('read_marker', {last_read_message_id: latest.id});
+  }, []);
 
   useEffect(() => {
     if (!serverUrl || !serverId || !channelId) {
@@ -175,6 +183,20 @@ export function useChannel(
     };
   }, [serverUrl, serverId, channelId]);
 
+  useEffect(() => {
+    if (Platform.OS === 'web' && typeof window !== 'undefined') {
+      const onFocus = () => markRead();
+      window.addEventListener('focus', onFocus);
+      return () => window.removeEventListener('focus', onFocus);
+    }
+
+    const sub = AppState.addEventListener('change', state => {
+      if (state === 'active') markRead();
+    });
+
+    return () => sub.remove();
+  }, [markRead]);
+
   function send(body: string, replyToMessageId: string | null = null): void {
     const trimmed = body.trim();
     if (!trimmed) return;
@@ -252,5 +274,6 @@ export function useChannel(
     send,
     edit,
     remove,
+    markRead,
   };
 }

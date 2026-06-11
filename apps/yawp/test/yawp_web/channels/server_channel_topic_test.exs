@@ -318,6 +318,49 @@ defmodule YawpWeb.ServerChannelTopicTest do
     refute_broadcast "new_message", _
   end
 
+  describe "read_marker" do
+    test "persists the marker and pushes it to another session for the same identity", ctx do
+      actor = seed_identity()
+      seed_membership(actor, ctx.server, [:read_messages, :send_messages])
+
+      {:ok, _reply, reader_socket} = join_channel(actor, ctx.server, ctx.channel)
+      assert_push "history", _
+      assert_push "presence_state", _
+
+      {:ok, _reply, other_socket} = join_channel(actor, ctx.server, ctx.channel)
+      assert_push "history", _
+      assert_push "presence_state", _
+
+      ref =
+        push(reader_socket, "read_marker", %{
+          "last_read_message_id" => "msg-9"
+        })
+
+      assert_reply ref, :ok, %{last_read_message_id: "msg-9"}
+      assert_push "read_marker", %{channel_id: channel_id, last_read_message_id: "msg-9"}
+      assert channel_id == ctx.channel.id
+
+      assert {:ok, marker} =
+               Servers.get_read_marker(actor.identity.id, ctx.channel.id, authorize?: false)
+
+      assert marker.last_read_message_id == "msg-9"
+      assert marker.identity_id == actor.identity.id
+
+      Process.unlink(other_socket.channel_pid)
+    end
+
+    test "rejects an invalid read marker", ctx do
+      actor = seed_identity()
+      seed_membership(actor, ctx.server, [:read_messages, :send_messages])
+      {:ok, _reply, socket} = join_channel(actor, ctx.server, ctx.channel)
+      assert_push "history", _
+      assert_push "presence_state", _
+
+      ref = push(socket, "read_marker", %{"last_read_message_id" => ""})
+      assert_reply ref, :error, %{reason: "invalid_payload"}
+    end
+  end
+
   describe "edit_message" do
     setup ctx do
       actor = seed_identity()

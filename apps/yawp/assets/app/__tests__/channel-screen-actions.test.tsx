@@ -7,6 +7,7 @@ import type {ChannelMessage} from '../chat/channel-store';
 const mockSend = jest.fn();
 const mockEdit = jest.fn();
 const mockRemove = jest.fn();
+const mockMarkRead = jest.fn();
 
 const SELF = 'zSelf';
 
@@ -39,6 +40,7 @@ jest.mock('../chat/channel-store', () => ({
     send: mockSend,
     edit: mockEdit,
     remove: mockRemove,
+    markRead: mockMarkRead,
   }),
 }));
 
@@ -85,6 +87,17 @@ describe('ChannelScreen message actions', () => {
       const root = roots.pop()!;
       ReactTestRenderer.act(() => root.unmount());
     }
+  });
+
+  test('marks the channel read when the list reaches the bottom', () => {
+    const root = render();
+    const list = root.root.findByProps({testID: 'channel-message-list'});
+
+    ReactTestRenderer.act(() => {
+      list.props.onEndReached();
+    });
+
+    expect(mockMarkRead).toHaveBeenCalled();
   });
 
   test('reply opens a reply card and sending threads the reply_to id', () => {

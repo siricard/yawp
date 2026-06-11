@@ -7,7 +7,11 @@ jest.mock('../chat/channel-store', () => ({
     status: 'joined',
     errorMessage: null,
     messages: [],
+    effectiveBits: 0,
     send: jest.fn(),
+    edit: jest.fn(),
+    remove: jest.fn(),
+    markRead: jest.fn(),
   }),
 }));
 

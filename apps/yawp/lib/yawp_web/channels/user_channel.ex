@@ -18,6 +18,7 @@ defmodule YawpWeb.UserChannel do
       send(self(), :after_join)
 
       Phoenix.PubSub.subscribe(Yawp.PubSub, inbox_topic(bare_did))
+      Phoenix.PubSub.subscribe(Yawp.PubSub, read_marker_topic(identity.id))
 
       {:ok,
        socket
@@ -67,6 +68,12 @@ defmodule YawpWeb.UserChannel do
   end
 
   @impl true
+  def handle_info({:dm_read_marker, marker}, socket) do
+    push(socket, "read_marker", serialize_dm_read_marker(marker))
+    {:noreply, socket}
+  end
+
+  @impl true
   def handle_in("delivery_ack", payload, socket) do
     if valid_delivery_ack?(payload) do
       broadcast!(socket, "delivery_ack", %{
@@ -87,6 +94,7 @@ defmodule YawpWeb.UserChannel do
   def handle_in("read_marker", payload, socket) do
     if valid_read_marker?(payload) do
       forward_read_marker(payload, socket)
+      persist_dm_read_marker(payload, socket)
 
       broadcast!(socket, "read_marker", %{
         conversation_id: Map.fetch!(payload, "conversation_id"),
@@ -104,6 +112,8 @@ defmodule YawpWeb.UserChannel do
 
   @spec inbox_topic(String.t()) :: String.t()
   def inbox_topic(bare_did), do: "user_inbox:#{bare_did}"
+
+  defp read_marker_topic(identity_id), do: "identity:#{identity_id}:dm_read_markers"
 
   defp sender_display_name(%{"sender_did" => did}) when is_binary(did) do
     case Identity.get_ppe_by_did(did) do
@@ -178,6 +188,35 @@ defmodule YawpWeb.UserChannel do
   end
 
   defp forward_read_marker(_, _), do: :ok
+
+  defp persist_dm_read_marker(payload, socket) do
+    attrs = %{
+      identity_id: socket.assigns.current_identity.id,
+      conversation_id: Map.fetch!(payload, "conversation_id"),
+      last_read_envelope_id: Map.fetch!(payload, "last_read_envelope_id"),
+      updated_at: DateTime.utc_now()
+    }
+
+    case Yawp.Federation.upsert_dm_read_marker(attrs) do
+      {:ok, marker} ->
+        Phoenix.PubSub.broadcast(
+          Yawp.PubSub,
+          read_marker_topic(marker.identity_id),
+          {:dm_read_marker, marker}
+        )
+
+      {:error, _} ->
+        :ok
+    end
+  end
+
+  defp serialize_dm_read_marker(%Yawp.Federation.DmReadMarker{} = marker) do
+    %{
+      conversation_id: marker.conversation_id,
+      last_read_envelope_id: marker.last_read_envelope_id,
+      updated_at: DateTime.to_iso8601(marker.updated_at)
+    }
+  end
 
   defp valid_device_signature?(payload) do
     payload

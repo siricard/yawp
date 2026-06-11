@@ -49,6 +49,7 @@ defmodule YawpWeb.ServerChannelTopic do
          true <- Permissions.has?(bits, :read_messages) do
       unless watch?, do: send(self(), :after_join)
       Phoenix.PubSub.subscribe(Yawp.PubSub, "server:#{server.id}:moderation")
+      Phoenix.PubSub.subscribe(Yawp.PubSub, read_marker_topic(identity.id))
 
       {:ok, %{effective_bits: bits},
        socket
@@ -87,6 +88,15 @@ defmodule YawpWeb.ServerChannelTopic do
   def handle_info({:member_removed, %{did: did, reason: reason}}, socket) do
     if bare_did(did) == bare_did(socket.assigns.current_identity.did) do
       push(socket, "removed", %{reason: reason, did: bare_did(did)})
+    end
+
+    {:noreply, socket}
+  end
+
+  @impl true
+  def handle_info({:read_marker, marker}, socket) do
+    if marker.channel_id == socket.assigns.channel.id do
+      push(socket, "read_marker", serialize_read_marker(marker))
     end
 
     {:noreply, socket}
@@ -173,6 +183,34 @@ defmodule YawpWeb.ServerChannelTopic do
 
       true ->
         handle_delete(payload, socket)
+    end
+  end
+
+  @impl true
+  def handle_in("read_marker", payload, socket) do
+    if valid_read_marker_payload?(payload) do
+      attrs = %{
+        identity_id: socket.assigns.current_identity.id,
+        channel_id: socket.assigns.channel.id,
+        last_read_message_id: Map.fetch!(payload, "last_read_message_id"),
+        updated_at: DateTime.utc_now()
+      }
+
+      case Servers.upsert_read_marker(attrs) do
+        {:ok, marker} ->
+          Phoenix.PubSub.broadcast(
+            Yawp.PubSub,
+            read_marker_topic(marker.identity_id),
+            {:read_marker, marker}
+          )
+
+          {:reply, {:ok, serialize_read_marker(marker)}, socket}
+
+        {:error, _} ->
+          {:reply, {:error, %{reason: "invalid_payload"}}, socket}
+      end
+    else
+      {:reply, {:error, %{reason: "invalid_payload"}}, socket}
     end
   end
 
@@ -264,6 +302,14 @@ defmodule YawpWeb.ServerChannelTopic do
 
   defp valid_delete_payload?(_), do: false
 
+  defp valid_read_marker_payload?(%{"last_read_message_id" => message_id}) do
+    is_binary(message_id) and byte_size(message_id) > 0
+  end
+
+  defp valid_read_marker_payload?(_), do: false
+
+  defp read_marker_topic(identity_id), do: "identity:#{identity_id}:server_read_markers"
+
   defp serialize_message(%Servers.Message{} = m, latest_edits, display_names) do
     edit = Map.get(latest_edits, m.id)
 
@@ -330,6 +376,15 @@ defmodule YawpWeb.ServerChannelTopic do
       reason: to_string(t.reason),
       actor_did: bare_did(t.actor_did),
       inserted_at: DateTime.to_iso8601(t.inserted_at)
+    }
+  end
+
+  defp serialize_read_marker(%Servers.ReadMarker{} = marker) do
+    %{
+      identity_id: marker.identity_id,
+      channel_id: marker.channel_id,
+      last_read_message_id: marker.last_read_message_id,
+      updated_at: DateTime.to_iso8601(marker.updated_at)
     }
   end
 

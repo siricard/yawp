@@ -35,6 +35,7 @@ jest.mock('../chat/channel-store', () => ({
     send: jest.fn(),
     edit: jest.fn(),
     remove: jest.fn(),
+    markRead: jest.fn(),
   }),
 }));
 

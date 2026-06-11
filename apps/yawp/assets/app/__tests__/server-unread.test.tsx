@@ -127,4 +127,28 @@ describe('useServerUnread', () => {
     expect(readState(root)).toContain('0|');
     ReactTestRenderer.act(() => root.unmount());
   });
+
+  test('read markers from another session clear channel unread', async () => {
+    let root!: ReactTestRenderer.ReactTestRenderer;
+    await ReactTestRenderer.act(async () => {
+      root = ReactTestRenderer.create(<Harness activeChannelId="ch-1" />);
+    });
+    await flush();
+
+    const ch2 = channels.find(c => c.topic.endsWith('ch-2'))!;
+    await ReactTestRenderer.act(async () => {
+      ch2.emit('new_message', {id: 'm-1'});
+    });
+    expect(readState(root)).toContain('"ch-2":1');
+
+    await ReactTestRenderer.act(async () => {
+      ch2.emit('read_marker', {
+        channel_id: 'ch-2',
+        last_read_message_id: 'm-1',
+      });
+    });
+
+    expect(readState(root)).toContain('0|');
+    ReactTestRenderer.act(() => root.unmount());
+  });
 });

@@ -316,6 +316,38 @@ defmodule YawpWeb.UserChannelTest do
 
       assert_reply ref, :ok
       assert_broadcast "read_marker", %{conversation_id: "conv-1", last_read_envelope_id: "env-1"}
+
+      assert {:ok, marker} =
+               Federation.get_dm_read_marker(actor.identity.id, "conv-1", authorize?: false)
+
+      assert marker.last_read_envelope_id == "env-1"
+      assert marker.identity_id == actor.identity.id
+    end
+
+    test "a read_marker is pushed to another session for the same identity" do
+      {:ok, _} = Federation.generate_server_key()
+      actor = seed_identity()
+      assert {:ok, _reply, socket} = join_user(actor, actor.did)
+      assert_push "presence_state", _
+      assert {:ok, _reply, other_socket} = join_user(actor, actor.did)
+      assert_push "presence_state", _
+
+      marker =
+        %{
+          "conversation_id" => "conv-2",
+          "last_read_envelope_id" => "env-2",
+          "sender_anchor" => "anchor-a.example",
+          "sender_did" => actor.did,
+          "signed_by" => actor.device_id,
+          "ts" => System.system_time(:millisecond)
+        }
+        |> sign_payload("sender_signature", actor.device_sk)
+
+      ref = push(socket, "read_marker", marker)
+
+      assert_reply ref, :ok
+      assert_push "read_marker", %{conversation_id: "conv-2", last_read_envelope_id: "env-2"}
+      Process.unlink(other_socket.channel_pid)
     end
 
     test "a malformed read_marker is rejected" do

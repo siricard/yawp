@@ -353,6 +353,7 @@ export function ChannelScreen({
     send,
     edit,
     remove,
+    markRead,
   } = useChannel(serverUrl, serverId, channelId);
   useEffect(() => {
     onEffectiveBits?.(effectiveBits);
@@ -390,10 +391,12 @@ export function ChannelScreen({
   }));
 
   useEffect(() => {
-    requestAnimationFrame(() => {
+    const frame = requestAnimationFrame(() => {
       listRef.current?.scrollToEnd({animated: true});
+      markRead();
     });
-  }, [messages.length]);
+    return () => cancelAnimationFrame(frame);
+  }, [messages.length, markRead]);
 
   function handleSend() {
     const trimmed = draft.trim();
@@ -519,8 +522,13 @@ export function ChannelScreen({
         windowSize={11}
         removeClippedSubviews={Platform.OS !== 'web'}
         onContentSizeChange={() =>
-          listRef.current?.scrollToEnd({animated: false})
+          {
+            listRef.current?.scrollToEnd({animated: false});
+            markRead();
+          }
         }
+        onEndReached={markRead}
+        onEndReachedThreshold={0.2}
         renderItem={({item}) => {
           const message = item.message;
           return (

@@ -130,6 +130,15 @@ defmodule Yawp.Servers do
       define :list_channel_messages, action: :list_for_channel, args: [:channel_id]
     end
 
+    resource Yawp.Servers.ReadMarker do
+      define :upsert_read_marker, action: :upsert
+
+      define :get_read_marker,
+        action: :get_for_identity_channel,
+        args: [:identity_id, :channel_id],
+        not_found_error?: false
+    end
+
     resource Yawp.Servers.MessageEdit do
       define :edit_server_message, action: :append
       define :list_message_edits, action: :list_for_message, args: [:message_id]

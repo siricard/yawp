@@ -30,6 +30,15 @@ defmodule Yawp.Federation do
       define :delivery_states_for_envelope, action: :for_envelope, args: [:envelope_id]
       define :delivery_states_for_conversation, action: :for_conversation, args: [:envelope_ids]
     end
+
+    resource Yawp.Federation.DmReadMarker do
+      define :upsert_dm_read_marker, action: :upsert
+
+      define :get_dm_read_marker,
+        action: :get_for_identity_conversation,
+        args: [:identity_id, :conversation_id],
+        not_found_error?: false
+    end
   end
 
   @spec append_inbox(String.t(), map()) ::
