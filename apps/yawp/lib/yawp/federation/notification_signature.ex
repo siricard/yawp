@@ -22,6 +22,7 @@ defmodule Yawp.Federation.NotificationSignature do
   def verify(_envelope, _source_anchor), do: {:error, :invalid_inner_signature}
 
   defp validate_shape(%{
+         "envelope_id" => envelope_id,
          "kind" => "notification",
          "user_did" => user_did,
          "source" => source_kind,
@@ -30,7 +31,8 @@ defmodule Yawp.Federation.NotificationSignature do
          "message_id" => message_id,
          "timestamp" => timestamp
        })
-       when is_binary(user_did) and user_did != "" and
+       when is_binary(envelope_id) and envelope_id != "" and is_binary(user_did) and
+              user_did != "" and
               source_kind in ["room_message", "room_mention", "dm"] and
               is_binary(source_server) and source_server != "" and
               is_binary(room_or_thread) and room_or_thread != "" and

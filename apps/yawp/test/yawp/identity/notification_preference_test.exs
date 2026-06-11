@@ -22,19 +22,24 @@ defmodule Yawp.Identity.NotificationPreferenceTest do
              })
 
     assert {:ok, _} =
-             Identity.upsert_notification_preference(%{
-               identity_id: identity.id,
-               server_id: server_id,
-               level: :muted
-             })
+             Identity.upsert_notification_preference(
+               %{
+                 identity_id: identity.id,
+                 server_id: server_id,
+                 level: :muted
+               },
+               actor: identity
+             )
 
     assert {:ok, _} =
-             Identity.upsert_notification_preference(%{
-               identity_id: identity.id,
-               server_id: server_id,
-               channel_id: channel_id,
-               level: :all
-             })
+             Identity.upsert_notification_preference(
+               %{
+                 identity_id: identity.id,
+                 channel_id: channel_id,
+                 level: :all
+               },
+               actor: identity
+             )
 
     assert {:ok, :all} =
              Identity.resolve_notification_level(%{
@@ -59,22 +64,46 @@ defmodule Yawp.Identity.NotificationPreferenceTest do
     device_subkey_id = Ecto.UUID.generate()
 
     assert {:ok, first} =
-             Identity.upsert_device_push_token(%{
-               identity_id: identity.id,
-               device_subkey_id: device_subkey_id,
-               platform: :apns,
-               token: "token-one"
-             })
+             Identity.upsert_device_push_token(
+               %{
+                 identity_id: identity.id,
+                 device_subkey_id: device_subkey_id,
+                 platform: :apns,
+                 token: "token-one"
+               },
+               actor: identity
+             )
 
     assert {:ok, second} =
-             Identity.upsert_device_push_token(%{
-               identity_id: identity.id,
-               device_subkey_id: device_subkey_id,
-               platform: :apns,
-               token: "token-two"
-             })
+             Identity.upsert_device_push_token(
+               %{
+                 identity_id: identity.id,
+                 device_subkey_id: device_subkey_id,
+                 platform: :apns,
+                 token: "token-two"
+               },
+               actor: identity
+             )
 
     assert first.id == second.id
     assert second.token == "token-two"
+  end
+
+  test "rejects ambiguous notification preference scopes" do
+    identity = identity!()
+
+    assert {:error, error} =
+             Identity.upsert_notification_preference(
+               %{
+                 identity_id: identity.id,
+                 server_id: Ecto.UUID.generate(),
+                 channel_id: Ecto.UUID.generate(),
+                 conversation_id: "dm-1",
+                 level: :muted
+               },
+               actor: identity
+             )
+
+    assert Exception.message(error) =~ "exactly one notification scope"
   end
 end

@@ -19,6 +19,7 @@ defmodule Yawp.Servers.SetupState do
 
   @type info :: %{
           claimed: boolean(),
+          server_id: String.t() | nil,
           server_name: String.t() | nil,
           fingerprint: String.t() | nil
         }
@@ -36,7 +37,7 @@ defmodule Yawp.Servers.SetupState do
 
   @spec info() :: info()
   def info do
-    {server_name, _server_id} =
+    {server_name, server_id} =
       case get_server() do
         {:ok, %Servers.Server{} = server} -> {server.name, server.id}
         _ -> {nil, nil}
@@ -44,6 +45,7 @@ defmodule Yawp.Servers.SetupState do
 
     %{
       claimed: claimed?(),
+      server_id: server_id,
       server_name: server_name,
       fingerprint: fingerprint()
     }

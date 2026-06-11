@@ -21,6 +21,31 @@ defmodule Yawp.Identity.ReadReceiptsRpcTest do
     }
   end
 
+  defp notification_body(did) do
+    %{
+      "action" => "upsert_notification_preference",
+      "input" => %{
+        "identityDid" => did,
+        "serverId" => Ecto.UUID.generate(),
+        "level" => "muted"
+      },
+      "fields" => ["id", "level"]
+    }
+  end
+
+  defp push_token_body(identity_id) do
+    %{
+      "action" => "upsert_device_push_token",
+      "input" => %{
+        "identityId" => identity_id,
+        "deviceSubkeyId" => Ecto.UUID.generate(),
+        "platform" => "apns",
+        "token" => "token"
+      },
+      "fields" => ["id"]
+    }
+  end
+
   test "set_read_receipts rejects unauthenticated rpc calls", %{conn: conn} do
     %{did: did} = seed_identity!()
 
@@ -70,5 +95,31 @@ defmodule Yawp.Identity.ReadReceiptsRpcTest do
     {:ok, blob} = Identity.get_private_blob_by_did(did)
     assert Jason.decode!(blob.ciphertext)["read_receipts_enabled"] == false
     assert blob.blob_version == 1
+  end
+
+  test "notification preference rpc rejects unauthenticated calls", %{conn: conn} do
+    %{did: did} = seed_identity!()
+
+    conn =
+      conn
+      |> put_req_header("content-type", "application/json")
+      |> post(~p"/rpc/run", notification_body(did))
+
+    payload = json_response(conn, 200)
+    assert payload["success"] == false
+    assert [%{"type" => "unauthorized"} | _] = payload["errors"]
+  end
+
+  test "device push token rpc rejects unauthenticated calls", %{conn: conn} do
+    %{identity: identity} = seed_identity!()
+
+    conn =
+      conn
+      |> put_req_header("content-type", "application/json")
+      |> post(~p"/rpc/run", push_token_body(identity.id))
+
+    payload = json_response(conn, 200)
+    assert payload["success"] == false
+    assert [%{"type" => "unauthorized"} | _] = payload["errors"]
   end
 end

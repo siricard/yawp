@@ -25,6 +25,5 @@ defmodule Yawp.Identity.NotificationPreference.Changes.AuthorizeOwner do
 
   defp authorized?(%Identity{id: id}, id), do: true
   defp authorized?(%{id: id}, id), do: true
-  defp authorized?(nil, _), do: true
   defp authorized?(_, _), do: false
 end

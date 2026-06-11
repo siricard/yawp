@@ -17,6 +17,7 @@ defmodule YawpWeb.ServerInfoController do
     |> put_resp_header("cache-control", "public, max-age=30")
     |> json(%{
       "claimed" => info.claimed,
+      "serverId" => info.server_id,
       "serverName" => info.server_name,
       "fingerprint" => info.fingerprint
     })

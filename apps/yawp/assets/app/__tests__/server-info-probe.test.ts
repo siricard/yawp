@@ -11,14 +11,14 @@ function jsonResponse(body: unknown, status = 200): Response {
 describe('probeServerInfo', () => {
   test('returns claimed=true info on a valid claimed response', async () => {
     const fetchImpl = jest.fn(async () =>
-      jsonResponse({claimed: true, serverName: 'Yawp', fingerprint: 'ab12:cd34'}),
+      jsonResponse({claimed: true, serverId: 'server-uuid-1', serverName: 'Yawp', fingerprint: 'ab12:cd34'}),
     ) as unknown as typeof fetch;
 
     const result = await probeServerInfo('http://localhost:4000', fetchImpl);
 
     expect(result).toEqual({
       ok: true,
-      info: {claimed: true, serverName: 'Yawp', fingerprint: 'ab12:cd34'},
+      info: {claimed: true, serverId: 'server-uuid-1', serverName: 'Yawp', fingerprint: 'ab12:cd34'},
     });
     expect((fetchImpl as jest.Mock).mock.calls[0][0]).toBe(
       'http://localhost:4000/.well-known/yawp/server-info',
@@ -33,7 +33,7 @@ describe('probeServerInfo', () => {
     const result = await probeServerInfo('http://localhost:4000/', fetchImpl);
     expect(result).toEqual({
       ok: true,
-      info: {claimed: false, serverName: 'Yawp', fingerprint: null},
+      info: {claimed: false, serverId: null, serverName: 'Yawp', fingerprint: null},
     });
   });
 

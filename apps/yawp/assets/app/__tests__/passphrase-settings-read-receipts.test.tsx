@@ -28,7 +28,7 @@ const mockUpsertNotificationPreference = jest.fn(async (_config?: unknown) => ({
 jest.mock('../identity-context', () => ({
   useIdentity: () => ({didFull: 'did:yawp:alice'}),
   useWorkspaceServers: () => ({
-    servers: [{did: 'server-1', url: 'http://localhost:4000', label: 'Local', role: 'Member'}],
+    servers: [{did: 'did:yawp:alice', serverId: 'server-uuid-1', url: 'http://localhost:4000', label: 'Local', role: 'Member'}],
   }),
   useBundleMetadata: () => ({
     metadata: mockMetadata,
@@ -144,6 +144,32 @@ describe('PassphraseSettingsScreen read receipts', () => {
         identityDid: 'did:yawp:alice',
         serverId: null,
         channelId: 'channel-general',
+        conversationId: null,
+        level: 'muted',
+      },
+      fields: ['id', 'level'],
+      headers: {Authorization: 'Bearer sess-token'},
+    });
+
+    ReactTestRenderer.act(() => root.unmount());
+  });
+
+  test('persists server notification levels using the backend server id', async () => {
+    let root!: ReactTestRenderer.ReactTestRenderer;
+    await ReactTestRenderer.act(async () => {
+      root = ReactTestRenderer.create(<PassphraseSettingsScreen onBack={() => {}} />);
+    });
+
+    await ReactTestRenderer.act(async () => {
+      await root.root.findByProps({testID: 'settings-notifications-server-server-uuid-1'}).props.onPress();
+    });
+
+    expect(mockMetadata.notificationPreferences?.servers?.['server-uuid-1']).toBe('muted');
+    expect(mockUpsertNotificationPreference).toHaveBeenCalledWith({
+      input: {
+        identityDid: 'did:yawp:alice',
+        serverId: 'server-uuid-1',
+        channelId: null,
         conversationId: null,
         level: 'muted',
       },

@@ -106,6 +106,7 @@ export function AddServerScreen({onCancel, onAdded, onNavigateToServer}: Props) 
           parsed.serverUrl,
           parsed.token,
           result.info.claimed,
+          result.info.serverId,
         );
         if (!ok) {
           setTokenValue(parsed.token);
@@ -166,6 +167,7 @@ export function AddServerScreen({onCancel, onAdded, onNavigateToServer}: Props) 
       url: link.serverUrl.replace(/\/+$/, ''),
       did: `did:yawp:${identityState.identity.did}`,
       role: redeem.kind === 'guest' ? 'Guest' : 'Member',
+      serverId: redeem.serverId,
       label: labelFromUrl(link.serverUrl),
     };
     addServer(server);
@@ -180,6 +182,7 @@ export function AddServerScreen({onCancel, onAdded, onNavigateToServer}: Props) 
     rawUrl: string,
     rawToken: string,
     claimed: boolean,
+    probedServerId: string | null = info?.serverId ?? null,
   ): Promise<boolean> {
     if (!identityReady) return false;
     const url = rawUrl.trim();
@@ -220,6 +223,7 @@ export function AddServerScreen({onCancel, onAdded, onNavigateToServer}: Props) 
       const server: WorkspaceServer = {
         url: url.replace(/\/+$/, ''),
         did: `did:yawp:${identityState.identity.did}`,
+        serverId: redeem.serverId || probedServerId || undefined,
         role: redeem.role,
         label: labelFromUrl(url),
       };
@@ -257,6 +261,7 @@ export function AddServerScreen({onCancel, onAdded, onNavigateToServer}: Props) 
       const server: WorkspaceServer = {
         url: url.replace(/\/+$/, ''),
         did: result.did,
+        serverId: probedServerId || undefined,
         role: result.role,
         label: labelFromUrl(url),
       };

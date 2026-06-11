@@ -2,6 +2,7 @@ import {useCallback, useState} from 'react';
 
 export type ServerInfo = {
   claimed: boolean;
+  serverId: string | null;
   serverName: string | null;
   fingerprint: string | null;
 };
@@ -64,6 +65,7 @@ export async function probeServerInfo(
       ok: true,
       info: {
         claimed: body.claimed,
+        serverId: typeof body.serverId === 'string' ? body.serverId : null,
         serverName: typeof body.serverName === 'string' ? body.serverName : null,
         fingerprint:
           typeof body.fingerprint === 'string' ? body.fingerprint : null,

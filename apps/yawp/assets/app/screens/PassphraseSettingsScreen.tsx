@@ -43,7 +43,7 @@ export function PassphraseSettingsScreen({onBack, conversations = []}: Props) {
   const [passkeyCapable, setPasskeyCapable] = useState(passkeyAvailableHint);
   const readReceiptsEnabled = metadata.readReceiptsEnabled !== false;
   const notificationPreferences = metadata.notificationPreferences ?? {};
-  const serverListKey = servers.map(server => `${server.did}:${server.url}`).join('|');
+  const serverListKey = servers.map(server => `${server.serverId ?? server.did}:${server.url}`).join('|');
 
   useEffect(() => {
     let mounted = true;
@@ -59,8 +59,9 @@ export function PassphraseSettingsScreen({onBack, conversations = []}: Props) {
     let mounted = true;
     void Promise.all(
       servers.map(async server => {
-        const tree = await fetchServerTree(server.url, server.did);
-        return [server.did, tree.channels] as const;
+        const serverId = server.serverId ?? server.did;
+        const tree = await fetchServerTree(server.url, serverId);
+        return [serverId, tree.channels] as const;
       }),
     ).then(entries => {
       if (mounted) setChannelsByServer(Object.fromEntries(entries));
@@ -285,23 +286,24 @@ export function PassphraseSettingsScreen({onBack, conversations = []}: Props) {
         </Text>
         <View className="flex-row flex-wrap" style={{gap: 8}}>
           {servers.map(server => {
-            const level = notificationPreferences.servers?.[server.did] ?? 'mentions_only';
+            const serverId = server.serverId ?? server.did;
+            const level = notificationPreferences.servers?.[serverId] ?? 'mentions_only';
             return (
               <Button
-                key={server.did}
-                testID={`settings-notifications-server-${server.did}`}
+                key={serverId}
+                testID={`settings-notifications-server-${serverId}`}
                 accessibilityLabel={`set ${server.label} notifications`}
                 variant="secondary"
                 size="sm"
                 label={`${server.label}: ${levelLabel(level)}`}
                 onPress={() =>
-                  setNotificationLevel('servers', server.did, nextNotificationLevel(level))
+                  setNotificationLevel('servers', serverId, nextNotificationLevel(level))
                 }
               />
             );
           })}
           {servers.flatMap(server =>
-            (channelsByServer[server.did] ?? []).map(channel => {
+            (channelsByServer[server.serverId ?? server.did] ?? []).map(channel => {
               const level = notificationPreferences.channels?.[channel.id] ?? 'mentions_only';
               return (
                 <Button

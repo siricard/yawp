@@ -36,6 +36,10 @@ defmodule Yawp.Identity.NotificationPreference do
     end
   end
 
+  validations do
+    validate Yawp.Identity.NotificationPreference.Validations.ScopeShape
+  end
+
   attributes do
     uuid_primary_key :id
 

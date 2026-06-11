@@ -61,6 +61,7 @@ export type Identity = {
 export type WorkspaceServer = {
   url: string;
   did: string;
+  serverId?: string;
   role: string;
   label: string;
   unreadCount?: number;
@@ -277,10 +278,10 @@ function serversFromBundle(bundle: IdentityBundleV1): WorkspaceServer[] {
   return bundle.metadata?.servers ?? [];
 }
 
-type PersistedServer = {url: string; did: string; role: string; label: string};
+type PersistedServer = {url: string; did: string; serverId?: string; role: string; label: string};
 
 function persistableServers(servers: WorkspaceServer[]): PersistedServer[] {
-  return servers.map(({url, did, role, label}) => ({url, did, role, label}));
+  return servers.map(({url, did, serverId, role, label}) => ({url, did, serverId, role, label}));
 }
 
 function buildMetadata(opts: {
