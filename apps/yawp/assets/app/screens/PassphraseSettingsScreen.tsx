@@ -8,6 +8,7 @@ import {normalizeAnchorServerUrl} from '../chat/anchor-url';
 import {fetchServerTree, TreeChannel} from '../chat/server-tree';
 import type {DmConversation} from './DmListScreen';
 import {getValidSessionToken} from '../session';
+import {probeServerInfo} from '../onboarding/useServerInfoProbe';
 import {Button, Card, Field, Input} from '../ui';
 
 const MIN_PASSPHRASE_LENGTH = 8;
@@ -30,7 +31,7 @@ export function PassphraseSettingsScreen({onBack, conversations = []}: Props) {
     enrollPasskey,
   } = usePassphrase();
   const identity = useIdentity();
-  const {servers} = useWorkspaceServers();
+  const {servers, addServer} = useWorkspaceServers();
   const {metadata, mutate} = useBundleMetadata();
   const [channelsByServer, setChannelsByServer] = useState<Record<string, TreeChannel[]>>({});
   const [current, setCurrent] = useState('');
@@ -43,7 +44,7 @@ export function PassphraseSettingsScreen({onBack, conversations = []}: Props) {
   const [passkeyCapable, setPasskeyCapable] = useState(passkeyAvailableHint);
   const readReceiptsEnabled = metadata.readReceiptsEnabled !== false;
   const notificationPreferences = metadata.notificationPreferences ?? {};
-  const serverListKey = servers.map(server => `${server.serverId ?? server.did}:${server.url}`).join('|');
+  const serverListKey = servers.map(server => `${server.serverId ?? ''}:${server.url}`).join('|');
 
   useEffect(() => {
     let mounted = true;
@@ -58,8 +59,8 @@ export function PassphraseSettingsScreen({onBack, conversations = []}: Props) {
   useEffect(() => {
     let mounted = true;
     void Promise.all(
-      servers.map(async server => {
-        const serverId = server.serverId ?? server.did;
+      servers.filter(server => server.serverId).map(async server => {
+        const serverId = server.serverId as string;
         const tree = await fetchServerTree(server.url, serverId);
         return [serverId, tree.channels] as const;
       }),
@@ -70,6 +71,20 @@ export function PassphraseSettingsScreen({onBack, conversations = []}: Props) {
       mounted = false;
     };
   }, [serverListKey]);
+
+  useEffect(() => {
+    let mounted = true;
+    void Promise.all(
+      servers.filter(server => !server.serverId).map(async server => {
+        const result = await probeServerInfo(server.url);
+        if (!mounted || !result.ok || !result.info.serverId) return;
+        addServer({...server, serverId: result.info.serverId});
+      }),
+    );
+    return () => {
+      mounted = false;
+    };
+  }, [serverListKey, addServer, servers]);
 
   const removingSeal = sealed && next.length === 0 && confirm.length === 0;
   const settingNew = next.length > 0;
@@ -285,8 +300,8 @@ export function PassphraseSettingsScreen({onBack, conversations = []}: Props) {
           Choose which conversations can show banners. Badges still show when muted.
         </Text>
         <View className="flex-row flex-wrap" style={{gap: 8}}>
-          {servers.map(server => {
-            const serverId = server.serverId ?? server.did;
+          {servers.filter(server => server.serverId).map(server => {
+            const serverId = server.serverId as string;
             const level = notificationPreferences.servers?.[serverId] ?? 'mentions_only';
             return (
               <Button
@@ -302,8 +317,13 @@ export function PassphraseSettingsScreen({onBack, conversations = []}: Props) {
               />
             );
           })}
+          {servers.some(server => !server.serverId) ? (
+            <Text testID="settings-notifications-server-refresh-hint" className="text-xs text-text-secondary">
+              Refreshing workspace notification controls…
+            </Text>
+          ) : null}
           {servers.flatMap(server =>
-            (channelsByServer[server.serverId ?? server.did] ?? []).map(channel => {
+            (server.serverId ? channelsByServer[server.serverId] ?? [] : []).map(channel => {
               const level = notificationPreferences.channels?.[channel.id] ?? 'mentions_only';
               return (
                 <Button

@@ -13,6 +13,14 @@ let mockMetadata: {
   readReceiptsEnabled: true,
   publishedProfile: {anchors: ['http://localhost:4000']},
 };
+type MockServer = {did: string; serverId?: string; url: string; label: string; role: string};
+
+let mockServers: MockServer[] = [
+  {did: 'did:yawp:alice', serverId: 'server-uuid-1', url: 'http://localhost:4000', label: 'Local', role: 'Member'},
+];
+const mockAddServer = jest.fn((server: MockServer) => {
+  mockServers = [...mockServers.filter(existing => existing.url !== server.url), server];
+});
 const mockMutate = jest.fn(async updater => {
   mockMetadata = updater(mockMetadata);
 });
@@ -28,7 +36,8 @@ const mockUpsertNotificationPreference = jest.fn(async (_config?: unknown) => ({
 jest.mock('../identity-context', () => ({
   useIdentity: () => ({didFull: 'did:yawp:alice'}),
   useWorkspaceServers: () => ({
-    servers: [{did: 'did:yawp:alice', serverId: 'server-uuid-1', url: 'http://localhost:4000', label: 'Local', role: 'Member'}],
+    servers: mockServers,
+    addServer: mockAddServer,
   }),
   useBundleMetadata: () => ({
     metadata: mockMetadata,
@@ -56,6 +65,18 @@ jest.mock('../chat/server-tree', () => ({
   })),
 }));
 
+jest.mock('../onboarding/useServerInfoProbe', () => ({
+  probeServerInfo: jest.fn(async () => ({
+    ok: true,
+    info: {
+      claimed: true,
+      serverId: 'discovered-server-uuid',
+      serverName: 'Local',
+      fingerprint: 'yp:test',
+    },
+  })),
+}));
+
 jest.mock('../session', () => ({
   getValidSessionToken: jest.fn(async () => ({ok: true, sessionToken: 'sess-token'})),
 }));
@@ -68,7 +89,11 @@ describe('PassphraseSettingsScreen read receipts', () => {
       readReceiptsEnabled: true,
       publishedProfile: {anchors: ['http://localhost:4000']},
     };
+    mockServers = [
+      {did: 'did:yawp:alice', serverId: 'server-uuid-1', url: 'http://localhost:4000', label: 'Local', role: 'Member'},
+    ];
     mockMutate.mockClear();
+    mockAddServer.mockClear();
     mockSetReadReceipts.mockReset();
     mockUpsertNotificationPreference.mockReset();
     mockSetReadReceipts.mockResolvedValue({
@@ -169,6 +194,45 @@ describe('PassphraseSettingsScreen read receipts', () => {
       input: {
         identityDid: 'did:yawp:alice',
         serverId: 'server-uuid-1',
+        channelId: null,
+        conversationId: null,
+        level: 'muted',
+      },
+      fields: ['id', 'level'],
+      headers: {Authorization: 'Bearer sess-token'},
+    });
+
+    ReactTestRenderer.act(() => root.unmount());
+  });
+
+  test('discovers legacy workspace server ids before server notification writes', async () => {
+    mockServers = [
+      {did: 'did:yawp:alice', url: 'http://localhost:4000', label: 'Local', role: 'Member'},
+    ];
+    let root!: ReactTestRenderer.ReactTestRenderer;
+    await ReactTestRenderer.act(async () => {
+      root = ReactTestRenderer.create(<PassphraseSettingsScreen onBack={() => {}} />);
+    });
+
+    await ReactTestRenderer.act(async () => {
+      await Promise.resolve();
+    });
+    await ReactTestRenderer.act(async () => {
+      root.update(<PassphraseSettingsScreen onBack={() => {}} />);
+    });
+
+    expect(() =>
+      root.root.findByProps({testID: 'settings-notifications-server-did:yawp:alice'}),
+    ).toThrow();
+
+    await ReactTestRenderer.act(async () => {
+      await root.root.findByProps({testID: 'settings-notifications-server-discovered-server-uuid'}).props.onPress();
+    });
+
+    expect(mockUpsertNotificationPreference).toHaveBeenCalledWith({
+      input: {
+        identityDid: 'did:yawp:alice',
+        serverId: 'discovered-server-uuid',
         channelId: null,
         conversationId: null,
         level: 'muted',
