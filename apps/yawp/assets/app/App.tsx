@@ -14,6 +14,7 @@ import {
 import {normalizeAnchorServerUrl} from './chat/anchor-url';
 import {discoverGeneralChannel} from './chat/discover';
 import {submitDm} from './chat/dm-submit';
+import type {AttachmentDescriptor} from './chat/attachments';
 import {mergeDeliveryStateMap, type DeliveryStateMap} from './chat/dm-outbox';
 import {buildReadMarker} from './chat/read-marker';
 import {fingerprintFromDid} from './identity/did';
@@ -137,7 +138,11 @@ function AppShell() {
     }
   }
 
-  async function handleStartDmConversation(recipientDids: string[], body: string) {
+  async function handleStartDmConversation(
+    recipientDids: string[],
+    body: string,
+    attachments: AttachmentDescriptor[] = [],
+  ) {
     if (identityState.status !== 'ready') return;
     const uniqueRecipientDids = normalizeRecipientDids(recipientDids, identityState.identity.didFull);
     if (uniqueRecipientDids.length < 1) return;
@@ -156,6 +161,7 @@ function AppShell() {
           delivery: 'sending',
           senderDid: identityState.identity.didFull,
           recipientDids: uniqueRecipientDids,
+          attachments,
           createdAt,
         },
       ],
@@ -165,6 +171,7 @@ function AppShell() {
       identity: identityState.identity,
       recipientDids: uniqueRecipientDids,
       body: trimmedBody,
+      attachments,
       senderAnchors: metadata.publishedProfile?.anchors,
       senderProfileVersion: metadata.profileVersion,
     });
@@ -211,6 +218,7 @@ function AppShell() {
           {
             id: result.envelope.envelope_id,
             body: result.envelope.body,
+            attachments: result.envelope.attachments,
             delivery: result.delivery,
             senderDid: result.envelope.sender_did,
             recipientDids: result.envelope.recipient_dids,
@@ -225,6 +233,7 @@ function AppShell() {
     recipientDids: string[],
     body: string,
     conversationId?: string,
+    attachments: AttachmentDescriptor[] = [],
   ): Promise<{
     id: string;
     conversationId: string;
@@ -239,6 +248,7 @@ function AppShell() {
       identity: identityState.identity,
       recipientDids: normalizeRecipientDids(recipientDids, identityState.identity.didFull),
       body,
+      attachments,
       senderAnchors: metadata.publishedProfile?.anchors,
       senderProfileVersion: metadata.profileVersion,
     });
@@ -260,6 +270,7 @@ function AppShell() {
           {
             id: result.envelope.envelope_id,
             body: result.envelope.body,
+            attachments: result.envelope.attachments,
             delivery: result.delivery,
             senderDid: result.envelope.sender_did,
             recipientDids: result.envelope.recipient_dids,
@@ -412,6 +423,8 @@ function AppShell() {
           onSendMessage={handleSendDmMessage}
           onAcceptRequest={handleAcceptDmRequest}
           onOpenConversation={setDmConversation}
+          serverUrl={primaryAnchorUrl(anchorUrls)}
+          uploadedByDid={identityState.status === 'ready' ? identityState.identity.didFull : undefined}
         />
       );
       break;

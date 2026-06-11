@@ -1,5 +1,5 @@
 import React, {useEffect, useRef, useState} from 'react';
-import {Platform, Pressable, ScrollView, Text, View} from 'react-native';
+import {Image, Platform, Pressable, ScrollView, Text, View} from 'react-native';
 import jsQR from 'jsqr';
 
 import {useAnchorStatus} from '../chat/anchor-connection';
@@ -15,6 +15,11 @@ import {
   type PerRecipientDelivery,
 } from '../chat/dm-outbox';
 import {Banner, Button, Input} from '../ui';
+import {
+  uploadAttachment,
+  verifyAttachmentBytes,
+  type AttachmentDescriptor,
+} from '../chat/attachments';
 import {pointerCursor} from '../ui/cursor';
 import {fingerprintFromDid, fingerprintFromPubkey} from '../identity/did';
 import {b64UrlToBytes} from '../identity/bundle';
@@ -65,17 +70,25 @@ export function DmListScreen({
   onSendMessage,
   onAcceptRequest,
   onOpenConversation,
+  serverUrl,
+  uploadedByDid,
+  attachmentFetchImpl,
 }: {
   onBack: () => void;
   availablePeers?: DmParticipant[];
   conversation?: DmConversation;
   conversations?: DmConversation[];
   deliveryStates?: DeliveryStateMap;
-  onStartConversation?: (recipientDids: string[], body: string) => unknown;
+  onStartConversation?: (
+    recipientDids: string[],
+    body: string,
+    attachments?: AttachmentDescriptor[],
+  ) => unknown;
   onSendMessage?: (
     recipientDids: string[],
     body: string,
     conversationId?: string,
+    attachments?: AttachmentDescriptor[],
   ) => Promise<{
     id: string;
     conversationId: string;
@@ -86,6 +99,9 @@ export function DmListScreen({
   } | null>;
   onAcceptRequest?: (senderDid: string) => Promise<boolean>;
   onOpenConversation?: (conversation: DmConversation) => void;
+  serverUrl?: string;
+  uploadedByDid?: string;
+  attachmentFetchImpl?: typeof fetch;
 }) {
   const {degraded} = useAnchorStatus();
   const {metadata, mutate} = useOptionalBundleMetadata();
@@ -97,6 +113,7 @@ export function DmListScreen({
   const [creatingConversation, setCreatingConversation] = useState(false);
   const [profilePeer, setProfilePeer] = useState<DmParticipant | null>(null);
   const [verifyingPeer, setVerifyingPeer] = useState<DmParticipant | null>(null);
+  const [pendingFiles, setPendingFiles] = useState<Blob[]>([]);
   const [cameraState, setCameraState] = useState<
     'idle' | 'scanning' | 'matched' | 'mismatch' | 'unavailable'
   >('idle');
@@ -111,26 +128,87 @@ export function DmListScreen({
   }, [conversation?.conversationId, conversation?.messages]);
 
   useEffect(() => {
+    let cancelled = false;
+    const pending = items
+      .flatMap(item =>
+        (item.attachments ?? []).map((attachment, index) => ({item, attachment, index})),
+      )
+      .filter(({attachment}) => {
+        const descriptor = attachment as AttachmentDescriptor;
+        return Boolean(descriptor.download_url && descriptor.content_hash && descriptor.integrity_failed === undefined);
+      });
+
+    pending.forEach(({item, attachment, index}) => {
+      const descriptor = attachment as AttachmentDescriptor;
+      (async () => {
+        try {
+          const response = await (attachmentFetchImpl ?? fetch)(descriptor.download_url as string);
+          const bytes = await response.arrayBuffer();
+          const verified = response.ok && await verifyAttachmentBytes(bytes, descriptor.content_hash);
+          if (cancelled) return;
+          setItems(prev => updateAttachment(prev, item.id, index, {
+            ...descriptor,
+            integrity_failed: !verified,
+          }));
+        } catch {
+          if (!cancelled) {
+            setItems(prev => updateAttachment(prev, item.id, index, {
+              ...descriptor,
+              integrity_failed: true,
+            }));
+          }
+        }
+      })();
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [items, attachmentFetchImpl]);
+
+  useEffect(() => {
     if (wasDegraded.current && !degraded) {
       setItems(prev => (hasQueued(prev) ? flushQueued(prev) : prev));
     }
     wasDegraded.current = degraded;
   }, [degraded]);
 
-  function handleSend() {
+  async function uploadPendingAttachments(): Promise<AttachmentDescriptor[]> {
+    if (pendingFiles.length === 0) return [];
+    if (!serverUrl) throw new Error('missing attachment server');
+    const uploaded = await Promise.all(
+      pendingFiles.map(file =>
+        uploadAttachment({
+          serverUrl,
+          file,
+          uploadedByDid,
+          fetchImpl: attachmentFetchImpl,
+        }),
+      ),
+    );
+    return uploaded.map(({ok: _ok, client_hash: _clientHash, ...descriptor}) => descriptor);
+  }
+
+  async function handleSend() {
     const decision = decideDmSend(draft, degraded);
     if (!decision.accepted && decision.reason === 'empty') return;
     if (!conversation && onStartConversation && selectedPeers.length === 0) return;
     const trimmed = draft.trim();
+    const attachments = pendingFiles.length === 0 ? [] : await uploadPendingAttachments();
     const recipientDids = conversation
       ? conversation.participants
           .map(participant => participant.did)
           .filter(did => did !== items[0]?.senderDid)
       : selectedPeers;
     if (!conversation && onStartConversation) {
-      onStartConversation(recipientDids, trimmed);
+      if (attachments.length > 0) {
+        onStartConversation(recipientDids, trimmed, attachments);
+      } else {
+        onStartConversation(recipientDids, trimmed);
+      }
       setCreatingConversation(false);
       setDraft('');
+      setPendingFiles([]);
       return;
     }
     seq.current += 1;
@@ -139,13 +217,18 @@ export function DmListScreen({
     const item: DmThreadMessage = {
       id: localId,
       body: trimmed,
+      attachments,
       delivery: willSubmit || decision.accepted ? 'sending' : 'queued',
       recipientDids,
     };
     setItems(prev => appendDmItem(prev, item));
     setDraft('');
+    setPendingFiles([]);
     if (onSendMessage) {
-      onSendMessage(recipientDids, trimmed, conversation?.conversationId).then(result => {
+      const sent = attachments.length > 0
+        ? onSendMessage(recipientDids, trimmed, conversation?.conversationId, attachments)
+        : onSendMessage(recipientDids, trimmed, conversation?.conversationId);
+      sent.then(result => {
         if (!result) {
           setItems(prev =>
             prev.map(existing =>
@@ -169,6 +252,13 @@ export function DmListScreen({
           ),
         );
       });
+    }
+  }
+
+  function handleAttachFiles(files: FileList | null | undefined) {
+    const selected = Array.from(files ?? []);
+    if (selected.length > 0) {
+      setPendingFiles(selected);
     }
   }
 
@@ -504,6 +594,13 @@ export function DmListScreen({
                         className="text-xs text-danger">
                         attachment integrity failed
                       </Text>
+                    ) : isImageAttachment(attachment) && attachment.download_url ? (
+                      <Image
+                        testID={`dm-attachment-image-${item.id}-${attachmentIndex}`}
+                        source={{uri: attachment.download_url as string}}
+                        className="h-40 w-full rounded"
+                        resizeMode="cover"
+                      />
                     ) : (
                       <Text className="text-xs text-text-secondary">
                         {attachmentLabel(attachment)}
@@ -648,6 +745,20 @@ export function DmListScreen({
                 value={draft}
                 onChangeText={setDraft}
               />
+              {Platform.OS === 'web'
+                ? React.createElement('input', {
+                    'data-testid': 'dm-attachment-input',
+                    type: 'file',
+                    multiple: true,
+                    onChange: (event: {target?: {files?: FileList | null}}) =>
+                      handleAttachFiles(event.target?.files),
+                  })
+                : null}
+              {pendingFiles.length > 0 ? (
+                <Text testID="dm-attachment-pending-count" className="mt-1 text-xs text-text-secondary">
+                  {pendingFiles.length} attachment{pendingFiles.length === 1 ? '' : 's'} selected
+                </Text>
+              ) : null}
             </View>
             <Button
               testID="dm-send-button"
@@ -851,6 +962,24 @@ function attachmentLabel(attachment: Record<string, unknown>): string {
         ? attachment.size_bytes
         : null;
   return size === null ? mime : `${mime} · ${size} bytes`;
+}
+
+function isImageAttachment(attachment: Record<string, unknown>): boolean {
+  return typeof attachment.mime === 'string' && attachment.mime.toLowerCase().startsWith('image/');
+}
+
+function updateAttachment(
+  items: DmThreadMessage[],
+  messageId: string,
+  attachmentIndex: number,
+  attachment: AttachmentDescriptor,
+): DmThreadMessage[] {
+  return items.map(item => {
+    if (item.id !== messageId) return item;
+    const attachments = [...(item.attachments ?? [])];
+    attachments[attachmentIndex] = attachment;
+    return {...item, attachments};
+  });
 }
 
 function withinGroupedWindow(previous: DmThreadMessage, next: DmThreadMessage): boolean {

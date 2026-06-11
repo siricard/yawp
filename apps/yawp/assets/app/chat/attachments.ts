@@ -1,3 +1,5 @@
+import {sha256} from '@noble/hashes/sha2.js';
+
 export type AttachmentDescriptor = {
   upload_id: string;
   content_hash: string;
@@ -9,10 +11,7 @@ export type AttachmentDescriptor = {
 
 export async function sha256Hex(bytes: ArrayBuffer | Uint8Array): Promise<string> {
   const data = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes);
-  const input = new ArrayBuffer(data.byteLength);
-  new Uint8Array(input).set(data);
-  const digest = await globalThis.crypto.subtle.digest('SHA-256', input);
-  return Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, '0')).join('');
+  return Array.from(sha256(data), byte => byte.toString(16).padStart(2, '0')).join('');
 }
 
 export async function verifyAttachmentBytes(
