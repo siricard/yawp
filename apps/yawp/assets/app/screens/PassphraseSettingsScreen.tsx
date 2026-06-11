@@ -9,6 +9,9 @@ import {getValidSessionToken} from '../session';
 import {Button, Card, Field, Input} from '../ui';
 
 const MIN_PASSPHRASE_LENGTH = 8;
+const NOTIFICATION_LEVELS = ['all', 'mentions_only', 'muted'] as const;
+
+type NotificationLevel = (typeof NOTIFICATION_LEVELS)[number];
 
 type Props = {
   onBack: () => void;
@@ -34,6 +37,10 @@ export function PassphraseSettingsScreen({onBack}: Props) {
   const [receiptsPending, setReceiptsPending] = useState(false);
   const [passkeyCapable, setPasskeyCapable] = useState(passkeyAvailableHint);
   const readReceiptsEnabled = metadata.readReceiptsEnabled !== false;
+  const notificationPreferences = metadata.notificationPreferences ?? {};
+  const generalLevel = notificationPreferences.channels?.general ?? 'mentions_only';
+  const serverLevel = notificationPreferences.servers?.default ?? 'mentions_only';
+  const dmLevel = notificationPreferences.conversations?.default ?? 'all';
 
   useEffect(() => {
     let mounted = true;
@@ -128,6 +135,33 @@ export function PassphraseSettingsScreen({onBack}: Props) {
     setReceiptsPending(false);
   }
 
+  async function setNotificationLevel(
+    scope: 'servers' | 'channels' | 'conversations',
+    key: string,
+    level: NotificationLevel,
+  ) {
+    await mutate(prev => ({
+      ...prev,
+      notificationPreferences: {
+        ...prev.notificationPreferences,
+        [scope]: {
+          ...(prev.notificationPreferences?.[scope] ?? {}),
+          [key]: level,
+        },
+      },
+    }));
+  }
+
+  function nextNotificationLevel(level: NotificationLevel): NotificationLevel {
+    const index = NOTIFICATION_LEVELS.indexOf(level);
+    return NOTIFICATION_LEVELS[(index + 1) % NOTIFICATION_LEVELS.length];
+  }
+
+  function levelLabel(level: NotificationLevel) {
+    if (level === 'mentions_only') return 'mentions only';
+    return level;
+  }
+
   return (
     <ScrollView
       className="flex-1 bg-bg"
@@ -196,6 +230,47 @@ export function PassphraseSettingsScreen({onBack}: Props) {
           disabled={receiptsPending}
           onPress={onToggleReadReceipts}
         />
+      </Card>
+
+      <Card variant="default" style={{marginBottom: 16}}>
+        <Text className="font-display text-lg font-bold text-text mb-2">
+          Notifications
+        </Text>
+        <Text className="text-sm text-text-secondary mb-4">
+          Choose which conversations can show banners. Badges still show when muted.
+        </Text>
+        <View className="flex-row flex-wrap" style={{gap: 8}}>
+          <Button
+            testID="settings-notifications-server-default"
+            accessibilityLabel="set workspace notifications"
+            variant="secondary"
+            size="sm"
+            label={`Workspace: ${levelLabel(serverLevel)}`}
+            onPress={() =>
+              setNotificationLevel('servers', 'default', nextNotificationLevel(serverLevel))
+            }
+          />
+          <Button
+            testID="settings-notifications-channel-general"
+            accessibilityLabel="set general channel notifications"
+            variant="secondary"
+            size="sm"
+            label={`#general: ${levelLabel(generalLevel)}`}
+            onPress={() =>
+              setNotificationLevel('channels', 'general', nextNotificationLevel(generalLevel))
+            }
+          />
+          <Button
+            testID="settings-notifications-dm-default"
+            accessibilityLabel="set direct message notifications"
+            variant="secondary"
+            size="sm"
+            label={`DMs: ${levelLabel(dmLevel)}`}
+            onPress={() =>
+              setNotificationLevel('conversations', 'default', nextNotificationLevel(dmLevel))
+            }
+          />
+        </View>
       </Card>
 
       <Card variant="default" style={{marginBottom: 16}}>

@@ -1,7 +1,15 @@
 import React from 'react';
 import ReactTestRenderer from 'react-test-renderer';
 
-let mockMetadata = {
+let mockMetadata: {
+  readReceiptsEnabled?: boolean;
+  publishedProfile?: {anchors?: string[]};
+  notificationPreferences?: {
+    servers?: Record<string, 'all' | 'mentions_only' | 'muted'>;
+    channels?: Record<string, 'all' | 'mentions_only' | 'muted'>;
+    conversations?: Record<string, 'all' | 'mentions_only' | 'muted'>;
+  };
+} = {
   readReceiptsEnabled: true,
   publishedProfile: {anchors: ['http://localhost:4000']},
 };
@@ -92,6 +100,21 @@ describe('PassphraseSettingsScreen read receipts', () => {
     expect(root.root.findByProps({testID: 'passphrase-error'}).props.children).toBe(
       'Could not update read receipts.',
     );
+
+    ReactTestRenderer.act(() => root.unmount());
+  });
+
+  test('persists notification levels in bundle metadata', async () => {
+    let root!: ReactTestRenderer.ReactTestRenderer;
+    await ReactTestRenderer.act(async () => {
+      root = ReactTestRenderer.create(<PassphraseSettingsScreen onBack={() => {}} />);
+    });
+
+    await ReactTestRenderer.act(async () => {
+      await root.root.findByProps({testID: 'settings-notifications-channel-general'}).props.onPress();
+    });
+
+    expect(mockMetadata.notificationPreferences?.channels?.general).toBe('muted');
 
     ReactTestRenderer.act(() => root.unmount());
   });

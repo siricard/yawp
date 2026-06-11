@@ -10,8 +10,7 @@ defmodule Yawp.Federation.NotificationSignature do
            Map.get(envelope, "signed_by", Map.get(envelope, "key_id", :missing)),
          ^source_anchor <- Map.get(envelope, "source_server", :missing),
          :ok <- validate_shape(envelope),
-         sig_b64 when is_binary(sig_b64) <-
-           Map.get(envelope, "source_server_signature", :missing),
+         sig_b64 when is_binary(sig_b64) <- signature(envelope),
          {:ok, sig} <- decode(sig_b64, 64),
          true <- verify_signature(envelope, source_anchor, key_id, sig) do
       :ok
@@ -25,7 +24,7 @@ defmodule Yawp.Federation.NotificationSignature do
   defp validate_shape(%{
          "kind" => "notification",
          "user_did" => user_did,
-         "source_kind" => source_kind,
+         "source" => source_kind,
          "source_server" => source_server,
          "room_id_or_thread_id" => room_or_thread,
          "message_id" => message_id,
@@ -40,12 +39,20 @@ defmodule Yawp.Federation.NotificationSignature do
     :ok
   end
 
+  defp validate_shape(%{"source_kind" => source_kind} = envelope) do
+    envelope
+    |> Map.delete("source_kind")
+    |> Map.put("source", source_kind)
+    |> validate_shape()
+  end
+
   defp validate_shape(_), do: :error
 
   defp verify_signature(envelope, source_anchor, key_id, sig) do
     canonical =
       envelope
       |> Map.delete("source_server_signature")
+      |> Map.delete("signature")
       |> CanonicalJson.encode()
 
     KeyDocFetcher.verify_with(source_anchor, key_id, canonical, sig)
@@ -53,6 +60,10 @@ defmodule Yawp.Federation.NotificationSignature do
     _ -> false
   catch
     _, _ -> false
+  end
+
+  defp signature(envelope) do
+    Map.get(envelope, "signature") || Map.get(envelope, "source_server_signature", :missing)
   end
 
   defp decode(value, byte_length) when is_binary(value) do

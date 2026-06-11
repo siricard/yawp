@@ -50,6 +50,11 @@ export type IdentityBundleV1 = {
     acceptedPeers?: string[];
     pinnedPeers?: string[];
     readReceiptsEnabled?: boolean;
+    notificationPreferences?: {
+      servers?: Record<string, 'all' | 'mentions_only' | 'muted'>;
+      channels?: Record<string, 'all' | 'mentions_only' | 'muted'>;
+      conversations?: Record<string, 'all' | 'mentions_only' | 'muted'>;
+    };
     peerVerification?: Array<{
       peer_did: string;
       status: 'verified' | 'key_changed';
@@ -134,6 +139,34 @@ export function isIdentityBundleV1(value: unknown): value is IdentityBundleV1 {
       typeof meta.readReceiptsEnabled !== 'boolean'
     ) {
       return false;
+    }
+    if (
+      'notificationPreferences' in meta &&
+      meta.notificationPreferences !== undefined
+    ) {
+      if (
+        typeof meta.notificationPreferences !== 'object' ||
+        meta.notificationPreferences === null
+      ) {
+        return false;
+      }
+      const prefs = meta.notificationPreferences as Record<string, unknown>;
+      const levelsOk = (value: unknown) =>
+        value === 'all' || value === 'mentions_only' || value === 'muted';
+      const scopeOk = (key: string) => {
+        if (!(key in prefs) || prefs[key] === undefined) return true;
+        if (
+          typeof prefs[key] !== 'object' ||
+          prefs[key] === null ||
+          Array.isArray(prefs[key])
+        ) {
+          return false;
+        }
+        return Object.values(prefs[key] as Record<string, unknown>).every(levelsOk);
+      };
+      if (!scopeOk('servers')) return false;
+      if (!scopeOk('channels')) return false;
+      if (!scopeOk('conversations')) return false;
     }
     if (
       'profileVersion' in meta &&

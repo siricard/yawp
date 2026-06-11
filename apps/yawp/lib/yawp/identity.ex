@@ -71,7 +71,64 @@ defmodule Yawp.Identity do
     resource Yawp.Identity.PrivateBlob do
       define :get_private_blob_by_did, action: :get_by_did, args: [:did], not_found_error?: false
     end
+
+    resource Yawp.Identity.NotificationPreference do
+      define :upsert_notification_preference, action: :upsert
+      define :list_notification_preferences, action: :for_identity, args: [:identity_id]
+    end
+
+    resource Yawp.Identity.DevicePushRegistry do
+      define :upsert_device_push_token, action: :upsert
+    end
   end
+
+  @spec resolve_notification_level(map()) ::
+          {:ok, :all | :mentions_only | :muted} | {:error, term()}
+  def resolve_notification_level(%{identity_id: identity_id} = scope)
+      when is_binary(identity_id) do
+    with {:ok, preferences} <- list_notification_preferences(identity_id) do
+      {:ok, resolve_notification_level_from(preferences, scope)}
+    end
+  end
+
+  def resolve_notification_level(_), do: {:error, :invalid_scope}
+
+  defp resolve_notification_level_from(preferences, %{conversation_id: conversation_id})
+       when is_binary(conversation_id) do
+    preferences
+    |> Enum.find(&(&1.conversation_id == conversation_id))
+    |> level_or(:all)
+  end
+
+  defp resolve_notification_level_from(preferences, %{channel_id: channel_id} = scope)
+       when is_binary(channel_id) do
+    server_id = Map.get(scope, :server_id)
+
+    preferences
+    |> Enum.find(&(&1.channel_id == channel_id))
+    |> case do
+      nil -> Enum.find(preferences, &server_preference?(&1, server_id))
+      preference -> preference
+    end
+    |> level_or(:mentions_only)
+  end
+
+  defp resolve_notification_level_from(preferences, %{server_id: server_id})
+       when is_binary(server_id) do
+    preferences
+    |> Enum.find(&server_preference?(&1, server_id))
+    |> level_or(:mentions_only)
+  end
+
+  defp resolve_notification_level_from(_preferences, _scope), do: :mentions_only
+
+  defp server_preference?(preference, server_id) do
+    preference.server_id == server_id and is_nil(preference.channel_id) and
+      is_nil(preference.conversation_id)
+  end
+
+  defp level_or(nil, default), do: default
+  defp level_or(preference, _default), do: preference.level
 
   @spec adopt_identity(map()) :: {:ok, :adopted} | {:error, term()}
   def adopt_identity(%{"did" => did, "master_public_key" => pk_b64, "ppe" => ppe} = envelope)
