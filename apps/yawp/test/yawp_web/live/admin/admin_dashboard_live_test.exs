@@ -93,6 +93,24 @@ defmodule YawpWeb.AdminDashboardLiveTest do
       {:ok, view, _html} = live(conn, "/admin")
       assert has_element?(view, "#section-operator-audit-log #audit-log-empty")
     end
+
+    test "per-server defaults exposes and persists retention selection", %{conn: conn} do
+      :ok = Yawp.Servers.Seeder.run()
+
+      {:ok, view, _html} = live(conn, "/admin")
+
+      assert has_element?(view, "#server-retention-form")
+      assert has_element?(view, "#server-retention-select")
+
+      view
+      |> form("#server-retention-form", %{"server" => %{"retention" => "seven_days"}})
+      |> render_submit()
+
+      {:ok, server} = Yawp.Servers.get_singleton_server()
+      assert server.retention == :duration_ms
+      assert server.retention_duration_ms == 604_800_000
+      assert has_element?(view, "#server-retention-select option[selected]", "7 days")
+    end
   end
 
   describe "chat-owner-management claim-token UI" do

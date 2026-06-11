@@ -34,6 +34,10 @@ defmodule Yawp.Servers.Server do
       description "Toggles whether deletes archive the original body to the admin-only store."
       accept [:body_archive_enabled]
     end
+
+    update :set_retention_default do
+      accept [:retention, :retention_duration_ms]
+    end
   end
 
   attributes do
@@ -64,6 +68,19 @@ defmodule Yawp.Servers.Server do
       When on, deleting a message archives the original body to the
       admin-only store rather than discarding it. Off by default.
       """
+    end
+
+    attribute :retention, :atom do
+      allow_nil? false
+      default :forever
+      public? true
+      constraints one_of: [:forever, :duration_ms]
+    end
+
+    attribute :retention_duration_ms, :integer do
+      allow_nil? true
+      public? true
+      constraints min: 1
     end
 
     create_timestamp :inserted_at

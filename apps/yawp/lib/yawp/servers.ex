@@ -45,6 +45,7 @@ defmodule Yawp.Servers do
       define :create_server, action: :create, args: [:name]
       define :list_servers, action: :read
       define :set_server_owner, action: :set_owner, args: [:owner_did]
+      define :set_server_retention_default, action: :set_retention_default
     end
 
     resource Yawp.Servers.Role do

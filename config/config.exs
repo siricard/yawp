@@ -23,7 +23,12 @@ config :yawp, Oban,
   notifier: Oban.Notifiers.Postgres,
   queues: [default: 10],
   repo: Yawp.Repo,
-  plugins: [{Oban.Plugins.Cron, []}]
+  plugins: [
+    {Oban.Plugins.Cron,
+     crontab: [
+       {"0 3 * * *", Yawp.Servers.RetentionSweepJob}
+     ]}
+  ]
 
 config :ash,
   allow_forbidden_field_for_relationships_by_default?: true,

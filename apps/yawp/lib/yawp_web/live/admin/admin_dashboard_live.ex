@@ -93,6 +93,36 @@ defmodule YawpWeb.AdminDashboardLive do
      |> put_flash(:info, "Per-server defaults acknowledged.")}
   end
 
+  def handle_event("save_retention_default", %{"server" => %{"retention" => retention}}, socket) do
+    account = socket.assigns.current_account
+
+    case socket.assigns.server do
+      nil ->
+        {:noreply, put_flash(socket, :error, "No server yet — seed has not run.")}
+
+      server ->
+        attrs = retention_attrs(retention)
+
+        case Yawp.Servers.set_server_retention_default(server, attrs, authorize?: false) do
+          {:ok, updated_server} ->
+            entry =
+              Yawp.Admin.audit!(account.id, "settings.change", %{
+                section: "per-server-defaults",
+                change: "retention"
+              })
+
+            {:noreply,
+             socket
+             |> assign(:server, updated_server)
+             |> stream_insert(:audit_log, entry, at: 0)
+             |> put_flash(:info, "Retention default saved.")}
+
+          {:error, _error} ->
+            {:noreply, put_flash(socket, :error, "Could not save retention default.")}
+        end
+    end
+  end
+
   def handle_event("mint_server_invite", params, socket) do
     account = socket.assigns.current_account
 
@@ -227,7 +257,42 @@ defmodule YawpWeb.AdminDashboardLive do
           icon="hero-adjustments-horizontal"
         >
           <p class="text-sm text-text-secondary">
-            Retention policy, attachment size limit, voice participant cap. Read-only for now.
+            Configure defaults applied to channels that do not override them.
+          </p>
+          <.form
+            :if={@server}
+            id="server-retention-form"
+            for={%{}}
+            as={:server}
+            phx-submit="save_retention_default"
+            class="mt-3 space-y-3"
+          >
+            <label class="block text-sm font-semibold text-text" for="server-retention-select">
+              Retention
+            </label>
+            <select
+              id="server-retention-select"
+              name="server[retention]"
+              class="w-full rounded-md border border-transparent bg-surface-2 text-text text-sm px-3 py-2 focus:border-primary outline-none"
+            >
+              <option
+                :for={{label, value} <- retention_options()}
+                value={value}
+                selected={value == selected_retention(@server)}
+              >
+                {label}
+              </option>
+            </select>
+            <button
+              id="server-retention-save-btn"
+              type="submit"
+              class={admin_secondary_btn_class()}
+            >
+              Save retention
+            </button>
+          </.form>
+          <p :if={is_nil(@server)} class="mt-3 text-sm text-text-secondary">
+            No server yet.
           </p>
           <button
             id="per-server-defaults-acknowledge-btn"
@@ -607,6 +672,37 @@ defmodule YawpWeb.AdminDashboardLive do
   end
 
   defp invite_kind_label(%{kind: kind}), do: to_string(kind)
+
+  defp retention_options do
+    [
+      {"Forever", "forever"},
+      {"24 hours", "one_day"},
+      {"7 days", "seven_days"},
+      {"30 days", "thirty_days"}
+    ]
+  end
+
+  defp selected_retention(%{retention: :duration_ms, retention_duration_ms: 86_400_000}),
+    do: "one_day"
+
+  defp selected_retention(%{retention: :duration_ms, retention_duration_ms: 604_800_000}),
+    do: "seven_days"
+
+  defp selected_retention(%{retention: :duration_ms, retention_duration_ms: 2_592_000_000}),
+    do: "thirty_days"
+
+  defp selected_retention(_server), do: "forever"
+
+  defp retention_attrs("one_day"),
+    do: %{retention: :duration_ms, retention_duration_ms: 86_400_000}
+
+  defp retention_attrs("seven_days"),
+    do: %{retention: :duration_ms, retention_duration_ms: 604_800_000}
+
+  defp retention_attrs("thirty_days"),
+    do: %{retention: :duration_ms, retention_duration_ms: 2_592_000_000}
+
+  defp retention_attrs(_), do: %{retention: :forever, retention_duration_ms: nil}
 
   defp build_mint_attrs(server, %{"kind" => "multi_use"} = params) do
     uses =

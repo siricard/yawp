@@ -33,7 +33,18 @@ defmodule Yawp.Servers.Channel do
 
     create :create do
       primary? true
-      accept [:server_id, :category_id, :name, :type, :position, :visibility, :join_policy]
+
+      accept [
+        :server_id,
+        :category_id,
+        :name,
+        :type,
+        :position,
+        :visibility,
+        :join_policy,
+        :retention,
+        :retention_duration_ms
+      ]
 
       change Yawp.Servers.Changes.EnforceChannelCategorySameServer
       change Yawp.Servers.Changes.RequireManageChannels
@@ -114,6 +125,18 @@ defmodule Yawp.Servers.Channel do
       default :invite_only
       constraints one_of: [:invite_only, :open]
       public? true
+    end
+
+    attribute :retention, :atom do
+      allow_nil? true
+      public? true
+      constraints one_of: [:forever, :duration_ms]
+    end
+
+    attribute :retention_duration_ms, :integer do
+      allow_nil? true
+      public? true
+      constraints min: 1
     end
 
     create_timestamp :inserted_at

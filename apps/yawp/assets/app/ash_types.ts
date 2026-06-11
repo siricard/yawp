@@ -139,13 +139,15 @@ export type ServerCategoryAttributesOnlySchema = {
 // ServerChannel Schema
 export type ServerChannelResourceSchema = {
   __type: "Resource";
-  __primitiveFields: "id" | "name" | "type" | "position" | "visibility" | "joinPolicy" | "serverId" | "categoryId";
+  __primitiveFields: "id" | "name" | "type" | "position" | "visibility" | "joinPolicy" | "retention" | "retentionDurationMs" | "serverId" | "categoryId";
   id: UUID;
   name: string;
   type: "text" | "voice";
   position: number;
   visibility: "private" | "server_public";
   joinPolicy: "invite_only" | "open";
+  retention: "duration_ms" | "forever" | null;
+  retentionDurationMs: number | null;
   serverId: UUID;
   categoryId: UUID | null;
   category: { __type: "Relationship"; __resource: ServerCategoryResourceSchema | null; };
@@ -155,13 +157,15 @@ export type ServerChannelResourceSchema = {
 
 export type ServerChannelAttributesOnlySchema = {
   __type: "Resource";
-  __primitiveFields: "id" | "name" | "type" | "position" | "visibility" | "joinPolicy" | "serverId" | "categoryId";
+  __primitiveFields: "id" | "name" | "type" | "position" | "visibility" | "joinPolicy" | "retention" | "retentionDurationMs" | "serverId" | "categoryId";
   id: UUID;
   name: string;
   type: "text" | "voice";
   position: number;
   visibility: "private" | "server_public";
   joinPolicy: "invite_only" | "open";
+  retention: "duration_ms" | "forever" | null;
+  retentionDurationMs: number | null;
   serverId: UUID;
   categoryId: UUID | null;
 };
@@ -579,6 +583,24 @@ export type ServerChannelFilterInput = {
     in?: Array<"invite_only" | "open">;
   };
 
+  retention?: {
+    eq?: "duration_ms" | "forever";
+    notEq?: "duration_ms" | "forever";
+    in?: Array<"duration_ms" | "forever">;
+    isNil?: boolean;
+  };
+
+  retentionDurationMs?: {
+    eq?: number;
+    notEq?: number;
+    greaterThan?: number;
+    greaterThanOrEqual?: number;
+    lessThan?: number;
+    lessThanOrEqual?: number;
+    in?: Array<number>;
+    isNil?: boolean;
+  };
+
   serverId?: {
     eq?: UUID;
     notEq?: UUID;
@@ -915,7 +937,7 @@ export type ServerBanFilterField = (typeof serverBanFilterFields)[number];
 export const serverCategoryFilterFields = ["id", "name", "position", "serverId", "parentId", "server", "parent"] as const;
 export type ServerCategoryFilterField = (typeof serverCategoryFilterFields)[number];
 
-export const serverChannelFilterFields = ["id", "name", "type", "position", "visibility", "joinPolicy", "serverId", "categoryId", "server", "category"] as const;
+export const serverChannelFilterFields = ["id", "name", "type", "position", "visibility", "joinPolicy", "retention", "retentionDurationMs", "serverId", "categoryId", "server", "category"] as const;
 export type ServerChannelFilterField = (typeof serverChannelFilterFields)[number];
 
 export const serverKickFilterFields = ["id", "reason", "serverId", "identityId", "kickedByIdentityId", "server", "identity", "kickedByIdentity"] as const;
@@ -946,7 +968,7 @@ export type ServerBanSortField = (typeof serverBanSortFields)[number];
 export const serverCategorySortFields = ["id", "name", "position", "serverId", "parentId"] as const;
 export type ServerCategorySortField = (typeof serverCategorySortFields)[number];
 
-export const serverChannelSortFields = ["id", "name", "type", "position", "visibility", "joinPolicy", "serverId", "categoryId"] as const;
+export const serverChannelSortFields = ["id", "name", "type", "position", "visibility", "joinPolicy", "retention", "retentionDurationMs", "serverId", "categoryId"] as const;
 export type ServerChannelSortField = (typeof serverChannelSortFields)[number];
 
 export const serverKickSortFields = ["id", "reason", "serverId", "identityId", "kickedByIdentityId"] as const;

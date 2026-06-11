@@ -1052,6 +1052,8 @@ export type CreateChannelInput = {
   position?: number;
   visibility?: "private" | "server_public";
   joinPolicy?: "invite_only" | "open";
+  retention?: "duration_ms" | "forever" | null;
+  retentionDurationMs?: number | null;
 };
 
 export type CreateChannelFields = UnifiedFieldSelection<ServerChannelResourceSchema>[];

@@ -5,6 +5,8 @@ defmodule Yawp.Servers.MessageTest do
   alias Yawp.Servers
   alias Yawp.Servers.Permissions
 
+  use Oban.Testing, repo: Yawp.Repo
+
   setup do
     {:ok, server} = Servers.create_server("Yawp")
 
@@ -421,6 +423,147 @@ defmodule Yawp.Servers.MessageTest do
 
       assert {:error, %Ash.Error.Forbidden{}} =
                Servers.list_archived_bodies_for_message(ctx.message.id, actor: nil)
+    end
+  end
+
+  describe "retention sweep" do
+    setup ctx do
+      {:ok, _key} = Yawp.Federation.generate_server_key()
+      Map.put(ctx, :now, ~U[2026-06-11 12:00:00.000000Z])
+    end
+
+    test "tombstones messages older than a finite channel retention cutoff", ctx do
+      {:ok, retained_channel} =
+        Servers.create_channel(
+          %{
+            server_id: ctx.server.id,
+            name: "retained",
+            type: :text,
+            retention: :duration_ms,
+            retention_duration_ms: 60_000
+          },
+          authorize?: false
+        )
+
+      {:ok, old_message} = send_message(retained_channel, ctx.sender, "old")
+      {:ok, fresh_message} = send_message(retained_channel, ctx.sender, "fresh")
+
+      old_inserted_at = DateTime.add(ctx.now, -120_000, :millisecond)
+      fresh_inserted_at = DateTime.add(ctx.now, -30_000, :millisecond)
+
+      Yawp.Repo.update_all(
+        from(m in Yawp.Servers.Message, where: m.id == ^old_message.id),
+        set: [server_inserted_at: old_inserted_at]
+      )
+
+      Yawp.Repo.update_all(
+        from(m in Yawp.Servers.Message, where: m.id == ^fresh_message.id),
+        set: [server_inserted_at: fresh_inserted_at]
+      )
+
+      assert :ok =
+               perform_job(Yawp.Servers.RetentionSweepJob, %{
+                 "now_ms" => DateTime.to_unix(ctx.now, :millisecond)
+               })
+
+      assert {:ok, [%{reason: :retention}]} = Servers.list_message_tombstones(old_message.id)
+      assert {:ok, []} = Servers.list_message_tombstones(fresh_message.id)
+
+      {:ok, [reread_old, reread_fresh]} = Servers.list_channel_messages(retained_channel.id)
+      assert reread_old.body == nil
+      assert reread_fresh.body == "fresh"
+    end
+
+    test "uses the server default when a channel has no explicit retention", ctx do
+      {:ok, _server} =
+        ctx.server
+        |> Ash.Changeset.for_update(:set_retention_default, %{
+          retention: :duration_ms,
+          retention_duration_ms: 60_000
+        })
+        |> Ash.update(authorize?: false)
+
+      {:ok, inherited_channel} =
+        Servers.create_channel(
+          %{server_id: ctx.server.id, name: "inherited", type: :text},
+          authorize?: false
+        )
+
+      {:ok, old_message} = send_message(inherited_channel, ctx.sender, "old")
+
+      Yawp.Repo.update_all(
+        from(m in Yawp.Servers.Message, where: m.id == ^old_message.id),
+        set: [server_inserted_at: DateTime.add(ctx.now, -120_000, :millisecond)]
+      )
+
+      assert :ok =
+               perform_job(Yawp.Servers.RetentionSweepJob, %{
+                 "now_ms" => DateTime.to_unix(ctx.now, :millisecond)
+               })
+
+      assert {:ok, [%{reason: :retention}]} = Servers.list_message_tombstones(old_message.id)
+    end
+
+    test "skips forever channels and already tombstoned messages", ctx do
+      {:ok, forever_channel} =
+        Servers.create_channel(
+          %{
+            server_id: ctx.server.id,
+            name: "forever",
+            type: :text,
+            retention: :forever
+          },
+          authorize?: false
+        )
+
+      {:ok, message} = send_message(forever_channel, ctx.sender, "kept")
+
+      Yawp.Repo.update_all(
+        from(m in Yawp.Servers.Message, where: m.id == ^message.id),
+        set: [server_inserted_at: DateTime.add(ctx.now, -120_000, :millisecond)]
+      )
+
+      assert :ok =
+               perform_job(Yawp.Servers.RetentionSweepJob, %{
+                 "now_ms" => DateTime.to_unix(ctx.now, :millisecond)
+               })
+
+      assert {:ok, []} = Servers.list_message_tombstones(message.id)
+
+      {:ok, finite_channel} =
+        Servers.create_channel(
+          %{
+            server_id: ctx.server.id,
+            name: "finite",
+            type: :text,
+            retention: :duration_ms,
+            retention_duration_ms: 60_000
+          },
+          authorize?: false
+        )
+
+      {:ok, tombstoned} = send_message(finite_channel, ctx.sender, "gone")
+
+      Yawp.Repo.update_all(
+        from(m in Yawp.Servers.Message, where: m.id == ^tombstoned.id),
+        set: [server_inserted_at: DateTime.add(ctx.now, -120_000, :millisecond), body: nil]
+      )
+
+      Ash.Seed.seed!(Yawp.Servers.MessageTombstone, %{
+        message_id: tombstoned.id,
+        reason: :sender,
+        actor_did: ctx.sender.did,
+        signature: <<0::512>>,
+        signed_by: ctx.sender.device_id
+      })
+
+      assert :ok =
+               perform_job(Yawp.Servers.RetentionSweepJob, %{
+                 "now_ms" => DateTime.to_unix(ctx.now, :millisecond)
+               })
+
+      {:ok, tombstones} = Servers.list_message_tombstones(tombstoned.id)
+      assert Enum.map(tombstones, & &1.reason) == [:sender]
     end
   end
 
