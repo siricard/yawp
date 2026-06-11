@@ -10,6 +10,7 @@ import {
   useAnchorStatus,
   type DeliveryStateEvent,
   type InboxEvent,
+  type PeerKeyRefreshedEvent,
 } from './chat/anchor-connection';
 import {normalizeAnchorServerUrl} from './chat/anchor-url';
 import {discoverGeneralChannel} from './chat/discover';
@@ -344,6 +345,14 @@ function AppShell() {
     setDeliveryStates(prev => mergeDeliveryStateMap(prev, event));
   }, []);
 
+  const handlePeerKeyRefreshed = useCallback((event: PeerKeyRefreshedEvent) => {
+    const currentRecords = peerVerificationRecords(metadata);
+    const nextRecords = detectKeyChanged(currentRecords, event.sender_did, event.sender_public_key);
+    if (nextRecords !== currentRecords) {
+      mutate(prev => ({...prev, peerVerification: nextRecords}));
+    }
+  }, [metadata, mutate]);
+
   if (identityState.status === 'onboarding') {
     return (
       <SafeAreaView
@@ -456,7 +465,8 @@ function AppShell() {
       anchorUrls={anchorUrls}
       guestAnchors={guestAnchors}
       onInbox={handleInbox}
-      onDeliveryState={handleDeliveryState}>
+      onDeliveryState={handleDeliveryState}
+      onPeerKeyRefreshed={handlePeerKeyRefreshed}>
       {identityState.status === 'ready' && screen.kind === 'dm' ? (
         <ReadMarkerEmitter
           conversation={dmConversation}

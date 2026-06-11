@@ -13,22 +13,41 @@ defmodule Yawp.Federation.PpeRefreshWorker do
 
   alias Yawp.Federation.Client
   alias Yawp.Identity
+  alias YawpWeb.UserChannel
 
   @impl Oban.Worker
-  def perform(%Oban.Job{args: %{"did" => did, "anchors" => anchors}})
+  def perform(%Oban.Job{args: %{"did" => did, "anchors" => anchors} = args})
       when is_binary(did) and is_list(anchors) do
+    recipients = Map.get(args, "recipient_dids", [])
+
     Enum.reduce_while(anchors, {:error, :no_anchor_reachable}, fn anchor, _acc ->
-      case fetch_and_apply(anchor, did) do
+      case fetch_and_apply(anchor, did, recipients) do
         :ok -> {:halt, :ok}
         {:error, _} -> {:cont, {:error, :no_anchor_reachable}}
       end
     end)
   end
 
-  defp fetch_and_apply(anchor, did) do
+  defp fetch_and_apply(anchor, did, recipients) do
     with {:ok, envelope} <- Client.fetch_ppe!(anchor, did),
          {:ok, _status} <- Identity.apply_ppe_if_newer(envelope) do
+      notify_peer_key_refreshed(did, envelope, recipients)
       :ok
     end
   end
+
+  defp notify_peer_key_refreshed(did, %{"public_key" => pk}, recipients) when is_binary(pk) do
+    recipients
+    |> Enum.filter(&is_binary/1)
+    |> Enum.uniq()
+    |> Enum.each(fn recipient ->
+      Phoenix.PubSub.broadcast(
+        Yawp.PubSub,
+        UserChannel.inbox_topic(String.replace_prefix(recipient, "did:yawp:", "")),
+        {:peer_key_refreshed, %{sender_did: did, sender_public_key: pk}}
+      )
+    end)
+  end
+
+  defp notify_peer_key_refreshed(_did, _envelope, _recipients), do: :ok
 end

@@ -21,7 +21,7 @@ defmodule Yawp.Federation.MessagePipeline do
          version when is_integer(version) <-
            Map.get(message, "sender_profile_version", :missing) do
       if newer_than_cache?(did, version) do
-        enqueue_refresh(did, anchors_for(message, did))
+        enqueue_refresh(did, anchors_for(message, did), recipients_for(message))
       else
         {:ok, :fresh}
       end
@@ -55,15 +55,33 @@ defmodule Yawp.Federation.MessagePipeline do
     |> Enum.uniq()
   end
 
-  defp enqueue_refresh(_did, []), do: {:ok, :no_anchors}
+  defp enqueue_refresh(_did, [], _recipients), do: {:ok, :no_anchors}
 
-  defp enqueue_refresh(did, anchors) do
-    %{"did" => did, "anchors" => anchors}
+  defp enqueue_refresh(did, anchors, recipients) do
+    %{"did" => did, "anchors" => anchors, "recipient_dids" => recipients}
     |> PpeRefreshWorker.new()
     |> Oban.insert()
     |> case do
       {:ok, _job} -> {:ok, :enqueued}
       {:error, _} = err -> err
     end
+  end
+
+  defp recipients_for(message) do
+    recipients =
+      case Map.get(message, "recipient_dids") do
+        list when is_list(list) -> list
+        _ -> []
+      end
+
+    recipient =
+      case Map.get(message, "recipient_did") do
+        did when is_binary(did) -> [did]
+        _ -> []
+      end
+
+    (recipients ++ recipient)
+    |> Enum.filter(&is_binary/1)
+    |> Enum.uniq()
   end
 end

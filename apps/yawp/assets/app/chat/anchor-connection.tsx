@@ -36,6 +36,11 @@ export type DeliveryStateEvent = {
   state: 'sent' | 'delivered' | 'read';
 };
 
+export type PeerKeyRefreshedEvent = {
+  sender_did: string;
+  sender_public_key: string;
+};
+
 const AnchorContext = createContext<AnchorConnection>({
   status: 'connecting',
   degraded: false,
@@ -48,6 +53,7 @@ export function useAnchorConnection(
   guestAnchors: string[] = [],
   onInbox?: (event: InboxEvent) => void,
   onDeliveryState?: (event: DeliveryStateEvent) => void,
+  onPeerKeyRefreshed?: (event: PeerKeyRefreshedEvent) => void,
 ): AnchorConnection {
   const [status, setStatus] = useState<AnchorStatus>('connecting');
   const degradedTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -141,6 +147,10 @@ export function useAnchorConnection(
           if (cancelled || !isDeliveryStateEvent(payload)) return;
           onDeliveryState?.(payload);
         });
+        channel.on('peer_key_refreshed', payload => {
+          if (cancelled || !isPeerKeyRefreshedEvent(payload)) return;
+          onPeerKeyRefreshed?.(payload);
+        });
         channel.join();
         joinedChannels.current = [...joinedChannels.current, channel];
 
@@ -165,7 +175,7 @@ export function useAnchorConnection(
       cleanups.forEach(fn => fn());
       joinedChannels.current = [];
     };
-  }, [anchorsKey, did, guestAnchorsKey, onInbox, onDeliveryState]);
+  }, [anchorsKey, did, guestAnchorsKey, onInbox, onDeliveryState, onPeerKeyRefreshed]);
 
   return {status, degraded: status === 'degraded', emitReadMarker};
 }
@@ -175,12 +185,14 @@ export function AnchorConnectionProvider({
   guestAnchors = [],
   onInbox,
   onDeliveryState,
+  onPeerKeyRefreshed,
   children,
 }: {
   anchorUrls: string[];
   guestAnchors?: string[];
   onInbox?: (event: InboxEvent) => void;
   onDeliveryState?: (event: DeliveryStateEvent) => void;
+  onPeerKeyRefreshed?: (event: PeerKeyRefreshedEvent) => void;
   children: React.ReactNode;
 }) {
   const state = useIdentityState();
@@ -191,6 +203,7 @@ export function AnchorConnectionProvider({
     guestAnchors,
     onInbox,
     onDeliveryState,
+    onPeerKeyRefreshed,
   );
   return (
     <AnchorContext.Provider value={connection}>
@@ -220,6 +233,15 @@ function isDeliveryStateEvent(payload: unknown): payload is DeliveryStateEvent {
     (candidate.state === 'sent' ||
       candidate.state === 'delivered' ||
       candidate.state === 'read')
+  );
+}
+
+function isPeerKeyRefreshedEvent(payload: unknown): payload is PeerKeyRefreshedEvent {
+  if (!payload || typeof payload !== 'object') return false;
+  const candidate = payload as Partial<PeerKeyRefreshedEvent>;
+  return (
+    typeof candidate.sender_did === 'string' &&
+    typeof candidate.sender_public_key === 'string'
   );
 }
 

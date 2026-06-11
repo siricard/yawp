@@ -21,8 +21,10 @@ jest.mock('../identity-context', () => ({
 }));
 
 import {DmListScreen} from '../screens/DmListScreen';
+import {fingerprintFromQrPayload, parseIdentityQrPayload} from '../screens/DmListScreen';
 import type {DeliveryStateMap} from '../chat/dm-outbox';
-import {didFromPubkey, fingerprintFromDid} from '../identity/did';
+import {bytesToB64Url} from '../identity/bundle';
+import {didFromPubkey, fingerprintFromDid, fingerprintFromPubkey} from '../identity/did';
 
 function indicatorText(
   root: ReactTestRenderer.ReactTestRenderer,
@@ -280,5 +282,28 @@ describe('DmListScreen delivery-state overlay', () => {
     expect(root.root.findAllByProps({testID: `dm-peer-row-verified-${did}`}).length).toBeGreaterThan(0);
 
     ReactTestRenderer.act(() => root.unmount());
+  });
+
+  test('accepts a QR payload only when the DID derives from the scanned key', () => {
+    const pk = new Uint8Array(32).fill(19);
+    const did = didFromPubkey(pk);
+    const payload = parseIdentityQrPayload(
+      JSON.stringify({did, master_pk: bytesToB64Url(pk), nonce: 'n'}),
+    );
+
+    expect(payload).not.toBeNull();
+    expect(fingerprintFromQrPayload(payload!, did)).toBe(fingerprintFromPubkey(pk));
+  });
+
+  test('rejects a QR payload with the right DID and the wrong scanned key', () => {
+    const rightPk = new Uint8Array(32).fill(20);
+    const wrongPk = new Uint8Array(32).fill(21);
+    const did = didFromPubkey(rightPk);
+    const payload = parseIdentityQrPayload(
+      JSON.stringify({did, master_pk: bytesToB64Url(wrongPk), nonce: 'n'}),
+    );
+
+    expect(payload).not.toBeNull();
+    expect(fingerprintFromQrPayload(payload!, did)).toBeNull();
   });
 });

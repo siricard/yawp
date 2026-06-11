@@ -21,7 +21,7 @@ import {
   type AttachmentDescriptor,
 } from '../chat/attachments';
 import {pointerCursor} from '../ui/cursor';
-import {fingerprintFromDid, fingerprintFromPubkey} from '../identity/did';
+import {didFromPubkey, fingerprintFromDid, fingerprintFromPubkey} from '../identity/did';
 import {b64UrlToBytes} from '../identity/bundle';
 import {useOptionalBundleMetadata} from '../identity-context';
 import {
@@ -358,8 +358,7 @@ export function DmListScreen({
       stream.getTracks().forEach(track => track.stop());
       const result = jsQR(image.data, image.width, image.height);
       const payload = parseIdentityQrPayload(result?.data);
-      const fingerprint =
-        payload?.did === peer.did ? fingerprintFromQrMasterPk(payload.master_pk) : null;
+      const fingerprint = payload ? fingerprintFromQrPayload(payload, peer.did) : null;
       if (!fingerprint) {
         setCameraState('mismatch');
         return;
@@ -919,7 +918,7 @@ function verifiedPeerDids(meta: unknown): Set<string> {
   );
 }
 
-function parseIdentityQrPayload(
+export function parseIdentityQrPayload(
   data: string | undefined,
 ): {did: string; master_pk: string; nonce: string} | null {
   if (!data) return null;
@@ -945,9 +944,15 @@ function parseIdentityQrPayload(
   }
 }
 
-function fingerprintFromQrMasterPk(masterPk: string): string | null {
+export function fingerprintFromQrPayload(
+  payload: {did: string; master_pk: string; nonce: string},
+  peerDid: string,
+): string | null {
   try {
-    return fingerprintFromPubkey(b64UrlToBytes(masterPk));
+    const pk = b64UrlToBytes(payload.master_pk);
+    if (payload.did !== peerDid) return null;
+    if (didFromPubkey(pk) !== peerDid) return null;
+    return fingerprintFromPubkey(pk);
   } catch {
     return null;
   }

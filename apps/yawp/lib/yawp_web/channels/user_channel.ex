@@ -69,6 +69,12 @@ defmodule YawpWeb.UserChannel do
   end
 
   @impl true
+  def handle_info({:peer_key_refreshed, payload}, socket) do
+    push(socket, "peer_key_refreshed", payload)
+    {:noreply, socket}
+  end
+
+  @impl true
   def handle_info({:dm_read_marker, marker}, socket) do
     push(socket, "read_marker", serialize_dm_read_marker(marker))
     {:noreply, socket}

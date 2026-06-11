@@ -50,6 +50,39 @@ defmodule Yawp.Federation.PpeRefreshWorkerTest do
     assert ppe.display_name == "Worker Alice"
   end
 
+  test "notifies recipients with the refreshed sender master key" do
+    did = "did:yawp:worker-rotation"
+    recipient = "did:yawp:recipient-rotation"
+    pk = valid_pubkey()
+
+    envelope = %{
+      "did" => did,
+      ("public_" <> "key") => pk,
+      "profile_version" => 9,
+      "anchors" => ["anchor-a.example"],
+      "display_name" => "Rotated Sender"
+    }
+
+    Phoenix.PubSub.subscribe(Yawp.PubSub, YawpWeb.UserChannel.inbox_topic("recipient-rotation"))
+
+    Application.put_env(:yawp, Yawp.Federation.Client,
+      req_options: [
+        plug: fn conn ->
+          Req.Test.json(conn, %{"ppe" => envelope})
+        end
+      ]
+    )
+
+    assert :ok =
+             perform_job(PpeRefreshWorker, %{
+               "did" => did,
+               "anchors" => ["anchor-a.example"],
+               "recipient_dids" => [recipient]
+             })
+
+    assert_receive {:peer_key_refreshed, %{sender_did: ^did, sender_public_key: ^pk}}
+  end
+
   test "tries the next anchor when the first fails" do
     did = "did:yawp:worker-fallback"
 
