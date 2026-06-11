@@ -45,6 +45,14 @@ defmodule Yawp.Identity do
       rpc_action :rotate_refresh, :rotate,
         show_metadata: [:session_token, :refresh_token, :expires_at]
     end
+
+    resource Yawp.Identity.NotificationPreference do
+      rpc_action :upsert_notification_preference, :upsert
+    end
+
+    resource Yawp.Identity.DevicePushRegistry do
+      rpc_action :upsert_device_push_token, :upsert
+    end
   end
 
   resources do

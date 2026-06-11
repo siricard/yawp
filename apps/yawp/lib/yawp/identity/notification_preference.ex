@@ -4,11 +4,16 @@ defmodule Yawp.Identity.NotificationPreference do
   use Ash.Resource,
     otp_app: :yawp,
     domain: Yawp.Identity,
-    data_layer: AshPostgres.DataLayer
+    data_layer: AshPostgres.DataLayer,
+    extensions: [AshTypescript.Resource]
 
   postgres do
     table "identity_notification_preferences"
     repo Yawp.Repo
+  end
+
+  typescript do
+    type_name "NotificationPreference"
   end
 
   actions do
@@ -16,7 +21,11 @@ defmodule Yawp.Identity.NotificationPreference do
 
     create :upsert do
       primary? true
-      accept [:identity_id, :server_id, :channel_id, :conversation_id, :level]
+      accept [:server_id, :channel_id, :conversation_id, :level]
+      argument :identity_id, :uuid, allow_nil?: true
+      argument :identity_did, :string, allow_nil?: true
+      change Yawp.Identity.NotificationPreference.Changes.ResolveIdentity
+      change Yawp.Identity.NotificationPreference.Changes.AuthorizeOwner
       upsert? true
       upsert_identity :unique_scope
     end

@@ -2,9 +2,11 @@
 import React, {useEffect, useState} from 'react';
 import {ScrollView, Text, View} from 'react-native';
 
-import {useBundleMetadata, useIdentity, usePassphrase} from '../identity-context';
-import {setReadReceipts} from '../ash_generated';
+import {useBundleMetadata, useIdentity, usePassphrase, useWorkspaceServers} from '../identity-context';
+import {setReadReceipts, upsertNotificationPreference} from '../ash_generated';
 import {normalizeAnchorServerUrl} from '../chat/anchor-url';
+import {fetchServerTree, TreeChannel} from '../chat/server-tree';
+import type {DmConversation} from './DmListScreen';
 import {getValidSessionToken} from '../session';
 import {Button, Card, Field, Input} from '../ui';
 
@@ -15,9 +17,10 @@ type NotificationLevel = (typeof NOTIFICATION_LEVELS)[number];
 
 type Props = {
   onBack: () => void;
+  conversations?: DmConversation[];
 };
 
-export function PassphraseSettingsScreen({onBack}: Props) {
+export function PassphraseSettingsScreen({onBack, conversations = []}: Props) {
   const {
     sealed,
     changePassphrase,
@@ -27,7 +30,9 @@ export function PassphraseSettingsScreen({onBack}: Props) {
     enrollPasskey,
   } = usePassphrase();
   const identity = useIdentity();
+  const {servers} = useWorkspaceServers();
   const {metadata, mutate} = useBundleMetadata();
+  const [channelsByServer, setChannelsByServer] = useState<Record<string, TreeChannel[]>>({});
   const [current, setCurrent] = useState('');
   const [next, setNext] = useState('');
   const [confirm, setConfirm] = useState('');
@@ -38,9 +43,7 @@ export function PassphraseSettingsScreen({onBack}: Props) {
   const [passkeyCapable, setPasskeyCapable] = useState(passkeyAvailableHint);
   const readReceiptsEnabled = metadata.readReceiptsEnabled !== false;
   const notificationPreferences = metadata.notificationPreferences ?? {};
-  const generalLevel = notificationPreferences.channels?.general ?? 'mentions_only';
-  const serverLevel = notificationPreferences.servers?.default ?? 'mentions_only';
-  const dmLevel = notificationPreferences.conversations?.default ?? 'all';
+  const serverListKey = servers.map(server => `${server.did}:${server.url}`).join('|');
 
   useEffect(() => {
     let mounted = true;
@@ -51,6 +54,21 @@ export function PassphraseSettingsScreen({onBack}: Props) {
       mounted = false;
     };
   }, [canUsePasskey]);
+
+  useEffect(() => {
+    let mounted = true;
+    void Promise.all(
+      servers.map(async server => {
+        const tree = await fetchServerTree(server.url, server.did);
+        return [server.did, tree.channels] as const;
+      }),
+    ).then(entries => {
+      if (mounted) setChannelsByServer(Object.fromEntries(entries));
+    });
+    return () => {
+      mounted = false;
+    };
+  }, [serverListKey]);
 
   const removingSeal = sealed && next.length === 0 && confirm.length === 0;
   const settingNew = next.length > 0;
@@ -140,6 +158,7 @@ export function PassphraseSettingsScreen({onBack}: Props) {
     key: string,
     level: NotificationLevel,
   ) {
+    const previous = metadata.notificationPreferences;
     await mutate(prev => ({
       ...prev,
       notificationPreferences: {
@@ -150,6 +169,31 @@ export function PassphraseSettingsScreen({onBack}: Props) {
         },
       },
     }));
+    const session = await getValidSessionToken({
+      serverUrl: primaryAnchorUrl(metadata.publishedProfile?.anchors),
+    });
+    if (!session.ok) {
+      await mutate(prev => ({...prev, notificationPreferences: previous}));
+      setError('Could not update notification settings.');
+      return;
+    }
+    const result = await upsertNotificationPreference({
+      input: {
+        identityDid: identity.didFull,
+        serverId: scope === 'servers' ? key : null,
+        channelId: scope === 'channels' ? key : null,
+        conversationId: scope === 'conversations' ? key : null,
+        level,
+      },
+      fields: ['id', 'level'],
+      headers: {Authorization: `Bearer ${session.sessionToken}`},
+    });
+    if (!result.success) {
+      await mutate(prev => ({...prev, notificationPreferences: previous}));
+      setError('Could not update notification settings.');
+    } else {
+      setDone('Notification settings updated.');
+    }
   }
 
   function nextNotificationLevel(level: NotificationLevel): NotificationLevel {
@@ -240,36 +284,65 @@ export function PassphraseSettingsScreen({onBack}: Props) {
           Choose which conversations can show banners. Badges still show when muted.
         </Text>
         <View className="flex-row flex-wrap" style={{gap: 8}}>
-          <Button
-            testID="settings-notifications-server-default"
-            accessibilityLabel="set workspace notifications"
-            variant="secondary"
-            size="sm"
-            label={`Workspace: ${levelLabel(serverLevel)}`}
-            onPress={() =>
-              setNotificationLevel('servers', 'default', nextNotificationLevel(serverLevel))
-            }
-          />
-          <Button
-            testID="settings-notifications-channel-general"
-            accessibilityLabel="set general channel notifications"
-            variant="secondary"
-            size="sm"
-            label={`#general: ${levelLabel(generalLevel)}`}
-            onPress={() =>
-              setNotificationLevel('channels', 'general', nextNotificationLevel(generalLevel))
-            }
-          />
-          <Button
-            testID="settings-notifications-dm-default"
-            accessibilityLabel="set direct message notifications"
-            variant="secondary"
-            size="sm"
-            label={`DMs: ${levelLabel(dmLevel)}`}
-            onPress={() =>
-              setNotificationLevel('conversations', 'default', nextNotificationLevel(dmLevel))
-            }
-          />
+          {servers.map(server => {
+            const level = notificationPreferences.servers?.[server.did] ?? 'mentions_only';
+            return (
+              <Button
+                key={server.did}
+                testID={`settings-notifications-server-${server.did}`}
+                accessibilityLabel={`set ${server.label} notifications`}
+                variant="secondary"
+                size="sm"
+                label={`${server.label}: ${levelLabel(level)}`}
+                onPress={() =>
+                  setNotificationLevel('servers', server.did, nextNotificationLevel(level))
+                }
+              />
+            );
+          })}
+          {servers.flatMap(server =>
+            (channelsByServer[server.did] ?? []).map(channel => {
+              const level = notificationPreferences.channels?.[channel.id] ?? 'mentions_only';
+              return (
+                <Button
+                  key={channel.id}
+                  testID={`settings-notifications-channel-${channel.id}`}
+                  accessibilityLabel={`set ${channel.name} channel notifications`}
+                  variant="secondary"
+                  size="sm"
+                  label={`#${channel.name}: ${levelLabel(level)}`}
+                  onPress={() =>
+                    setNotificationLevel('channels', channel.id, nextNotificationLevel(level))
+                  }
+                />
+              );
+            }),
+          )}
+          {conversations.filter(conversation => Boolean(conversation.conversationId)).map(conversation => {
+            const conversationId = conversation.conversationId as string;
+            const level =
+              notificationPreferences.conversations?.[conversationId] ?? 'all';
+            const label =
+              conversation.participants.map(participant => participant.label).join(', ') ||
+              conversationId;
+            return (
+              <Button
+                key={conversationId}
+                testID={`settings-notifications-dm-${conversationId}`}
+                accessibilityLabel={`set ${label} direct message notifications`}
+                variant="secondary"
+                size="sm"
+                label={`${label}: ${levelLabel(level)}`}
+                onPress={() =>
+                  setNotificationLevel(
+                    'conversations',
+                    conversationId,
+                    nextNotificationLevel(level),
+                  )
+                }
+              />
+            );
+          })}
         </View>
       </Card>
 

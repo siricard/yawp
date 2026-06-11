@@ -4,11 +4,16 @@ defmodule Yawp.Identity.DevicePushRegistry do
   use Ash.Resource,
     otp_app: :yawp,
     domain: Yawp.Identity,
-    data_layer: AshPostgres.DataLayer
+    data_layer: AshPostgres.DataLayer,
+    extensions: [AshTypescript.Resource]
 
   postgres do
     table "identity_device_push_registries"
     repo Yawp.Repo
+  end
+
+  typescript do
+    type_name "DevicePushRegistry"
   end
 
   actions do
@@ -17,6 +22,7 @@ defmodule Yawp.Identity.DevicePushRegistry do
     create :upsert do
       primary? true
       accept [:identity_id, :device_subkey_id, :platform, :token]
+      change Yawp.Identity.DevicePushRegistry.Changes.AuthorizeOwner
       change set_attribute(:updated_at, &DateTime.utc_now/0)
       upsert? true
       upsert_identity :unique_device_platform

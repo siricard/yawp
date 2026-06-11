@@ -49,17 +49,29 @@ defmodule Yawp.Federation.NotificationSignature do
   defp validate_shape(_), do: :error
 
   defp verify_signature(envelope, source_anchor, key_id, sig) do
-    canonical =
-      envelope
-      |> Map.delete("source_server_signature")
-      |> Map.delete("signature")
-      |> CanonicalJson.encode()
+    canonical = canonical_without_key(envelope)
+    legacy = canonical_with_key(envelope)
 
-    KeyDocFetcher.verify_with(source_anchor, key_id, canonical, sig)
+    KeyDocFetcher.verify_with(source_anchor, key_id, canonical, sig) or
+      KeyDocFetcher.verify_with(source_anchor, key_id, legacy, sig)
   rescue
     _ -> false
   catch
     _, _ -> false
+  end
+
+  defp canonical_without_key(envelope) do
+    envelope
+    |> Map.delete("signed_by")
+    |> Map.delete("key_id")
+    |> canonical_with_key()
+  end
+
+  defp canonical_with_key(envelope) do
+    envelope
+    |> Map.delete("source_server_signature")
+    |> Map.delete("signature")
+    |> CanonicalJson.encode()
   end
 
   defp signature(envelope) do

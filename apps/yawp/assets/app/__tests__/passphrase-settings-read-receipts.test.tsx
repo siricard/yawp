@@ -20,9 +20,16 @@ const mockSetReadReceipts = jest.fn(async (_config?: unknown) => ({
   success: true,
   data: {did: 'did:yawp:alice', readReceiptsEnabled: false},
 }));
+const mockUpsertNotificationPreference = jest.fn(async (_config?: unknown) => ({
+  success: true,
+  data: {id: 'pref-1', level: 'muted'},
+}));
 
 jest.mock('../identity-context', () => ({
   useIdentity: () => ({didFull: 'did:yawp:alice'}),
+  useWorkspaceServers: () => ({
+    servers: [{did: 'server-1', url: 'http://localhost:4000', label: 'Local', role: 'Member'}],
+  }),
   useBundleMetadata: () => ({
     metadata: mockMetadata,
     mutate: mockMutate,
@@ -39,6 +46,14 @@ jest.mock('../identity-context', () => ({
 
 jest.mock('../ash_generated', () => ({
   setReadReceipts: (config: unknown) => mockSetReadReceipts(config),
+  upsertNotificationPreference: (config: unknown) => mockUpsertNotificationPreference(config),
+}));
+
+jest.mock('../chat/server-tree', () => ({
+  fetchServerTree: jest.fn(async () => ({
+    categories: [],
+    channels: [{id: 'channel-general', name: 'general', categoryId: null, position: 0}],
+  })),
 }));
 
 jest.mock('../session', () => ({
@@ -55,9 +70,14 @@ describe('PassphraseSettingsScreen read receipts', () => {
     };
     mockMutate.mockClear();
     mockSetReadReceipts.mockReset();
+    mockUpsertNotificationPreference.mockReset();
     mockSetReadReceipts.mockResolvedValue({
       success: true,
       data: {did: 'did:yawp:alice', readReceiptsEnabled: false},
+    });
+    mockUpsertNotificationPreference.mockResolvedValue({
+      success: true,
+      data: {id: 'pref-1', level: 'muted'},
     });
   });
 
@@ -111,10 +131,25 @@ describe('PassphraseSettingsScreen read receipts', () => {
     });
 
     await ReactTestRenderer.act(async () => {
-      await root.root.findByProps({testID: 'settings-notifications-channel-general'}).props.onPress();
+      await Promise.resolve();
     });
 
-    expect(mockMetadata.notificationPreferences?.channels?.general).toBe('muted');
+    await ReactTestRenderer.act(async () => {
+      await root.root.findByProps({testID: 'settings-notifications-channel-channel-general'}).props.onPress();
+    });
+
+    expect(mockMetadata.notificationPreferences?.channels?.['channel-general']).toBe('muted');
+    expect(mockUpsertNotificationPreference).toHaveBeenCalledWith({
+      input: {
+        identityDid: 'did:yawp:alice',
+        serverId: null,
+        channelId: 'channel-general',
+        conversationId: null,
+        level: 'muted',
+      },
+      fields: ['id', 'level'],
+      headers: {Authorization: 'Bearer sess-token'},
+    });
 
     ReactTestRenderer.act(() => root.unmount());
   });

@@ -65,6 +65,7 @@ defmodule Yawp.Servers.Message do
       change Yawp.Servers.Message.Changes.VerifySendSignature
       change Yawp.Servers.Message.Changes.AssignServerSerial
       change set_attribute(:server_inserted_at, &DateTime.utc_now/0)
+      change Yawp.Servers.Message.Changes.FanOutNotifications
     end
 
     update :wipe_body do

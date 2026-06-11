@@ -27,6 +27,33 @@ export type AdminAccountAttributesOnlySchema = {
 };
 
 
+// DevicePushRegistry Schema
+export type DevicePushRegistryResourceSchema = {
+  __type: "Resource";
+  __primitiveFields: "id" | "deviceSubkeyId" | "platform" | "token" | "updatedAt" | "identityId";
+  id: UUID;
+  deviceSubkeyId: UUID;
+  platform: "apns" | "fcm";
+  token: string;
+  updatedAt: UtcDateTimeUsec;
+  identityId: UUID;
+  identity: { __type: "Relationship"; __resource: IdentityResourceSchema; };
+};
+
+
+
+export type DevicePushRegistryAttributesOnlySchema = {
+  __type: "Resource";
+  __primitiveFields: "id" | "deviceSubkeyId" | "platform" | "token" | "updatedAt" | "identityId";
+  id: UUID;
+  deviceSubkeyId: UUID;
+  platform: "apns" | "fcm";
+  token: string;
+  updatedAt: UtcDateTimeUsec;
+  identityId: UUID;
+};
+
+
 // Identity Schema
 export type IdentityResourceSchema = {
   __type: "Resource";
@@ -52,6 +79,33 @@ export type IdentityAttributesOnlySchema = {
   anchorList: Array<string>;
   profileVersion: number;
   readReceiptsEnabled: boolean;
+};
+
+
+// NotificationPreference Schema
+export type NotificationPreferenceResourceSchema = {
+  __type: "Resource";
+  __primitiveFields: "id" | "serverId" | "channelId" | "conversationId" | "level" | "identityId";
+  id: UUID;
+  serverId: UUID | null;
+  channelId: UUID | null;
+  conversationId: string | null;
+  level: "all" | "mentions_only" | "muted";
+  identityId: UUID;
+  identity: { __type: "Relationship"; __resource: IdentityResourceSchema; };
+};
+
+
+
+export type NotificationPreferenceAttributesOnlySchema = {
+  __type: "Resource";
+  __primitiveFields: "id" | "serverId" | "channelId" | "conversationId" | "level" | "identityId";
+  id: UUID;
+  serverId: UUID | null;
+  channelId: UUID | null;
+  conversationId: string | null;
+  level: "all" | "mentions_only" | "muted";
+  identityId: UUID;
 };
 
 
@@ -335,6 +389,55 @@ export type AdminAccountFilterInput = {
 
 
 };
+export type DevicePushRegistryFilterInput = {
+  and?: Array<DevicePushRegistryFilterInput>;
+  or?: Array<DevicePushRegistryFilterInput>;
+  not?: Array<DevicePushRegistryFilterInput>;
+
+  id?: {
+    eq?: UUID;
+    notEq?: UUID;
+    in?: Array<UUID>;
+  };
+
+  deviceSubkeyId?: {
+    eq?: UUID;
+    notEq?: UUID;
+    in?: Array<UUID>;
+  };
+
+  platform?: {
+    eq?: "apns" | "fcm";
+    notEq?: "apns" | "fcm";
+    in?: Array<"apns" | "fcm">;
+  };
+
+  token?: {
+    eq?: string;
+    notEq?: string;
+    in?: Array<string>;
+  };
+
+  updatedAt?: {
+    eq?: UtcDateTimeUsec;
+    notEq?: UtcDateTimeUsec;
+    greaterThan?: UtcDateTimeUsec;
+    greaterThanOrEqual?: UtcDateTimeUsec;
+    lessThan?: UtcDateTimeUsec;
+    lessThanOrEqual?: UtcDateTimeUsec;
+    in?: Array<UtcDateTimeUsec>;
+  };
+
+  identityId?: {
+    eq?: UUID;
+    notEq?: UUID;
+    in?: Array<UUID>;
+  };
+
+
+  identity?: IdentityFilterInput;
+
+};
 export type IdentityFilterInput = {
   and?: Array<IdentityFilterInput>;
   or?: Array<IdentityFilterInput>;
@@ -386,6 +489,54 @@ export type IdentityFilterInput = {
   };
 
 
+
+};
+export type NotificationPreferenceFilterInput = {
+  and?: Array<NotificationPreferenceFilterInput>;
+  or?: Array<NotificationPreferenceFilterInput>;
+  not?: Array<NotificationPreferenceFilterInput>;
+
+  id?: {
+    eq?: UUID;
+    notEq?: UUID;
+    in?: Array<UUID>;
+  };
+
+  serverId?: {
+    eq?: UUID;
+    notEq?: UUID;
+    in?: Array<UUID>;
+    isNil?: boolean;
+  };
+
+  channelId?: {
+    eq?: UUID;
+    notEq?: UUID;
+    in?: Array<UUID>;
+    isNil?: boolean;
+  };
+
+  conversationId?: {
+    eq?: string;
+    notEq?: string;
+    in?: Array<string>;
+    isNil?: boolean;
+  };
+
+  level?: {
+    eq?: "all" | "mentions_only" | "muted";
+    notEq?: "all" | "mentions_only" | "muted";
+    in?: Array<"all" | "mentions_only" | "muted">;
+  };
+
+  identityId?: {
+    eq?: UUID;
+    notEq?: UUID;
+    in?: Array<UUID>;
+  };
+
+
+  identity?: IdentityFilterInput;
 
 };
 export type RefreshTokenFilterInput = {
@@ -925,8 +1076,14 @@ export type ServerInviteFilterInput = {
 export const adminAccountFilterFields = ["id", "email", "lastLoginAt"] as const;
 export type AdminAccountFilterField = (typeof adminAccountFilterFields)[number];
 
+export const devicePushRegistryFilterFields = ["id", "deviceSubkeyId", "platform", "token", "updatedAt", "identityId", "identity"] as const;
+export type DevicePushRegistryFilterField = (typeof devicePushRegistryFilterFields)[number];
+
 export const identityFilterFields = ["id", "did", "masterPublicKey", "deviceSubkeys", "anchorList", "profileVersion", "readReceiptsEnabled"] as const;
 export type IdentityFilterField = (typeof identityFilterFields)[number];
+
+export const notificationPreferenceFilterFields = ["id", "serverId", "channelId", "conversationId", "level", "identityId", "identity"] as const;
+export type NotificationPreferenceFilterField = (typeof notificationPreferenceFilterFields)[number];
 
 export const refreshTokenFilterFields = ["id", "token", "identityId", "deviceId", "expiresAt", "revokedAt", "rotatedTo", "identity", "rotatedToRefresh"] as const;
 export type RefreshTokenFilterField = (typeof refreshTokenFilterFields)[number];
@@ -956,8 +1113,14 @@ export type ServerInviteFilterField = (typeof serverInviteFilterFields)[number];
 export const adminAccountSortFields = ["id", "email", "lastLoginAt"] as const;
 export type AdminAccountSortField = (typeof adminAccountSortFields)[number];
 
+export const devicePushRegistrySortFields = ["id", "deviceSubkeyId", "platform", "token", "updatedAt", "identityId"] as const;
+export type DevicePushRegistrySortField = (typeof devicePushRegistrySortFields)[number];
+
 export const identitySortFields = ["id", "did", "masterPublicKey", "deviceSubkeys", "anchorList", "profileVersion", "readReceiptsEnabled"] as const;
 export type IdentitySortField = (typeof identitySortFields)[number];
+
+export const notificationPreferenceSortFields = ["id", "serverId", "channelId", "conversationId", "level", "identityId"] as const;
+export type NotificationPreferenceSortField = (typeof notificationPreferenceSortFields)[number];
 
 export const refreshTokenSortFields = ["id", "token", "identityId", "deviceId", "expiresAt", "revokedAt", "rotatedTo"] as const;
 export type RefreshTokenSortField = (typeof refreshTokenSortFields)[number];

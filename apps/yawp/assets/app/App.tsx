@@ -408,7 +408,10 @@ function AppShell() {
       break;
     case 'passphrase-settings':
       body = (
-        <PassphraseSettingsScreen onBack={() => setScreen({kind: 'home'})} />
+        <PassphraseSettingsScreen
+          onBack={() => setScreen({kind: 'home'})}
+          conversations={inboxConversations}
+        />
       );
       break;
     case 'dm':
