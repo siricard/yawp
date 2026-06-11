@@ -44,11 +44,14 @@ defmodule Yawp.Servers.MessageSearchTest do
     } =
       seed_graph()
 
+    readable = insert_message(public_channel.id, admin.identity.did, "crowded-result readable")
+
     Enum.each(1..60, fn index ->
-      insert_message(private_channel.id, admin.identity.did, "crowded-result #{index}")
+      body = String.duplicate("crowded-result ", 8) <> Integer.to_string(index)
+      insert_message(private_channel.id, admin.identity.did, body)
     end)
 
-    insert_message(public_channel.id, admin.identity.did, "crowded-result readable")
+    assert readable.id not in raw_limited_match_ids(server.id, "crowded-result", 50)
 
     assert {:ok, [hit]} =
              Servers.search_messages(server.id, "crowded-result", actor: member.identity)
@@ -197,5 +200,24 @@ defmodule Yawp.Servers.MessageSearchTest do
       server_serial: System.unique_integer([:positive]),
       server_inserted_at: DateTime.utc_now()
     })
+  end
+
+  defp raw_limited_match_ids(server_id, query, limit) do
+    %{rows: rows} =
+      Repo.query!(
+        """
+        select m.id
+        from server_messages m
+        join server_channels c on c.id = m.channel_id
+        where c.server_id::text = $1
+          and m.search_vector @@ websearch_to_tsquery('simple', $2)
+        order by ts_rank(m.search_vector, websearch_to_tsquery('simple', $2)) desc,
+                 m.server_inserted_at desc
+        limit $3
+        """,
+        [server_id, query, limit]
+      )
+
+    Enum.map(rows, fn [id] -> Ecto.UUID.load!(id) end)
   end
 end
