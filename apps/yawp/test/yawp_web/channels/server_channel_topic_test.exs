@@ -104,6 +104,24 @@ defmodule YawpWeb.ServerChannelTopicTest do
     }
   end
 
+  defp read_marker_payload(channel, actor, message_id, opts \\ []) do
+    ts = Keyword.get(opts, :ts, System.system_time(:millisecond))
+
+    envelope = %{
+      "channel_id" => channel.id,
+      "identity_did" => actor.did,
+      "last_read_message_id" => message_id,
+      "ts" => ts
+    }
+
+    %{
+      "last_read_message_id" => message_id,
+      "signed_by" => actor.device_id,
+      "signature" => sign(envelope, actor.device_sk),
+      "ts" => ts
+    }
+  end
+
   describe "join authorization" do
     test "member with read_messages joins and receives a history + presence_state", ctx do
       actor = seed_identity()
@@ -331,22 +349,63 @@ defmodule YawpWeb.ServerChannelTopicTest do
       assert_push "history", _
       assert_push "presence_state", _
 
-      ref =
-        push(reader_socket, "read_marker", %{
-          "last_read_message_id" => "msg-9"
-        })
+      ref = push(reader_socket, "read_marker", read_marker_payload(ctx.channel, actor, "msg-9"))
 
       assert_reply ref, :ok, %{last_read_message_id: "msg-9"}
-      assert_push "read_marker", %{channel_id: channel_id, last_read_message_id: "msg-9"}
+
+      assert_push "read_marker", %{
+        channel_id: channel_id,
+        last_read_message_id: "msg-9",
+        signed_by: signed_by,
+        signature: signature
+      }
+
       assert channel_id == ctx.channel.id
+      assert signed_by == actor.device_id
+      assert is_binary(signature)
 
       assert {:ok, marker} =
                Servers.get_read_marker(actor.identity.id, ctx.channel.id, authorize?: false)
 
       assert marker.last_read_message_id == "msg-9"
       assert marker.identity_id == actor.identity.id
+      assert marker.signed_by == actor.device_id
+      assert marker.signature == Base.url_decode64!(signature, padding: false)
 
       Process.unlink(other_socket.channel_pid)
+    end
+
+    test "rejects an unsigned read marker", ctx do
+      actor = seed_identity()
+      seed_membership(actor, ctx.server, [:read_messages, :send_messages])
+      {:ok, _reply, socket} = join_channel(actor, ctx.server, ctx.channel)
+      assert_push "history", _
+      assert_push "presence_state", _
+
+      ref = push(socket, "read_marker", %{"last_read_message_id" => "msg-9"})
+      assert_reply ref, :error, %{reason: "invalid_payload"}
+
+      assert {:ok, nil} =
+               Servers.get_read_marker(actor.identity.id, ctx.channel.id, authorize?: false)
+    end
+
+    test "rejects a forged read marker", ctx do
+      actor = seed_identity()
+      seed_membership(actor, ctx.server, [:read_messages, :send_messages])
+      {:ok, _reply, socket} = join_channel(actor, ctx.server, ctx.channel)
+      assert_push "history", _
+      assert_push "presence_state", _
+
+      payload =
+        ctx.channel
+        |> read_marker_payload(actor, "msg-9")
+        |> Map.put("last_read_message_id", "msg-10")
+
+      ref = push(socket, "read_marker", payload)
+      assert_reply ref, :error, %{reason: "invalid_signature"}
+
+      assert {:ok, nil} =
+               Servers.get_read_marker(actor.identity.id, ctx.channel.id, authorize?: false)
     end
 
     test "rejects an invalid read marker", ctx do
@@ -356,7 +415,7 @@ defmodule YawpWeb.ServerChannelTopicTest do
       assert_push "history", _
       assert_push "presence_state", _
 
-      ref = push(socket, "read_marker", %{"last_read_message_id" => ""})
+      ref = push(socket, "read_marker", read_marker_payload(ctx.channel, actor, ""))
       assert_reply ref, :error, %{reason: "invalid_payload"}
     end
   end

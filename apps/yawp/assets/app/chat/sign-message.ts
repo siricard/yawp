@@ -1,5 +1,4 @@
-
-import {canonicalJson} from '../canonical-json';
+import { canonicalJson } from "../canonical-json";
 
 type Signer = (bytes: Uint8Array) => Uint8Array;
 
@@ -26,6 +25,13 @@ export type DeleteEnvelope = {
   ts: number;
 };
 
+export type ChannelReadMarkerEnvelope = {
+  channel_id: string;
+  identity_did: string;
+  last_read_message_id: string;
+  ts: number;
+};
+
 export function buildSendCanonical(envelope: SendEnvelope): Uint8Array {
   return new TextEncoder().encode(canonicalJson(envelope));
 }
@@ -35,6 +41,12 @@ export function buildEditCanonical(envelope: EditEnvelope): Uint8Array {
 }
 
 export function buildDeleteCanonical(envelope: DeleteEnvelope): Uint8Array {
+  return new TextEncoder().encode(canonicalJson(envelope));
+}
+
+export function buildChannelReadMarkerCanonical(
+  envelope: ChannelReadMarkerEnvelope
+): Uint8Array {
   return new TextEncoder().encode(canonicalJson(envelope));
 }
 
@@ -50,12 +62,21 @@ export function signDelete(envelope: DeleteEnvelope, signer: Signer): string {
   return bytesToBase64Url(signer(buildDeleteCanonical(envelope)));
 }
 
+export function signChannelReadMarker(
+  envelope: ChannelReadMarkerEnvelope,
+  signer: Signer
+): string {
+  return bytesToBase64Url(signer(buildChannelReadMarkerCanonical(envelope)));
+}
+
 function bytesToBase64Url(bytes: Uint8Array): string {
-  let bin = '';
+  let bin = "";
   for (let i = 0; i < bytes.length; i++) {
     bin += String.fromCharCode(bytes[i]);
   }
   const b64 =
-    typeof btoa === 'function' ? btoa(bin) : Buffer.from(bytes).toString('base64');
-  return b64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+    typeof btoa === "function"
+      ? btoa(bin)
+      : Buffer.from(bytes).toString("base64");
+  return b64.replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 }

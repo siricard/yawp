@@ -21,10 +21,14 @@ defmodule Yawp.Servers.ReadMarker do
 
     create :upsert do
       primary? true
-      accept [:identity_id, :channel_id, :last_read_message_id, :updated_at]
+      accept [:identity_id, :channel_id, :last_read_message_id, :signed_by, :updated_at]
+      argument :identity_did, :string, allow_nil?: false
+      argument :sender_signature, :string, allow_nil?: false
+      argument :ts, :integer, allow_nil?: false
       upsert? true
       upsert_identity :unique_identity_channel
-      upsert_fields [:last_read_message_id, :updated_at]
+      upsert_fields [:last_read_message_id, :signed_by, :signature, :updated_at]
+      change Yawp.Servers.ReadMarker.Changes.VerifySignature
       change set_attribute(:updated_at, &DateTime.utc_now/0)
     end
 
@@ -40,6 +44,16 @@ defmodule Yawp.Servers.ReadMarker do
     uuid_primary_key :id
 
     attribute :last_read_message_id, :string do
+      allow_nil? false
+      public? true
+    end
+
+    attribute :signed_by, :string do
+      allow_nil? false
+      public? true
+    end
+
+    attribute :signature, :binary do
       allow_nil? false
       public? true
     end

@@ -1,11 +1,15 @@
+import { useCallback, useEffect, useRef, useState } from "react";
+import { AppState, Platform } from "react-native";
+import type { Channel, Socket } from "phoenix";
 
-import {useCallback, useEffect, useRef, useState} from 'react';
-import {AppState, Platform} from 'react-native';
-import type {Channel, Socket} from 'phoenix';
-
-import {useIdentity} from '../identity-context';
-import {getSocket} from './socket';
-import {signDelete, signEdit, signSend} from './sign-message';
+import { useIdentity } from "../identity-context";
+import { getSocket } from "./socket";
+import {
+  signChannelReadMarker,
+  signDelete,
+  signEdit,
+  signSend,
+} from "./sign-message";
 
 export type ChannelMessage = {
   id: string;
@@ -34,7 +38,7 @@ type MessageDeleted = {
   reason: string;
 };
 
-export type UseChannelStatus = 'connecting' | 'joined' | 'error' | 'removed';
+export type UseChannelStatus = "connecting" | "joined" | "error" | "removed";
 
 type MemberRemoved = {
   did: string;
@@ -60,10 +64,10 @@ function sortBySerial(list: ChannelMessage[]): ChannelMessage[] {
 export function useChannel(
   serverUrl: string | null,
   serverId: string | null,
-  channelId: string | null,
+  channelId: string | null
 ): UseChannelResult {
   const identity = useIdentity();
-  const [status, setStatus] = useState<UseChannelStatus>('connecting');
+  const [status, setStatus] = useState<UseChannelStatus>("connecting");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [removedReason, setRemovedReason] = useState<string | null>(null);
   const [messages, setMessages] = useState<ChannelMessage[]>([]);
@@ -76,10 +80,26 @@ export function useChannel(
   const markRead = useCallback((): void => {
     const channel = channelRef.current;
     const latest = messagesRef.current[messagesRef.current.length - 1];
-    if (!channel || !latest || latest.id === lastReadRef.current) return;
+    if (!channel || !channelId || !latest || latest.id === lastReadRef.current)
+      return;
     lastReadRef.current = latest.id;
-    channel.push('read_marker', {last_read_message_id: latest.id});
-  }, []);
+    const ts = Date.now();
+    const signature = signChannelReadMarker(
+      {
+        channel_id: channelId,
+        identity_did: identity.didFull,
+        last_read_message_id: latest.id,
+        ts,
+      },
+      identity.signDevice
+    );
+    channel.push("read_marker", {
+      last_read_message_id: latest.id,
+      signed_by: identity.deviceId,
+      signature,
+      ts,
+    });
+  }, [channelId, identity]);
 
   useEffect(() => {
     if (!serverUrl || !serverId || !channelId) {
@@ -93,83 +113,81 @@ export function useChannel(
       const result = await getSocket(serverUrl);
       if (cancelled) return;
       if (!result.ok) {
-        setStatus('error');
+        setStatus("error");
         setErrorMessage(
-          'No active session on this anchor. Re-add the server to continue.',
+          "No active session on this anchor. Re-add the server to continue."
         );
         return;
       }
       localSocket = result.socket;
       localChannel = localSocket.channel(
         `server:${serverId}:channel:${channelId}`,
-        {},
+        {}
       );
       channelRef.current = localChannel;
 
-      localChannel.on('history', (payload: {messages: ChannelMessage[]}) => {
+      localChannel.on("history", (payload: { messages: ChannelMessage[] }) => {
         if (cancelled) return;
         setMessages(sortBySerial(payload?.messages ?? []));
       });
 
-      localChannel.on('new_message', (msg: ChannelMessage) => {
+      localChannel.on("new_message", (msg: ChannelMessage) => {
         if (cancelled) return;
-        setMessages(prev => {
-          if (prev.some(m => m.id === msg.id)) return prev;
+        setMessages((prev) => {
+          if (prev.some((m) => m.id === msg.id)) return prev;
           return sortBySerial([...prev, msg]);
         });
       });
 
-      localChannel.on('message_edited', (edit: MessageEdited) => {
+      localChannel.on("message_edited", (edit: MessageEdited) => {
         if (cancelled) return;
-        setMessages(prev =>
-          prev.map(m =>
+        setMessages((prev) =>
+          prev.map((m) =>
             m.id === edit.message_id
-              ? {...m, body: edit.body, edited: true}
-              : m,
-          ),
+              ? { ...m, body: edit.body, edited: true }
+              : m
+          )
         );
       });
 
-      localChannel.on('message_deleted', (del: MessageDeleted) => {
+      localChannel.on("message_deleted", (del: MessageDeleted) => {
         if (cancelled) return;
-        setMessages(prev =>
-          prev.map(m =>
-            m.id === del.message_id ? {...m, body: null} : m,
-          ),
+        setMessages((prev) =>
+          prev.map((m) => (m.id === del.message_id ? { ...m, body: null } : m))
         );
       });
 
-      localChannel.on('removed', (payload: MemberRemoved) => {
+      localChannel.on("removed", (payload: MemberRemoved) => {
         if (cancelled) return;
-        setStatus('removed');
-        setRemovedReason(payload?.reason ?? 'removed');
+        setStatus("removed");
+        setRemovedReason(payload?.reason ?? "removed");
       });
 
       localChannel
         .join()
-        .receive('ok', (resp: {effective_bits?: number} | undefined) => {
+        .receive("ok", (resp: { effective_bits?: number } | undefined) => {
           if (cancelled) return;
-          setStatus('joined');
+          setStatus("joined");
           setErrorMessage(null);
           setEffectiveBits(
-            typeof resp?.effective_bits === 'number' ? resp.effective_bits : 0,
+            typeof resp?.effective_bits === "number" ? resp.effective_bits : 0
           );
         })
-        .receive('error', (resp: {reason?: string} | undefined) => {
+        .receive("error", (resp: { reason?: string } | undefined) => {
           if (cancelled) return;
-          setStatus('error');
+          setStatus("error");
           setEffectiveBits(0);
           setErrorMessage(
-            typeof resp?.reason === 'string'
+            typeof resp?.reason === "string"
               ? resp.reason
-              : 'Could not join the channel.',
+              : "Could not join the channel."
           );
         })
-        .receive('timeout', () => {
+        .receive("timeout", () => {
           if (cancelled) return;
-          setStatus('error');
+          setStatus("error");
           setEffectiveBits(0);
-          setErrorMessage('Joining the channel timed out.');
+          setErrorMessage("Joining the channel timed out.");
         });
     })();
 
@@ -177,21 +195,20 @@ export function useChannel(
       cancelled = true;
       try {
         localChannel?.leave();
-      } catch {
-      }
+      } catch {}
       channelRef.current = null;
     };
   }, [serverUrl, serverId, channelId]);
 
   useEffect(() => {
-    if (Platform.OS === 'web' && typeof window !== 'undefined') {
+    if (Platform.OS === "web" && typeof window !== "undefined") {
       const onFocus = () => markRead();
-      window.addEventListener('focus', onFocus);
-      return () => window.removeEventListener('focus', onFocus);
+      window.addEventListener("focus", onFocus);
+      return () => window.removeEventListener("focus", onFocus);
     }
 
-    const sub = AppState.addEventListener('change', state => {
-      if (state === 'active') markRead();
+    const sub = AppState.addEventListener("change", (state) => {
+      if (state === "active") markRead();
     });
 
     return () => sub.remove();
@@ -213,9 +230,9 @@ export function useChannel(
         attachments: [],
         ts,
       },
-      identity.signDevice,
+      identity.signDevice
     );
-    channel.push('send_message', {
+    channel.push("send_message", {
       body: trimmed,
       reply_to_message_id: replyToMessageId,
       signed_by: identity.deviceId,
@@ -231,10 +248,10 @@ export function useChannel(
     if (!channel) return;
     const ts = Date.now();
     const signature = signEdit(
-      {message_id: messageId, body: trimmed, ts},
-      identity.signDevice,
+      { message_id: messageId, body: trimmed, ts },
+      identity.signDevice
     );
-    channel.push('edit_message', {
+    channel.push("edit_message", {
       message_id: messageId,
       body: trimmed,
       signed_by: identity.deviceId,
@@ -250,15 +267,15 @@ export function useChannel(
     const signature = signDelete(
       {
         message_id: messageId,
-        reason: 'sender',
+        reason: "sender",
         actor_did: identity.didFull,
         ts,
       },
-      identity.signDevice,
+      identity.signDevice
     );
-    channel.push('delete_message', {
+    channel.push("delete_message", {
       message_id: messageId,
-      reason: 'sender',
+      reason: "sender",
       signed_by: identity.deviceId,
       signature,
       ts,

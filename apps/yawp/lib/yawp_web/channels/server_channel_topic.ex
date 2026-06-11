@@ -191,8 +191,12 @@ defmodule YawpWeb.ServerChannelTopic do
     if valid_read_marker_payload?(payload) do
       attrs = %{
         identity_id: socket.assigns.current_identity.id,
+        identity_did: socket.assigns.current_identity.did,
         channel_id: socket.assigns.channel.id,
         last_read_message_id: Map.fetch!(payload, "last_read_message_id"),
+        signed_by: Map.fetch!(payload, "signed_by"),
+        sender_signature: Map.fetch!(payload, "signature"),
+        ts: Map.fetch!(payload, "ts"),
         updated_at: DateTime.utc_now()
       }
 
@@ -207,7 +211,7 @@ defmodule YawpWeb.ServerChannelTopic do
           {:reply, {:ok, serialize_read_marker(marker)}, socket}
 
         {:error, _} ->
-          {:reply, {:error, %{reason: "invalid_payload"}}, socket}
+          {:reply, {:error, %{reason: "invalid_signature"}}, socket}
       end
     else
       {:reply, {:error, %{reason: "invalid_payload"}}, socket}
@@ -302,8 +306,14 @@ defmodule YawpWeb.ServerChannelTopic do
 
   defp valid_delete_payload?(_), do: false
 
-  defp valid_read_marker_payload?(%{"last_read_message_id" => message_id}) do
-    is_binary(message_id) and byte_size(message_id) > 0
+  defp valid_read_marker_payload?(%{
+         "last_read_message_id" => message_id,
+         "signed_by" => signed_by,
+         "signature" => signature,
+         "ts" => ts
+       }) do
+    is_binary(message_id) and byte_size(message_id) > 0 and is_binary(signed_by) and
+      byte_size(signed_by) > 0 and is_binary(signature) and is_integer(ts)
   end
 
   defp valid_read_marker_payload?(_), do: false
@@ -384,6 +394,8 @@ defmodule YawpWeb.ServerChannelTopic do
       identity_id: marker.identity_id,
       channel_id: marker.channel_id,
       last_read_message_id: marker.last_read_message_id,
+      signed_by: marker.signed_by,
+      signature: Base.url_encode64(marker.signature, padding: false),
       updated_at: DateTime.to_iso8601(marker.updated_at)
     }
   end
