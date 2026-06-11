@@ -72,6 +72,7 @@ defmodule YawpWeb.AttachmentController do
          {:ok, attachment} <- Servers.get_attachment_by_upload_id(upload_id),
          {:ok, path} <- local_path(attachment) do
       conn
+      |> put_resp_header("access-control-allow-origin", "*")
       |> put_resp_content_type(attachment.mime)
       |> send_file(200, path)
     else

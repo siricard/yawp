@@ -83,6 +83,23 @@ defmodule YawpWeb.AttachmentControllerTest do
     assert json_response(conn, 403) == %{"error" => "download_url_expired"}
   end
 
+  test "download allows browser verification from a peer anchor", %{conn: conn} do
+    upload = upload_fixture(<<0, 1, 2, 3, 4, 255>>, "image.png", "image/png")
+
+    conn = post(conn, ~p"/api/uploads", %{"file" => upload})
+    %{"download_url" => download_url} = json_response(conn, 201)
+
+    uri = URI.parse(download_url)
+
+    conn =
+      build_conn()
+      |> put_req_header("origin", "http://localhost:4100")
+      |> get(uri.path <> "?" <> uri.query)
+
+    assert response(conn, 200) == <<0, 1, 2, 3, 4, 255>>
+    assert get_resp_header(conn, "access-control-allow-origin") == ["*"]
+  end
+
   defp upload_fixture(body, filename, content_type) do
     path = Path.join(System.tmp_dir!(), "yawp-upload-#{System.unique_integer([:positive])}")
     File.write!(path, body)
