@@ -15,6 +15,7 @@ import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {useChannel, type ChannelMessage} from '../chat/channel-store';
 import {hasPermission} from '../chat/edit-mode';
 import {MessageBody} from '../chat/MessageBody';
+import {searchServerMessages, type SearchHit} from '../chat/search';
 import {useDisplayName, useIdentityState} from '../identity-context';
 import {banServerMember, kickServerMember} from '../server-moderation';
 import {pointerCursor} from '../ui/cursor';
@@ -379,6 +380,9 @@ export function ChannelScreen({
     null,
   );
   const [showMembers, setShowMembers] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState<SearchHit[]>([]);
+  const [searching, setSearching] = useState(false);
   const listRef = useRef<FlatList<{message: ChannelMessage; showHeader: boolean}> | null>(null);
 
   const members = Array.from(new Set(messages.map(m => m.sender_did)));
@@ -397,6 +401,35 @@ export function ChannelScreen({
     });
     return () => cancelAnimationFrame(frame);
   }, [messages.length, markRead]);
+
+  useEffect(() => {
+    const trimmed = searchQuery.trim();
+    if (trimmed.length < 2) {
+      setSearchResults([]);
+      setSearching(false);
+      return;
+    }
+
+    let cancelled = false;
+    setSearching(true);
+    const handle = setTimeout(() => {
+      searchServerMessages({serverUrl, serverId, query: trimmed})
+        .then(results => {
+          if (!cancelled) setSearchResults(results);
+        })
+        .catch(() => {
+          if (!cancelled) setSearchResults([]);
+        })
+        .finally(() => {
+          if (!cancelled) setSearching(false);
+        });
+    }, 250);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(handle);
+    };
+  }, [searchQuery, serverId, serverUrl]);
 
   function handleSend() {
     const trimmed = draft.trim();
@@ -488,6 +521,16 @@ export function ChannelScreen({
             {serverLabel}
           </Text>
         </View>
+        <View className="w-64 max-w-[40%] mr-3">
+          <TextInput
+            testID="server-search-input"
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            placeholder="Search this workspace"
+            placeholderTextColor="#7a8290"
+            className="px-4 py-2 rounded-pill bg-bg text-text border border-border-soft"
+          />
+        </View>
         <Text testID="channel-status" className={statusClass} style={{fontFamily: monospace}}>
           {status}
         </Text>
@@ -507,6 +550,35 @@ export function ChannelScreen({
           testID="channel-error"
           className="px-6 py-2 bg-danger/20 border-b border-danger">
           <Text className="text-xs text-danger">{errorMessage}</Text>
+        </View>
+      ) : null}
+
+      {searchQuery.trim().length >= 2 ? (
+        <View
+          testID="server-search-results"
+          className="border-b border-border-soft bg-surface px-6 py-3">
+          <Text className="text-xs font-semibold text-text-secondary mb-2">
+            {searching
+              ? 'Searching…'
+              : searchResults.length === 0
+                ? 'No matching messages'
+                : `${searchResults.length} matching message${
+                    searchResults.length === 1 ? '' : 's'
+                  }`}
+          </Text>
+          {searchResults.slice(0, 5).map(result => (
+            <View
+              key={result.id}
+              testID={`server-search-result-${result.id}`}
+              className="py-2 border-t border-border-soft">
+              <Text className="text-xs text-text-tertiary" style={{fontFamily: monospace}}>
+                {displayAuthor(result.senderDid)}
+              </Text>
+              <Text className="text-sm text-text" numberOfLines={2}>
+                {result.body ?? '[deleted]'}
+              </Text>
+            </View>
+          ))}
         </View>
       ) : null}
 

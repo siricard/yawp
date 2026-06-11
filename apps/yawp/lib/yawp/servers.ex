@@ -1,14 +1,5 @@
 defmodule Yawp.Servers do
-  @moduledoc """
-  Ash domain for the server / channel / role graph.
-
-   lands the minimal schemas for `Server`, `Role`, and `Channel`
-  plus a `Seeder` module that idempotently creates the singleton
-  server row, its three system roles (Owner/Admin/Member), and the
-  default `#general` text and `General` voice channels on first boot.
-  Richer columns and the membership / invite / category tables land
-  .
-  """
+  @moduledoc false
 
   use Ash.Domain, otp_app: :yawp, extensions: [AshTypescript.Rpc]
 
@@ -42,6 +33,10 @@ defmodule Yawp.Servers do
 
     resource Yawp.Servers.Ban do
       rpc_action :ban_member, :ban
+    end
+
+    resource Yawp.Servers.Message do
+      rpc_action :search_messages, :search
     end
   end
 
@@ -128,6 +123,7 @@ defmodule Yawp.Servers do
     resource Yawp.Servers.Message do
       define :send_server_message, action: :send
       define :list_channel_messages, action: :list_for_channel, args: [:channel_id]
+      define :search_messages, action: :search, args: [:server_id, :query]
     end
 
     resource Yawp.Servers.ReadMarker do
@@ -159,12 +155,6 @@ defmodule Yawp.Servers do
     end
   end
 
-  @doc """
-  Returns `{:ok, server | nil}` for the singleton server.
-
-   uses this to look up the Server FK when assigning the Owner
-  role to the operator account.
-  """
   @spec get_singleton_server() :: {:ok, Yawp.Servers.Server.t() | nil}
   def get_singleton_server do
     case list_servers() do

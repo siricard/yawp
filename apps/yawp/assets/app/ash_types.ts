@@ -193,6 +193,44 @@ export type ServerKickAttributesOnlySchema = {
 };
 
 
+// ServerMessage Schema
+export type ServerMessageResourceSchema = {
+  __type: "Resource";
+  __primitiveFields: "id" | "senderDid" | "body" | "mentions" | "attachments" | "senderSignature" | "signedBy" | "serverSerial" | "serverInsertedAt" | "channelId" | "replyToMessageId";
+  id: UUID;
+  senderDid: string;
+  body: string | null;
+  mentions: Array<string>;
+  attachments: Array<Record<string, any>>;
+  senderSignature: Binary;
+  signedBy: string;
+  serverSerial: number;
+  serverInsertedAt: UtcDateTimeUsec;
+  channelId: UUID;
+  replyToMessageId: UUID | null;
+  channel: { __type: "Relationship"; __resource: ServerChannelResourceSchema; };
+  replyToMessage: { __type: "Relationship"; __resource: ServerMessageResourceSchema | null; };
+};
+
+
+
+export type ServerMessageAttributesOnlySchema = {
+  __type: "Resource";
+  __primitiveFields: "id" | "senderDid" | "body" | "mentions" | "attachments" | "senderSignature" | "signedBy" | "serverSerial" | "serverInsertedAt" | "channelId" | "replyToMessageId";
+  id: UUID;
+  senderDid: string;
+  body: string | null;
+  mentions: Array<string>;
+  attachments: Array<Record<string, any>>;
+  senderSignature: Binary;
+  signedBy: string;
+  serverSerial: number;
+  serverInsertedAt: UtcDateTimeUsec;
+  channelId: UUID;
+  replyToMessageId: UUID | null;
+};
+
+
 // RoomInvite Schema
 export type RoomInviteResourceSchema = {
   __type: "Resource";
@@ -601,6 +639,93 @@ export type ServerKickFilterInput = {
   kickedByIdentity?: IdentityFilterInput;
 
 };
+export type ServerMessageFilterInput = {
+  and?: Array<ServerMessageFilterInput>;
+  or?: Array<ServerMessageFilterInput>;
+  not?: Array<ServerMessageFilterInput>;
+
+  id?: {
+    eq?: UUID;
+    notEq?: UUID;
+    in?: Array<UUID>;
+  };
+
+  senderDid?: {
+    eq?: string;
+    notEq?: string;
+    in?: Array<string>;
+  };
+
+  body?: {
+    eq?: string;
+    notEq?: string;
+    in?: Array<string>;
+    isNil?: boolean;
+  };
+
+  mentions?: {
+    eq?: Array<string>;
+    notEq?: Array<string>;
+    in?: Array<Array<string>>;
+  };
+
+  attachments?: {
+    eq?: Array<Record<string, any>>;
+    notEq?: Array<Record<string, any>>;
+    in?: Array<Array<Record<string, any>>>;
+  };
+
+  senderSignature?: {
+    eq?: Binary;
+    notEq?: Binary;
+    in?: Array<Binary>;
+  };
+
+  signedBy?: {
+    eq?: string;
+    notEq?: string;
+    in?: Array<string>;
+  };
+
+  serverSerial?: {
+    eq?: number;
+    notEq?: number;
+    greaterThan?: number;
+    greaterThanOrEqual?: number;
+    lessThan?: number;
+    lessThanOrEqual?: number;
+    in?: Array<number>;
+  };
+
+  serverInsertedAt?: {
+    eq?: UtcDateTimeUsec;
+    notEq?: UtcDateTimeUsec;
+    greaterThan?: UtcDateTimeUsec;
+    greaterThanOrEqual?: UtcDateTimeUsec;
+    lessThan?: UtcDateTimeUsec;
+    lessThanOrEqual?: UtcDateTimeUsec;
+    in?: Array<UtcDateTimeUsec>;
+  };
+
+  channelId?: {
+    eq?: UUID;
+    notEq?: UUID;
+    in?: Array<UUID>;
+  };
+
+  replyToMessageId?: {
+    eq?: UUID;
+    notEq?: UUID;
+    in?: Array<UUID>;
+    isNil?: boolean;
+  };
+
+
+  channel?: ServerChannelFilterInput;
+
+  replyToMessage?: ServerMessageFilterInput;
+
+};
 export type RoomInviteFilterInput = {
   and?: Array<RoomInviteFilterInput>;
   or?: Array<RoomInviteFilterInput>;
@@ -796,6 +921,9 @@ export type ServerChannelFilterField = (typeof serverChannelFilterFields)[number
 export const serverKickFilterFields = ["id", "reason", "serverId", "identityId", "kickedByIdentityId", "server", "identity", "kickedByIdentity"] as const;
 export type ServerKickFilterField = (typeof serverKickFilterFields)[number];
 
+export const serverMessageFilterFields = ["id", "senderDid", "body", "mentions", "attachments", "senderSignature", "signedBy", "serverSerial", "serverInsertedAt", "channelId", "replyToMessageId", "channel", "replyToMessage"] as const;
+export type ServerMessageFilterField = (typeof serverMessageFilterFields)[number];
+
 export const roomInviteFilterFields = ["id", "token", "kind", "usesRemaining", "expiresAt", "consumedAt", "revokedAt", "serverId", "channelId", "createdByIdentityId", "server", "channel", "createdByIdentity"] as const;
 export type RoomInviteFilterField = (typeof roomInviteFilterFields)[number];
 
@@ -823,6 +951,9 @@ export type ServerChannelSortField = (typeof serverChannelSortFields)[number];
 
 export const serverKickSortFields = ["id", "reason", "serverId", "identityId", "kickedByIdentityId"] as const;
 export type ServerKickSortField = (typeof serverKickSortFields)[number];
+
+export const serverMessageSortFields = ["id", "senderDid", "body", "mentions", "attachments", "senderSignature", "signedBy", "serverSerial", "serverInsertedAt", "channelId", "replyToMessageId"] as const;
+export type ServerMessageSortField = (typeof serverMessageSortFields)[number];
 
 export const roomInviteSortFields = ["id", "token", "kind", "usesRemaining", "expiresAt", "consumedAt", "revokedAt", "serverId", "channelId", "createdByIdentityId"] as const;
 export type RoomInviteSortField = (typeof roomInviteSortFields)[number];

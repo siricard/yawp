@@ -1,23 +1,11 @@
 defmodule Yawp.Servers.Message do
-  @moduledoc """
-  A text message in a server channel.
-
-  Each row carries the sender's DID, the device-subkey ed25519
-  `sender_signature` over the canonical-JSON envelope, and a
-  per-channel monotonic `server_serial`. The `:send` action verifies the
-  signature against the device-subkey public key resolved from the
-  sender identity's `device_subkeys` JSONB before persisting; failure
-  short-circuits with `invalid_signature`.
-
-  Ordering is server-authoritative: timelines render by `server_serial`,
-  never by the client-supplied `ts`. Deletes wipe `body` via a
-  `Yawp.Servers.MessageTombstone` while preserving the row's serial slot.
-  """
+  @moduledoc false
 
   use Ash.Resource,
     otp_app: :yawp,
     domain: Yawp.Servers,
-    data_layer: AshPostgres.DataLayer
+    data_layer: AshPostgres.DataLayer,
+    extensions: [AshTypescript.Resource]
 
   @max_body_length 4000
 
@@ -31,8 +19,22 @@ defmodule Yawp.Servers.Message do
     end
   end
 
+  typescript do
+    type_name "ServerMessage"
+  end
+
   actions do
     defaults [:read]
+
+    action :search, {:array, :struct} do
+      constraints instance_of: __MODULE__
+
+      argument :server_id, :uuid, allow_nil?: false
+      argument :query, :string, allow_nil?: false
+      argument :limit, :integer, allow_nil?: false, default: 50
+
+      run Yawp.Servers.Message.Search
+    end
 
     create :send do
       description """

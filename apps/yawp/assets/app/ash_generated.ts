@@ -1468,6 +1468,74 @@ export async function validateKickMember(
 }
 
 
+export type SearchMessagesInput = {
+  serverId: UUID;
+  query: string;
+  limit?: number;
+};
+
+export type InferSearchMessagesResult = Array<Record<string, any>>;
+
+export type SearchMessagesResult = | { success: true; data: InferSearchMessagesResult; }
+| { success: false; errors: AshRpcError[]; }
+
+;
+
+/**
+ * Execute generic action on Message
+ *
+ * @ashActionType :action
+ */
+export async function searchMessages(
+  config: {
+  tenant?: string;
+  input: SearchMessagesInput;
+  headers?: Record<string, string>;
+  fetchOptions?: RequestInit;
+  customFetch?: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
+}
+): Promise<SearchMessagesResult> {
+  const payload = {
+    action: "search_messages",
+    ...(config.tenant !== undefined && { tenant: config.tenant }),
+    input: config.input
+  };
+
+  return executeActionRpcRequest<SearchMessagesResult>(
+    payload,
+    config
+  );
+}
+
+
+/**
+ * Validate: Execute generic action on Message
+ *
+ * @ashActionType :action
+ * @validation true
+ */
+export async function validateSearchMessages(
+  config: {
+  tenant?: string;
+  input: SearchMessagesInput;
+  headers?: Record<string, string>;
+  fetchOptions?: RequestInit;
+  customFetch?: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
+}
+): Promise<ValidationResult> {
+  const payload = {
+    action: "search_messages",
+    ...(config.tenant !== undefined && { tenant: config.tenant }),
+    input: config.input
+  };
+
+  return executeValidationRpcRequest<ValidationResult>(
+    payload,
+    config
+  );
+}
+
+
 export type CreateRoomInviteInput = {
   channelId: UUID;
   kind?: "multi_use" | "single_use" | null;
