@@ -114,6 +114,7 @@ export function DmListScreen({
   const [profilePeer, setProfilePeer] = useState<DmParticipant | null>(null);
   const [verifyingPeer, setVerifyingPeer] = useState<DmParticipant | null>(null);
   const [pendingFiles, setPendingFiles] = useState<Blob[]>([]);
+  const [attachmentError, setAttachmentError] = useState<string | null>(null);
   const [cameraState, setCameraState] = useState<
     'idle' | 'scanning' | 'matched' | 'mismatch' | 'unavailable'
   >('idle');
@@ -194,7 +195,13 @@ export function DmListScreen({
     if (!decision.accepted && decision.reason === 'empty') return;
     if (!conversation && onStartConversation && selectedPeers.length === 0) return;
     const trimmed = draft.trim();
-    const attachments = pendingFiles.length === 0 ? [] : await uploadPendingAttachments();
+    let attachments: AttachmentDescriptor[];
+    try {
+      attachments = pendingFiles.length === 0 ? [] : await uploadPendingAttachments();
+    } catch {
+      setAttachmentError('attachment integrity failed');
+      return;
+    }
     const recipientDids = conversation
       ? conversation.participants
           .map(participant => participant.did)
@@ -258,6 +265,7 @@ export function DmListScreen({
   function handleAttachFiles(files: FileList | null | undefined) {
     const selected = Array.from(files ?? []);
     if (selected.length > 0) {
+      setAttachmentError(null);
       setPendingFiles(selected);
     }
   }
@@ -756,6 +764,11 @@ export function DmListScreen({
               {pendingFiles.length > 0 ? (
                 <Text testID="dm-attachment-pending-count" className="mt-1 text-xs text-text-secondary">
                   {pendingFiles.length} attachment{pendingFiles.length === 1 ? '' : 's'} selected
+                </Text>
+              ) : null}
+              {attachmentError ? (
+                <Text testID="dm-attachment-upload-error" className="mt-1 text-xs text-danger">
+                  {attachmentError}
                 </Text>
               ) : null}
             </View>

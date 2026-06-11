@@ -43,5 +43,8 @@ export async function uploadAttachment(args: {
   }
 
   const payload = await response.json() as AttachmentDescriptor;
+  if (typeof payload.content_hash !== 'string' || payload.content_hash.toLowerCase() !== clientHash) {
+    throw new Error('attachment integrity failed');
+  }
   return {...payload, ok: true, client_hash: clientHash};
 }

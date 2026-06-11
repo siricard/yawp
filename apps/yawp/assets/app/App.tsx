@@ -586,6 +586,7 @@ function conversationFromInboxEvent(event: InboxEvent): DmConversation | null {
       {
         id: event.envelope_id,
         body: typeof envelope.body === 'string' ? envelope.body : '',
+        attachments: normalizeAttachments(envelope.attachments),
         senderDid,
         senderAnchors,
         recipientDids,
@@ -594,6 +595,15 @@ function conversationFromInboxEvent(event: InboxEvent): DmConversation | null {
       },
     ],
   };
+}
+
+function normalizeAttachments(value: unknown): AttachmentDescriptor[] {
+  if (!Array.isArray(value)) return [];
+  return value.filter((attachment): attachment is AttachmentDescriptor => {
+    if (!attachment || typeof attachment !== 'object') return false;
+    const candidate = attachment as Record<string, unknown>;
+    return typeof candidate.upload_id === 'string' && typeof candidate.content_hash === 'string';
+  });
 }
 
 export function recentDmsFromConversations(

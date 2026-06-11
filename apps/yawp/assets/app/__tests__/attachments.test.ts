@@ -16,7 +16,7 @@ describe('attachment hashing', () => {
       ok: true,
       json: async () => ({
         upload_id: 'up-1',
-        content_hash: 'server-hash',
+        content_hash: '7fa36b95d5c98859ed72b4787f3c28b29eaa103970786755c9711cbb19be631c',
         mime: 'image/png',
         size: 16,
       }),
@@ -35,5 +35,25 @@ describe('attachment hashing', () => {
     );
     expect(result.client_hash).toBe('7fa36b95d5c98859ed72b4787f3c28b29eaa103970786755c9711cbb19be631c');
     expect(result.upload_id).toBe('up-1');
+  });
+
+  test('rejects upload responses whose server hash differs from the client hash', async () => {
+    const file = new Blob([new TextEncoder().encode('hello attachment')], {type: 'image/png'});
+    const fetchImpl = jest.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        upload_id: 'up-1',
+        content_hash: '0000000000000000000000000000000000000000000000000000000000000000',
+        mime: 'image/png',
+        size: 16,
+      }),
+    });
+
+    await expect(uploadAttachment({
+      serverUrl: 'https://anchor.example/',
+      file,
+      uploadedByDid: 'did:yawp:alice',
+      fetchImpl: fetchImpl as unknown as typeof fetch,
+    })).rejects.toThrow('attachment integrity failed');
   });
 });

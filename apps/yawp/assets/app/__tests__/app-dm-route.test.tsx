@@ -558,6 +558,50 @@ describe("App direct-message route", () => {
     ReactTestRenderer.act(() => root.unmount());
   });
 
+  test("maps inbound envelope attachments into the real direct-message route", async () => {
+    let root!: ReactTestRenderer.ReactTestRenderer;
+    await ReactTestRenderer.act(async () => {
+      root = ReactTestRenderer.create(<App />);
+    });
+    await flush();
+
+    await ReactTestRenderer.act(async () => {
+      anchorInbox?.({
+        envelope_id: "inbox-attachment-1",
+        inbox_serial: 1,
+        is_request: false,
+        envelope: {
+          sender_did: "did:yawp:bob",
+          recipient_dids: ["did:yawp:alice"],
+          conversation_id: "conversation-bob-alice-attachment",
+          timestamp: "2026-06-05T00:00:00.000Z",
+          body: "image",
+          attachments: [{
+            upload_id: "up-1",
+            content_hash: "7fa36b95d5c98859ed72b4787f3c28b29eaa103970786755c9711cbb19be631c",
+            mime: "image/png",
+            size: 16,
+            download_url: "https://anchor.example/api/downloads/up-1?sig=s&exp=1",
+          }],
+        },
+      });
+    });
+
+    await ReactTestRenderer.act(async () => {
+      root.root.findByProps({ testID: "workspace-dm-tile" }).props.onPress();
+    });
+
+    await ReactTestRenderer.act(async () => {
+      root.root
+        .findAllByProps({ testID: "dm-conversation-conversation-bob-alice-attachment" })[0]
+        .props.onPress();
+    });
+
+    expect(root.root.findByProps({ testID: "dm-attachment-inbox-attachment-1-0" })).toBeTruthy();
+
+    ReactTestRenderer.act(() => root.unmount());
+  });
+
   test("accepts an inbound request through the app route and moves it to the inbox", async () => {
     let root!: ReactTestRenderer.ReactTestRenderer;
     await ReactTestRenderer.act(async () => {
