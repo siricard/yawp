@@ -18,12 +18,43 @@ defmodule Yawp.Servers.Message.Search do
     with {:ok, actor} <- require_actor(actor),
          {:ok, server} <- get_server(server_id) do
       messages =
-        server_id
-        |> matching_ids(query, limit)
-        |> load_messages()
-        |> Enum.filter(&visible?(&1, actor, server))
+        collect_visible_matches(server_id, query, limit, actor, server)
 
       {:ok, messages}
+    end
+  end
+
+  defp collect_visible_matches(server_id, query, limit, actor, server) do
+    collect_visible_matches(server_id, query, limit, actor, server, 0, [])
+  end
+
+  defp collect_visible_matches(_server_id, _query, limit, _actor, _server, _offset, acc)
+       when length(acc) >= limit do
+    Enum.take(acc, limit)
+  end
+
+  defp collect_visible_matches(server_id, query, limit, actor, server, offset, acc) do
+    batch_size = max(limit * 5, 50)
+
+    case matching_ids(server_id, query, batch_size, offset) do
+      [] ->
+        Enum.take(acc, limit)
+
+      ids ->
+        visible =
+          ids
+          |> load_messages()
+          |> Enum.filter(&visible?(&1, actor, server))
+
+        collect_visible_matches(
+          server_id,
+          query,
+          limit,
+          actor,
+          server,
+          offset + batch_size,
+          acc ++ visible
+        )
     end
   end
 
@@ -37,7 +68,7 @@ defmodule Yawp.Servers.Message.Search do
     end
   end
 
-  defp matching_ids(server_id, query, limit) do
+  defp matching_ids(server_id, query, limit, offset) do
     sql = """
     select m.id
     from server_messages m
@@ -47,9 +78,10 @@ defmodule Yawp.Servers.Message.Search do
     order by ts_rank(m.search_vector, websearch_to_tsquery('simple', $2)) desc,
              m.server_inserted_at desc
     limit $3
+    offset $4
     """
 
-    %{rows: rows} = Repo.query!(sql, [server_id, query, limit])
+    %{rows: rows} = Repo.query!(sql, [server_id, query, limit, offset])
     Enum.map(rows, fn [id] -> normalize_uuid(id) end)
   end
 

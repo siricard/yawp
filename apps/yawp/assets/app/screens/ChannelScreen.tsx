@@ -382,6 +382,7 @@ export function ChannelScreen({
   const [showMembers, setShowMembers] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<SearchHit[]>([]);
+  const [searchError, setSearchError] = useState<string | null>(null);
   const [searching, setSearching] = useState(false);
   const listRef = useRef<FlatList<{message: ChannelMessage; showHeader: boolean}> | null>(null);
 
@@ -406,6 +407,7 @@ export function ChannelScreen({
     const trimmed = searchQuery.trim();
     if (trimmed.length < 2) {
       setSearchResults([]);
+      setSearchError(null);
       setSearching(false);
       return;
     }
@@ -414,11 +416,17 @@ export function ChannelScreen({
     setSearching(true);
     const handle = setTimeout(() => {
       searchServerMessages({serverUrl, serverId, query: trimmed})
-        .then(results => {
-          if (!cancelled) setSearchResults(results);
+        .then(result => {
+          if (!cancelled) {
+            setSearchResults(result.ok ? result.hits : []);
+            setSearchError(result.ok ? null : result.message);
+          }
         })
         .catch(() => {
-          if (!cancelled) setSearchResults([]);
+          if (!cancelled) {
+            setSearchResults([]);
+            setSearchError('Search failed. Try again later.');
+          }
         })
         .finally(() => {
           if (!cancelled) setSearching(false);
@@ -560,7 +568,9 @@ export function ChannelScreen({
           <Text className="text-xs font-semibold text-text-secondary mb-2">
             {searching
               ? 'Searching…'
-              : searchResults.length === 0
+              : searchError
+                ? searchError
+                : searchResults.length === 0
                 ? 'No matching messages'
                 : `${searchResults.length} matching message${
                     searchResults.length === 1 ? '' : 's'

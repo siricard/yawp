@@ -34,6 +34,28 @@ defmodule Yawp.Servers.MessageSearchTest do
     assert hit.body == "ancient badger note"
   end
 
+  test "search_messages/3 filters visibility before trimming ranked results" do
+    %{
+      server: server,
+      admin: admin,
+      member: member,
+      private_channel: private_channel,
+      public_channel: public_channel
+    } =
+      seed_graph()
+
+    Enum.each(1..60, fn index ->
+      insert_message(private_channel.id, admin.identity.did, "crowded-result #{index}")
+    end)
+
+    insert_message(public_channel.id, admin.identity.did, "crowded-result readable")
+
+    assert {:ok, [hit]} =
+             Servers.search_messages(server.id, "crowded-result", actor: member.identity)
+
+    assert hit.body == "crowded-result readable"
+  end
+
   test "message search vector is maintained by postgres" do
     %{admin: admin, public_channel: public_channel} = seed_graph()
     message = insert_message(public_channel.id, admin.identity.did, "otter lighthouse")
