@@ -137,6 +137,32 @@ describe('Input', () => {
     expect(m?.props.secureTextEntry).toBe(true);
   });
 
+  test('password variant opts out of password managers', async () => {
+    const root = await render(
+      <Input testID="pw" variant="password" value="" onChangeText={() => {}} />,
+    );
+    const m = root.root
+      .findAllByProps({testID: 'pw'})
+      .find(n => n.props.secureTextEntry !== undefined);
+    expect(m?.props.autoComplete).toBe('off');
+    expect(m?.props.dataSet).toEqual({
+      '1p-ignore': 'true',
+      lpignore: 'true',
+      bwignore: 'true',
+    });
+  });
+
+  test('text variant does not carry password-manager opt-outs', async () => {
+    const root = await render(
+      <Input testID="in" value="" onChangeText={() => {}} />,
+    );
+    const m = root.root
+      .findAllByProps({testID: 'in'})
+      .find(n => n.props.secureTextEntry !== undefined);
+    expect(m?.props.autoComplete).toBeUndefined();
+    expect(m?.props.dataSet).toBeUndefined();
+  });
+
   test('textarea variant sets multiline', async () => {
     const root = await render(
       <Input testID="ta" variant="textarea" value="" onChangeText={() => {}} />,

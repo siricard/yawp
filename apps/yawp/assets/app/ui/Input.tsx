@@ -17,6 +17,17 @@ type BlurHandler = NonNullable<TextInputProps['onBlur']>;
 // `outlineStyle` is a react-native-web-only property absent from RN's TextStyle.
 const noFocusOutline = {outlineStyle: 'none'} as unknown as TextStyle;
 
+// Opts password fields out of password-manager capture (1Password, LastPass,
+// Bitwarden). react-native-web maps `dataSet` keys to `data-*` DOM attributes;
+// native RN ignores `dataSet`. `dataSet` is absent from RN's TextInputProps,
+// hence the dedicated type.
+const passwordManagerOptOut: Pick<TextInputProps, 'autoComplete'> & {
+  dataSet: Record<string, string>;
+} = {
+  autoComplete: 'off',
+  dataSet: {'1p-ignore': 'true', lpignore: 'true', bwignore: 'true'},
+};
+
 export type InputProps = Omit<TextInputProps, 'style'> & {
   variant?: InputVariant;
   error?: boolean;
@@ -77,6 +88,7 @@ export const Input = React.forwardRef<TextInput, InputProps>(function Input(
         testID={testID}
         secureTextEntry={secure}
         multiline={isTextarea}
+        {...(secure ? passwordManagerOptOut : null)}
         placeholderTextColor="#7a8290"
         className="flex-1 text-text text-sm"
         onFocus={handleFocus}
