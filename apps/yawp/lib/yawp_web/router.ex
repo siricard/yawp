@@ -27,6 +27,16 @@ defmodule YawpWeb.Router do
     plug :put_secure_browser_headers
   end
 
+  pipeline :health do
+    plug :accepts, ["json"]
+  end
+
+  scope "/", YawpWeb do
+    pipe_through :health
+
+    get "/health", HealthController, :show
+  end
+
   scope "/", YawpWeb do
     pipe_through :rpc
 

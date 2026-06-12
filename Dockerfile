@@ -128,10 +128,8 @@ USER yawp
 
 EXPOSE 4000
 
-# Health probe used by docker-compose. The Phoenix root route always responds
-# 200 once the endpoint is up — no auth or database round-trip required.
 HEALTHCHECK --interval=10s --timeout=5s --start-period=30s --retries=12 \
-  CMD curl -fsS http://127.0.0.1:4000/ || exit 1
+  CMD curl -fsS http://127.0.0.1:4000/health || exit 1
 
 # tini reaps zombies and forwards signals to the release script so
 # `docker stop` triggers a clean BEAM shutdown.
