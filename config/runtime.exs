@@ -46,6 +46,20 @@ if config_env() == :prod do
       You can generate one by calling: mix phx.gen.secret
       """
 
+  attachment_signing_secret =
+    System.get_env("ATTACHMENT_SIGNING_SECRET") ||
+      raise """
+      environment variable ATTACHMENT_SIGNING_SECRET is missing.
+      You can generate one by calling: openssl rand -base64 48
+      """
+
+  uploads_dir =
+    System.get_env("UPLOADS_DIR") ||
+      raise """
+      environment variable UPLOADS_DIR is missing.
+      Set it to an absolute path for local attachment storage.
+      """
+
   host = System.get_env("PHX_HOST") || "example.com"
 
   config :yawp, :dns_cluster_query, System.get_env("DNS_CLUSTER_QUERY")
@@ -61,4 +75,9 @@ if config_env() == :prod do
     token_signing_secret:
       System.get_env("TOKEN_SIGNING_SECRET") ||
         raise("Missing environment variable `TOKEN_SIGNING_SECRET`!")
+
+  config :yawp, :attachments,
+    backend: :local,
+    storage_path: uploads_dir,
+    download_secret: attachment_signing_secret
 end

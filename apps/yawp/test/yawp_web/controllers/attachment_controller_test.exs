@@ -100,10 +100,45 @@ defmodule YawpWeb.AttachmentControllerTest do
     assert get_resp_header(conn, "access-control-allow-origin") == ["*"]
   end
 
+  test "download signatures use the configured attachment secret" do
+    upload_id = "upload-123"
+    expires_at = DateTime.utc_now() |> DateTime.add(300, :second) |> DateTime.to_unix()
+
+    expected =
+      :crypto.mac(:hmac, :sha256, @secret, "#{upload_id}|#{expires_at}")
+      |> Base.url_encode64(padding: false)
+
+    refute YawpWeb.AttachmentController.sign_download(upload_id, expires_at) ==
+             sign_with_endpoint_secret(upload_id, expires_at)
+
+    assert YawpWeb.AttachmentController.sign_download(upload_id, expires_at) == expected
+  end
+
+  test "download signatures do not fall back to endpoint secret" do
+    Application.put_env(:yawp, :attachments,
+      backend: :local,
+      storage_path: Path.join(System.tmp_dir!(), "yawp-no-secret")
+    )
+
+    assert_raise KeyError, fn ->
+      YawpWeb.AttachmentController.sign_download("upload-123", 1_900_000_000)
+    end
+  end
+
   defp upload_fixture(body, filename, content_type) do
     path = Path.join(System.tmp_dir!(), "yawp-upload-#{System.unique_integer([:positive])}")
     File.write!(path, body)
 
     %Plug.Upload{path: path, filename: filename, content_type: content_type}
+  end
+
+  defp sign_with_endpoint_secret(upload_id, expires_at) do
+    :crypto.mac(
+      :hmac,
+      :sha256,
+      YawpWeb.Endpoint.config(:secret_key_base),
+      "#{upload_id}|#{expires_at}"
+    )
+    |> Base.url_encode64(padding: false)
   end
 end

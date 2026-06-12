@@ -7,7 +7,11 @@ defmodule Yawp.Config.RuntimeDevOverridesTest do
     prev = %{
       "DATABASE" => System.get_env("DATABASE"),
       "DATABASE_URL" => System.get_env("DATABASE_URL"),
-      "PORT" => System.get_env("PORT")
+      "PORT" => System.get_env("PORT"),
+      "SECRET_KEY_BASE" => System.get_env("SECRET_KEY_BASE"),
+      "TOKEN_SIGNING_SECRET" => System.get_env("TOKEN_SIGNING_SECRET"),
+      "ATTACHMENT_SIGNING_SECRET" => System.get_env("ATTACHMENT_SIGNING_SECRET"),
+      "UPLOADS_DIR" => System.get_env("UPLOADS_DIR")
     }
 
     on_exit(fn ->
@@ -63,5 +67,50 @@ defmodule Yawp.Config.RuntimeDevOverridesTest do
     repo = cfg[:yawp][Yawp.Repo] || []
     refute Keyword.has_key?(repo, :url)
     refute Keyword.has_key?(repo, :database)
+  end
+
+  test "prod: required attachment signing secret is fail closed" do
+    put_prod_env(%{"ATTACHMENT_SIGNING_SECRET" => nil})
+
+    assert_raise RuntimeError, ~r/ATTACHMENT_SIGNING_SECRET/, fn ->
+      read_runtime(:prod)
+    end
+  end
+
+  test "prod: required uploads dir is fail closed" do
+    put_prod_env(%{"UPLOADS_DIR" => nil})
+
+    assert_raise RuntimeError, ~r/UPLOADS_DIR/, fn ->
+      read_runtime(:prod)
+    end
+  end
+
+  test "prod: attachment config reads dedicated secret and uploads dir" do
+    put_prod_env(%{
+      "ATTACHMENT_SIGNING_SECRET" => "prod-attachment-secret",
+      "UPLOADS_DIR" => "/var/lib/yawp/uploads"
+    })
+
+    cfg = read_runtime(:prod)
+
+    assert cfg[:yawp][:attachments][:download_secret] == "prod-attachment-secret"
+    assert cfg[:yawp][:attachments][:storage_path] == "/var/lib/yawp/uploads"
+  end
+
+  defp put_prod_env(overrides) do
+    base = %{
+      "DATABASE_URL" => "ecto://" <> "user:pass" <> "@localhost/yawp_prod",
+      "SECRET_KEY_BASE" => String.duplicate("a", 64),
+      "TOKEN_SIGNING_SECRET" => String.duplicate("b", 64),
+      "ATTACHMENT_SIGNING_SECRET" => String.duplicate("c", 64),
+      "UPLOADS_DIR" => "/tmp/yawp-prod-uploads"
+    }
+
+    base
+    |> Map.merge(overrides)
+    |> Enum.each(fn
+      {key, nil} -> System.delete_env(key)
+      {key, value} -> System.put_env(key, value)
+    end)
   end
 end

@@ -177,7 +177,7 @@ defmodule YawpWeb.AttachmentController do
 
   defp download_secret do
     attachments_config()
-    |> Keyword.get_lazy(:download_secret, fn -> YawpWeb.Endpoint.config(:secret_key_base) end)
+    |> Keyword.fetch!(:download_secret)
   end
 
   defp attachments_config, do: Application.get_env(:yawp, :attachments, [])

@@ -65,4 +65,12 @@ defmodule Yawp.VaultTest do
       assert out1 != out2
     end
   end
+
+  test "production branch fails closed when CLOAK_KEY is missing" do
+    source = File.read!("lib/yawp/vault.ex")
+
+    assert source =~ "CLOAK_KEY environment variable is missing or empty"
+    assert source =~ "raise \"\"\""
+    assert source =~ "if Mix.env() in [:dev, :test] do"
+  end
 end

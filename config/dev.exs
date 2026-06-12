@@ -33,7 +33,14 @@ config :yawp, YawpWeb.Endpoint,
     ]
   ]
 
-config :yawp, dev_routes: true, token_signing_secret: "E+o+Ldp6XJ9VsEqkTk8+UombPEhZoiCJ"
+config :yawp,
+  dev_routes: true,
+  token_signing_secret: "********************************",
+  attachments: [
+    backend: :local,
+    storage_path: Path.expand("../apps/yawp/priv/uploads", __DIR__),
+    download_secret: "dev-attachment-signing-secret"
+  ]
 
 config :logger, :default_formatter, format: "[$level] $message\n"
 

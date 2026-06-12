@@ -1,7 +1,19 @@
 import Config
 config :yawp, Oban, testing: :manual
-config :yawp, token_signing_secret: "********************************"
-config :yawp, dev_routes: true
+
+config :yawp,
+  token_signing_secret: "********************************",
+  dev_routes: true,
+  attachments: [
+    backend: :local,
+    storage_path:
+      Path.join(
+        System.tmp_dir!(),
+        "yawp-test-uploads-#{System.get_env("MIX_TEST_PARTITION", "0")}"
+      ),
+    download_secret: "test-attachment-signing-secret"
+  ]
+
 config :yawp, ensure_server_key_on_boot: false
 
 config :yawp, Yawp.Federation.KeyDocFetcher,
