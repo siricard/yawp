@@ -68,7 +68,7 @@ RUN mix deps.get --only ${MIX_ENV} \
 #    `npm ci` for reproducible installs; the lockfile is kept in sync with
 #    the umbrella layout (see F6.5 housekeeping).
 COPY apps/yawp/assets/package.json apps/yawp/assets/package-lock.json apps/yawp/assets/
-RUN cd apps/yawp/assets && npm ci --no-audit --no-fund --omit=optional
+RUN cd apps/yawp/assets && npm ci --no-audit --no-fund --omit=optional --legacy-peer-deps
 
 # 3. Application source. Native (RN iOS/Android/macOS) is excluded via
 #    .dockerignore — it bloats the context with no benefit to the server build.
@@ -120,7 +120,9 @@ WORKDIR /app
 # Non-root runtime user.
 RUN groupadd --system --gid 1000 yawp \
  && useradd --system --uid 1000 --gid yawp --home /app --shell /usr/sbin/nologin yawp \
+ && mkdir -p /data/uploads \
  && chown -R yawp:yawp /app
+RUN chown -R yawp:yawp /data
 
 COPY --from=builder --chown=yawp:yawp /app/_build/prod/rel/yawp ./
 

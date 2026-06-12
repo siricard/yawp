@@ -1,0 +1,17 @@
+(local_tls) {
+	tls internal
+}
+
+(public_tls) {
+}
+
+{$PHX_HOST} {
+	import {$CADDY_TLS_SNIPPET:local_tls}
+
+	encode zstd gzip
+
+	reverse_proxy phoenix:4000 {
+		header_up X-Forwarded-Proto https
+		header_up X-Forwarded-Host {host}
+	}
+}

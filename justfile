@@ -122,6 +122,9 @@ ladle:
 verify-singletons:
     nix develop -c node apps/yawp/assets/native/scripts/verify-singletons.mjs
 
+check-compose-env:
+    nix develop -c bash scripts/check-compose-env.sh
+
 # Open Phoenix routes
 routes:
     nix develop -c mix phx.routes
