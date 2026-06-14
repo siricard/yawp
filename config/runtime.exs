@@ -53,13 +53,18 @@ if config_env() == :prod do
         postgres_host = System.get_env("POSTGRES_HOST", "postgres")
         postgres_port = System.get_env("POSTGRES_PORT", "5432")
 
-        user = URI.encode_www_form(postgres_components["POSTGRES_USER"])
-        password = URI.encode_www_form(postgres_components["POSTGRES_PASSWORD"])
-        host = URI.encode_www_form(postgres_host)
-        port = URI.encode_www_form(postgres_port)
-        database = URI.encode_www_form(postgres_components["POSTGRES_DB"])
+        userinfo =
+          URI.encode_www_form(postgres_components["POSTGRES_USER"]) <>
+            ":" <> URI.encode_www_form(postgres_components["POSTGRES_PASSWORD"])
 
-        "ecto://" <> user <> ":" <> password <> "@" <> host <> ":" <> port <> "/" <> database
+        %URI{
+          scheme: "ecto",
+          userinfo: userinfo,
+          host: postgres_host,
+          port: String.to_integer(postgres_port),
+          path: "/" <> URI.encode_www_form(postgres_components["POSTGRES_DB"])
+        }
+        |> URI.to_string()
     end
 
   maybe_ipv6 = if System.get_env("ECTO_IPV6") in ~w(true 1), do: [:inet6], else: []
