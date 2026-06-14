@@ -320,6 +320,21 @@ docker compose logs phoenix | grep -E '/admin/setup\?token='
 
 Claim each server from its own setup URL and operator account. Keep the `.env` files separate. Do not copy secrets from one anchor to the other.
 
+### Seed a staging anchor remotely
+
+After creating the operator account, sign in to `/admin` and generate a chat-owner claim token. Use that token from your laptop or from the VPS checkout:
+
+```bash
+node scripts/staging-seed.mjs \
+  --base-url https://anchor-a.staging.example \
+  --claim-token paste-claim-token-here \
+  --output anchor-a-seed.json
+```
+
+The seed command talks only to the public HTTPS and RPC surfaces. It claims the chat owner, binds devices for two generated identities, mints and redeems a room invite, verifies the default text channel through RPC, sends a two-message direct-message exchange, and writes the generated identity/session artifact to the output file. Store the artifact somewhere private if you want to reuse the seeded browser sessions for manual testing.
+
+Repeat with `https://anchor-b.staging.example` and that anchor's own fresh claim token when you need both anchors populated.
+
 To reset a staging anchor to a clean state, destroy only that host's compose volumes and start again:
 
 ```bash
@@ -329,7 +344,7 @@ docker compose -f docker-compose.yml -f docker-compose.staging.yml up -d --wait
 docker compose logs phoenix | grep -E '/admin/setup\?token='
 ```
 
-Then create the operator account again and re-run the claim flow.
+Then create the operator account again, generate a new chat-owner claim token, and re-run `node scripts/staging-seed.mjs --base-url https://anchor-a.staging.example --claim-token paste-claim-token-here --output anchor-a-seed.json`. The old seed artifact is no longer valid after `down -v`.
 
 ## Operations
 

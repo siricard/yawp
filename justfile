@@ -56,6 +56,7 @@ ci:
     nix develop -c mix compile --warnings-as-errors
     nix develop -c bash -c 'cd apps/yawp && mix ash.setup --quiet'
     nix develop -c mix test
+    nix develop -c node --test scripts/staging-seed.test.mjs
     nix develop -c bash -c 'cd apps/yawp/assets && npx tsc --noEmit'
     nix develop -c bash -c 'cd apps/yawp/assets/native && npx tsc --noEmit'
     nix develop -c bash -c 'cd apps/yawp/assets/native && npm test --silent'
@@ -127,6 +128,9 @@ check-compose-env:
 
 release-smoke:
     nix develop -c bash scripts/release-smoke.sh
+
+staging-seed-test:
+    nix develop -c node --test scripts/staging-seed.test.mjs
 
 # Open Phoenix routes
 routes:
