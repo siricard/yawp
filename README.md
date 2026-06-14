@@ -124,25 +124,13 @@ The required variables are:
 * `SECRET_KEY_BASE` — from step 1.
 * `TOKEN_SIGNING_SECRET` — from step 1.
 * `CLOAK_KEY` — base64-encoded 32-byte key that encrypts at-rest secrets (federation server private key, etc.) via ash_cloak. Required in production — the server fails to boot without it. Generate with `mix yawp.gen.cloak_key` (or `openssl rand -base64 32`). See [docs/self-hosting.md](docs/self-hosting.md) for full guidance.
-* `POSTGRES_PASSWORD` — pick a strong password for the bundled Postgres.
-* `DATABASE_URL` — Ecto connection string. The hostname `postgres` refers to
-  the sibling compose service. The literal format is shown inside the fenced
-  code block below, split into its four parts on separate lines so the shape
-  is unambiguous — concatenate them with **no spaces between parts** to
-  produce the actual value you paste into `.env`:
+* `POSTGRES_USER`, `POSTGRES_PASSWORD`, and `POSTGRES_DB` — credentials for
+  the bundled Postgres service. Pick a strong password; Phoenix derives its
+  database connection at runtime and safely encodes reserved characters.
 
-  ```
-  ecto://
-  USER:PASSWORD
-  @postgres
-  /DB
-  ```
-
-  `USER` and `PASSWORD` are the values of `POSTGRES_USER` and
-  `POSTGRES_PASSWORD` you set above; `DB` is `POSTGRES_DB`. If your password
-  contains URL-reserved characters (`@`, `:`, `/`, `#`, `?`, `%`), URL-encode
-  them before pasting. The commented template at the bottom of
-  `.env.example` shows the same assembly inline.
+`DATABASE_URL` is optional. Set it only when pointing Yawp at a managed or
+external Postgres service, and uncomment the matching passthrough in
+`docker-compose.yml`.
 
 `PHX_PORT` defaults to `4000`; set it to `80` (and front it with a reverse
 proxy like Caddy or nginx for TLS) for a public deployment. All other
@@ -219,8 +207,8 @@ If you pinned `YAWP_IMAGE` in `.env`, bump the tag there before running
 
 * **Phoenix container restarts in a loop** — almost always a missing or
   malformed required env var. Check `docker compose logs phoenix` for the
-  first error after boot; common culprits are an unset `DATABASE_URL` or a
-  `SECRET_KEY_BASE` shorter than 64 bytes.
+  first error after boot; common culprits are an incomplete `POSTGRES_*` set
+  or a `SECRET_KEY_BASE` shorter than 64 bytes.
 
 * **`docker compose pull` says "manifest not found"** — the image tag you
   pinned in `YAWP_IMAGE` doesn't exist on GHCR. List available tags:

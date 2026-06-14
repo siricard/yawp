@@ -7,6 +7,11 @@ defmodule Yawp.Config.RuntimeDevOverridesTest do
     prev = %{
       "DATABASE" => System.get_env("DATABASE"),
       "DATABASE_URL" => System.get_env("DATABASE_URL"),
+      "POSTGRES_USER" => System.get_env("POSTGRES_USER"),
+      "POSTGRES_PASSWORD" => System.get_env("POSTGRES_PASSWORD"),
+      "POSTGRES_DB" => System.get_env("POSTGRES_DB"),
+      "POSTGRES_HOST" => System.get_env("POSTGRES_HOST"),
+      "POSTGRES_PORT" => System.get_env("POSTGRES_PORT"),
       "PORT" => System.get_env("PORT"),
       "SECRET_KEY_BASE" => System.get_env("SECRET_KEY_BASE"),
       "TOKEN_SIGNING_SECRET" => System.get_env("TOKEN_SIGNING_SECRET"),
@@ -97,9 +102,46 @@ defmodule Yawp.Config.RuntimeDevOverridesTest do
     assert cfg[:yawp][:attachments][:storage_path] == "/var/lib/yawp/uploads"
   end
 
+  test "prod: derives URL-encoded repo URL from Postgres components" do
+    put_prod_env(%{
+      "DATABASE_URL" => nil,
+      "POSTGRES_USER" => "yawp user",
+      "POSTGRES_PASSWORD" => "pa:ss@word/with?symbols",
+      "POSTGRES_DB" => "yawp/prod",
+      "POSTGRES_HOST" => "db.internal",
+      "POSTGRES_PORT" => "6543"
+    })
+
+    cfg = read_runtime(:prod)
+
+    assert cfg[:yawp][Yawp.Repo][:url] ==
+             "ecto://" <>
+               "yawp+user:pa%3Ass%40word%2Fwith%3Fsymbols@db.internal:6543/yawp%2Fprod"
+  end
+
+  test "prod: explicit DATABASE_URL takes precedence over Postgres components" do
+    url = "ecto://" <> "managed:secret" <> "@managed.example/yawp"
+
+    put_prod_env(%{
+      "DATABASE_URL" => url,
+      "POSTGRES_USER" => "ignored",
+      "POSTGRES_PASSWORD" => "ignored",
+      "POSTGRES_DB" => "ignored",
+      "POSTGRES_HOST" => "ignored",
+      "POSTGRES_PORT" => "1111"
+    })
+
+    cfg = read_runtime(:prod)
+
+    assert cfg[:yawp][Yawp.Repo][:url] == url
+  end
+
   defp put_prod_env(overrides) do
     base = %{
       "DATABASE_URL" => "ecto://" <> "user:pass" <> "@localhost/yawp_prod",
+      "POSTGRES_USER" => "yawp",
+      "POSTGRES_PASSWORD" => "postgres-secret",
+      "POSTGRES_DB" => "yawp_prod",
       "SECRET_KEY_BASE" => String.duplicate("a", 64),
       "TOKEN_SIGNING_SECRET" => String.duplicate("b", 64),
       "ATTACHMENT_SIGNING_SECRET" => String.duplicate("c", 64),

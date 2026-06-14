@@ -67,7 +67,6 @@ UPLOADS_DIR=/data/uploads
 POSTGRES_USER=${postgres_user}
 POSTGRES_PASSWORD=${postgres_password}
 POSTGRES_DB=${postgres_db}
-DATABASE_URL=ecto://${postgres_user}:${postgres_password}@postgres/${postgres_db}
 YAWP_IMAGE=${image_tag}
 ENV
 

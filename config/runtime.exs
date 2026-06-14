@@ -26,11 +26,41 @@ config :yawp, :build_info,
 
 if config_env() == :prod do
   database_url =
-    System.get_env("DATABASE_URL") ||
-      raise """
-      environment variable DATABASE_URL is missing.
-      For example: ecto://USER:PASS@HOST/DATABASE
-      """
+    case System.get_env("DATABASE_URL") do
+      url when is_binary(url) and url != "" ->
+        url
+
+      _ ->
+        postgres_components = %{
+          "POSTGRES_USER" => System.get_env("POSTGRES_USER"),
+          "POSTGRES_PASSWORD" => System.get_env("POSTGRES_PASSWORD"),
+          "POSTGRES_DB" => System.get_env("POSTGRES_DB")
+        }
+
+        missing_components =
+          postgres_components
+          |> Enum.filter(fn {_key, value} -> value in [nil, ""] end)
+          |> Enum.map_join(", ", fn {key, _value} -> key end)
+
+        if missing_components != "" do
+          raise """
+          environment variable DATABASE_URL is missing, and the Postgres component set is incomplete.
+          Missing required variable(s): #{missing_components}.
+          Set DATABASE_URL for an external database, or set POSTGRES_USER, POSTGRES_PASSWORD, and POSTGRES_DB for the bundled Postgres service.
+          """
+        end
+
+        postgres_host = System.get_env("POSTGRES_HOST", "postgres")
+        postgres_port = System.get_env("POSTGRES_PORT", "5432")
+
+        user = URI.encode_www_form(postgres_components["POSTGRES_USER"])
+        password = URI.encode_www_form(postgres_components["POSTGRES_PASSWORD"])
+        host = URI.encode_www_form(postgres_host)
+        port = URI.encode_www_form(postgres_port)
+        database = URI.encode_www_form(postgres_components["POSTGRES_DB"])
+
+        "ecto://" <> user <> ":" <> password <> "@" <> host <> ":" <> port <> "/" <> database
+    end
 
   maybe_ipv6 = if System.get_env("ECTO_IPV6") in ~w(true 1), do: [:inet6], else: []
 
