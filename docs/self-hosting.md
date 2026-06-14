@@ -31,12 +31,15 @@ For local testing on your Mac, use `localhost` instead of your domain.
 
 ### Install Docker Engine and Compose v2
 
-Run this on the VPS:
+The repository includes an idempotent provisioning script that installs Docker
+Engine with Compose v2 when needed. Run it after cloning the repository in the
+next step.
+
+The provisioning script installs Docker Engine with Compose v2 only when needed, creates the application directory only when missing, and leaves an existing `.env` unchanged. Re-running it on a prepared host is a no-op aside from ownership and permission checks.
+
+After provisioning, verify Docker:
 
 ```bash
-curl -fsSL https://get.docker.com | sh
-sudo usermod -aG docker "$USER"
-newgrp docker
 docker version
 docker compose version
 ```
@@ -52,62 +55,62 @@ git clone https://github.com/siricard/yawp.git
 cd yawp
 ```
 
-The directory must contain `docker-compose.yml`, `Caddyfile`, and `.env.example`.
+The directory must contain `docker-compose.yml`, `docker-compose.staging.yml`, `Caddyfile`, and `.env.example`.
+
+Prepare the host and this checkout:
+
+```bash
+sudo bash scripts/provision-staging.sh --dry-run --app-dir "$PWD" --app-user "$USER" --hostname chat.example.com
+sudo bash scripts/provision-staging.sh --app-dir "$PWD" --app-user "$USER" --hostname chat.example.com
+```
 
 ## Configuration
 
-Create `.env` from the template:
+For a VPS, let the provisioning script create `.env` with generated secrets:
 
 ```bash
-cp .env.example .env
+sudo bash scripts/provision-staging.sh --app-dir "$PWD" --app-user "$USER" --hostname chat.example.com
 ```
 
-Generate each required value with the commands below. Store the generated secrets in a password manager. Do not commit `.env`.
+For a local Mac smoke file, print a generated `.env` and redirect it:
+
+```bash
+bash scripts/provision-staging.sh --print-env --hostname localhost --phx-port 4300 --http-port 8300 --https-port 8443 --tls-snippet local_tls > .env
+```
+
+Store the generated secrets in a password manager. Do not commit `.env`.
+
+The script generates the required values below with `openssl rand`.
 
 ### `SECRET_KEY_BASE`
 
 Signs Phoenix cookies and session data. Rotating it signs everyone out.
 
-```bash
-openssl rand -base64 64 | tr -d '\n'
-printf '\n'
-```
+Generated as 64 random bytes encoded with base64.
 
 ### `TOKEN_SIGNING_SECRET`
 
 Signs authentication tokens. Use a different value from `SECRET_KEY_BASE`.
 
-```bash
-openssl rand -base64 64 | tr -d '\n'
-printf '\n'
-```
+Generated as 64 random bytes encoded with base64.
 
 ### `CLOAK_KEY`
 
 Encrypts server-side secrets at rest. It must be base64 for 32 raw bytes.
 
-```bash
-openssl rand -base64 32 | tr -d '\n'
-printf '\n'
-```
+Generated as 32 random bytes encoded with base64.
 
 ### `ATTACHMENT_SIGNING_SECRET`
 
 Signs attachment download URLs. Use a different value from the other secrets.
 
-```bash
-openssl rand -base64 48 | tr -d '\n'
-printf '\n'
-```
+Generated as 48 random bytes encoded with base64.
 
 ### `POSTGRES_PASSWORD`
 
 Password for the bundled Postgres container.
 
-```bash
-openssl rand -base64 32 | tr -d '\n'
-printf '\n'
-```
+Generated as 32 random bytes encoded with base64.
 
 ### `UPLOADS_DIR`
 
@@ -143,7 +146,7 @@ set it, uncomment the matching passthrough in `docker-compose.yml`.
 
 ### Fill `.env`
 
-Edit `.env` and set these required variables:
+Edit `.env` if you need to change the hostname or ports:
 
 ```bash
 nano .env
@@ -169,8 +172,13 @@ POSTGRES_PORT=5432
 ```
 
 Leave `PHX_PORT` unset on a public VPS. The compose stack binds Phoenix to
-loopback only for local smoke checks; Caddy is the public HTTP and HTTPS
-entrypoint.
+loopback only when `PHX_PORT` is set. Caddy is the public HTTP and HTTPS
+entrypoint. For staging, use the staging compose overlay so Phoenix has no host
+published port at all:
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.staging.yml up -d --wait
+```
 
 For a local Mac test, set:
 
@@ -293,20 +301,20 @@ dig +short anchor-b.staging.example A
 On the first VPS, repeat the same setup with a `.env` whose `PHX_HOST` is `anchor-a.staging.example`:
 
 ```bash
-cp .env.example .env
-nano .env
-docker compose pull
-docker compose up -d --wait
+sudo bash scripts/provision-staging.sh --dry-run --app-dir "$PWD" --app-user "$USER" --hostname anchor-a.staging.example
+sudo bash scripts/provision-staging.sh --app-dir "$PWD" --app-user "$USER" --hostname anchor-a.staging.example
+docker compose -f docker-compose.yml -f docker-compose.staging.yml pull
+docker compose -f docker-compose.yml -f docker-compose.staging.yml up -d --wait
 docker compose logs phoenix | grep -E '/admin/setup\?token='
 ```
 
 On the second VPS, use a separate `.env` whose `PHX_HOST` is `anchor-b.staging.example` and separate generated secrets:
 
 ```bash
-cp .env.example .env
-nano .env
-docker compose pull
-docker compose up -d --wait
+sudo bash scripts/provision-staging.sh --dry-run --app-dir "$PWD" --app-user "$USER" --hostname anchor-b.staging.example
+sudo bash scripts/provision-staging.sh --app-dir "$PWD" --app-user "$USER" --hostname anchor-b.staging.example
+docker compose -f docker-compose.yml -f docker-compose.staging.yml pull
+docker compose -f docker-compose.yml -f docker-compose.staging.yml up -d --wait
 docker compose logs phoenix | grep -E '/admin/setup\?token='
 ```
 
@@ -316,8 +324,8 @@ To reset a staging anchor to a clean state, destroy only that host's compose vol
 
 ```bash
 docker compose down -v
-docker compose pull
-docker compose up -d --wait
+docker compose -f docker-compose.yml -f docker-compose.staging.yml pull
+docker compose -f docker-compose.yml -f docker-compose.staging.yml up -d --wait
 docker compose logs phoenix | grep -E '/admin/setup\?token='
 ```
 
