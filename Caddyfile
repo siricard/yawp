@@ -5,6 +5,10 @@
 (public_tls) {
 }
 
+http://localhost:2021 {
+	respond /health 200
+}
+
 {$PHX_HOST} {
 	import {$CADDY_TLS_SNIPPET:local_tls}
 

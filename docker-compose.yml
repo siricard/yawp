@@ -71,7 +71,7 @@ services:
       - caddy_data:/data
       - caddy_config:/config
     healthcheck:
-      test: ["CMD-SHELL", "wget -q --spider --no-check-certificate --header=\"Host: $${PHX_HOST:-localhost}\" https://localhost/health"]
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:2021/health"]
       interval: 10s
       timeout: 5s
       retries: 12
