@@ -153,7 +153,6 @@ For a public VPS, set:
 
 ```bash
 PHX_HOST=chat.example.com
-PHX_PORT=4000
 HTTP_PORT=80
 HTTPS_PORT=443
 CADDY_TLS_SNIPPET=public_tls
@@ -168,6 +167,10 @@ POSTGRES_DB=yawp_prod
 POSTGRES_HOST=postgres
 POSTGRES_PORT=5432
 ```
+
+Leave `PHX_PORT` unset on a public VPS. The compose stack binds Phoenix to
+loopback only for local smoke checks; Caddy is the public HTTP and HTTPS
+entrypoint.
 
 For a local Mac test, set:
 

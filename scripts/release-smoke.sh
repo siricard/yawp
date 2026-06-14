@@ -114,6 +114,8 @@ from urllib.parse import urlparse
 import sys
 
 parsed = urlparse(sys.argv[1])
+if parsed.scheme != "https" or parsed.hostname != "localhost":
+    raise SystemExit(f"unexpected download_url origin: {sys.argv[1]}")
 path = parsed.path
 if parsed.query:
     path += "?" + parsed.query
