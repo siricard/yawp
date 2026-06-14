@@ -125,6 +125,9 @@ verify-singletons:
 check-compose-env:
     nix develop -c bash scripts/check-compose-env.sh
 
+release-smoke:
+    nix develop -c bash scripts/release-smoke.sh
+
 # Open Phoenix routes
 routes:
     nix develop -c mix phx.routes
