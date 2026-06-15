@@ -115,4 +115,55 @@ if HEALTH_RETRIES=2 \
   exit 1
 fi
 
+real_deploy_bin="${tmp_dir}/real-deploy-bin"
+real_deploy_log="${tmp_dir}/real-deploy.log"
+real_key_file="${tmp_dir}/staging_ssh_key"
+mkdir -p "$real_deploy_bin"
+printf 'fake private key\n' >"$real_key_file"
+chmod 600 "$real_key_file"
+
+cat >"${real_deploy_bin}/ssh" <<'SH'
+#!/usr/bin/env bash
+log="${FAKE_SSH_LOG:?FAKE_SSH_LOG required}"
+printf 'argv:' >>"$log"
+for arg in "$@"; do
+  printf ' <%s>' "$arg" >>"$log"
+done
+printf '\n' >>"$log"
+if [ "$1" != "-i" ]; then
+  printf 'missing -i as first ssh argument\n' >&2
+  exit 98
+fi
+if [ ! -f "$2" ]; then
+  printf 'ssh key file does not exist: %s\n' "$2" >&2
+  exit 97
+fi
+cat >>"$log"
+SH
+chmod +x "${real_deploy_bin}/ssh"
+
+cat >"${real_deploy_bin}/curl" <<'SH'
+#!/usr/bin/env bash
+printf 'curl:' >>"${FAKE_SSH_LOG:?FAKE_SSH_LOG required}"
+for arg in "$@"; do
+  printf ' <%s>' "$arg" >>"$FAKE_SSH_LOG"
+done
+printf '\n' >>"$FAKE_SSH_LOG"
+exit 0
+SH
+chmod +x "${real_deploy_bin}/curl"
+
+PATH="${real_deploy_bin}:$PATH" \
+FAKE_SSH_LOG="$real_deploy_log" \
+SSH_KEY_FILE="$real_key_file" \
+HEALTH_RETRIES=1 \
+HEALTH_INTERVAL_SECONDS=0 \
+HEALTH_TIMEOUT_SECONDS=1 \
+"$deploy_script" ghcr.io/example/yawp:real deploy@fakehost
+
+real_deploy_output="$(cat "$real_deploy_log")"
+assert_contains "$real_deploy_output" "argv: <-i> <${real_key_file}> <-o> <IdentitiesOnly=yes> <-o> <StrictHostKeyChecking=accept-new> <deploy@fakehost> <bash -se>"
+assert_contains "$real_deploy_output" "printf 'YAWP_IMAGE=%s\n' 'ghcr.io/example/yawp:real'"
+assert_contains "$real_deploy_output" "curl: <-fsS> <--max-time> <1> <https://fakehost/health>"
+
 printf 'deploy tests passed\n'

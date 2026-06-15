@@ -128,14 +128,13 @@ jobs:
 
       - name: Install SSH key
         run: |
-          install -d -m 700 ~/.ssh
-          printf '%s\n' "${{ secrets.STAGING_SSH_KEY }}" > ~/.ssh/staging
-          chmod 600 ~/.ssh/staging
+          install -m 600 /dev/null "${{ runner.temp }}/staging_ssh_key"
+          printf '%s\n' "${{ secrets.STAGING_SSH_KEY }}" > "${{ runner.temp }}/staging_ssh_key"
 
       - name: Deploy and health-check staging A
         id: health-check
         env:
-          SSH_KEY_FILE: ~/.ssh/staging
+          SSH_KEY_FILE: ${{ runner.temp }}/staging_ssh_key
         run: scripts/deploy.sh "${{ steps.image.outputs.ref }}" "deploy@${{ secrets.STAGING_A_HOST }}"
 
   deploy-staging-b:
@@ -158,11 +157,10 @@ jobs:
 
       - name: Install SSH key
         run: |
-          install -d -m 700 ~/.ssh
-          printf '%s\n' "${{ secrets.STAGING_SSH_KEY }}" > ~/.ssh/staging
-          chmod 600 ~/.ssh/staging
+          install -m 600 /dev/null "${{ runner.temp }}/staging_ssh_key"
+          printf '%s\n' "${{ secrets.STAGING_SSH_KEY }}" > "${{ runner.temp }}/staging_ssh_key"
 
       - name: Deploy and health-check staging B
         env:
-          SSH_KEY_FILE: ~/.ssh/staging
+          SSH_KEY_FILE: ${{ runner.temp }}/staging_ssh_key
         run: scripts/deploy.sh "${{ steps.image.outputs.ref }}" "deploy@${{ secrets.STAGING_B_HOST }}"

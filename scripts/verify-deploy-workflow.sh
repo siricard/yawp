@@ -5,6 +5,7 @@ repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 deploy_workflow="${repo_root}/.github/workflows/deploy.yml"
 release_workflow="${repo_root}/.github/workflows/release.yml"
 deploy_script="${repo_root}/scripts/deploy.sh"
+workflow_ssh_key_file="\${{ runner.temp }}/staging_ssh_key"
 
 run_actionlint() {
   if command -v actionlint >/dev/null 2>&1; then
@@ -63,8 +64,10 @@ assert_yq '.jobs."deploy-staging-a".steps[] | select(.id == "health-check") | .r
 assert_yq '.jobs."deploy-staging-b".steps[] | select(.run | type == "!!str") | .run | select(contains("scripts/deploy.sh")) | contains("secrets.STAGING_B_HOST")' "$deploy_workflow" "deploy-staging-b must invoke deploy script with staging B host secret"
 assert_yq '[.jobs."deploy-staging-a".steps[] | select(.run | type == "!!str") | .run | select(contains("secrets.")) | contains("secrets.STAGING_SSH_KEY")] | any' "$deploy_workflow" "deploy-staging-a must install the staging SSH key secret"
 assert_yq '[.jobs."deploy-staging-b".steps[] | select(.run | type == "!!str") | .run | select(contains("secrets.")) | contains("secrets.STAGING_SSH_KEY")] | any' "$deploy_workflow" "deploy-staging-b must install the staging SSH key secret"
-assert_yq '.jobs."deploy-staging-a".steps[] | select(.id == "health-check") | .env.SSH_KEY_FILE == "~/.ssh/staging"' "$deploy_workflow" "deploy-staging-a must pass the SSH key file to deploy.sh"
-assert_yq '.jobs."deploy-staging-b".steps[] | select(.run | type == "!!str") | select(.run | contains("scripts/deploy.sh")) | .env.SSH_KEY_FILE == "~/.ssh/staging"' "$deploy_workflow" "deploy-staging-b must pass the SSH key file to deploy.sh"
+assert_yq '.jobs."deploy-staging-a".steps[] | select(.name == "Install SSH key") | .run | (contains("runner.temp") and contains("staging_ssh_key") and contains("install -m 600") and (contains("~/") | not))' "$deploy_workflow" "deploy-staging-a must install the staging SSH key at an absolute runner temp path"
+assert_yq '.jobs."deploy-staging-b".steps[] | select(.name == "Install SSH key") | .run | (contains("runner.temp") and contains("staging_ssh_key") and contains("install -m 600") and (contains("~/") | not))' "$deploy_workflow" "deploy-staging-b must install the staging SSH key at an absolute runner temp path"
+assert_yq '.jobs."deploy-staging-a".steps[] | select(.id == "health-check") | .env.SSH_KEY_FILE == "'"$workflow_ssh_key_file"'"' "$deploy_workflow" "deploy-staging-a must pass an absolute runner temp SSH key file to deploy.sh"
+assert_yq '.jobs."deploy-staging-b".steps[] | select(.run | type == "!!str") | select(.run | contains("scripts/deploy.sh")) | .env.SSH_KEY_FILE == "'"$workflow_ssh_key_file"'"' "$deploy_workflow" "deploy-staging-b must pass an absolute runner temp SSH key file to deploy.sh"
 assert_no_latest_in_dispatch_deploy
 assert_yq '.jobs."build-and-push".steps[] | select(.uses == "docker/build-push-action@v6") | .with.tags | (contains("github.ref_name") and (contains(":latest") | not))' "$release_workflow" "release workflow must publish only the literal v* tag"
 
