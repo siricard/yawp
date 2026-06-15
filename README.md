@@ -68,6 +68,8 @@ just rn-macos
 
 `just rn-metro` **must be running before** `just rn-ios`, `just rn-android`, or `just rn-macos` is invoked. If Metro is not already listening on port 8081, the launched React Native app can show the redbox error `No script URL provided`.
 
+Native distribution notes for TestFlight and the Play internal testing track live in [`apps/yawp/assets/native/RELEASING.md`](apps/yawp/assets/native/RELEASING.md).
+
 ## Self-hosting
 
 The self-hosting guide lives in [`docs/self-hosting.md`](docs/self-hosting.md).
