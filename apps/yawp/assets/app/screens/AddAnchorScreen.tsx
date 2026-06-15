@@ -119,7 +119,7 @@ export function AddAnchorScreen({onCancel, onAdded}: Props) {
 
           <Field
             label="New anchor host"
-            helper="Just the host (and port), e.g. anchor-b.example or localhost:4100.">
+            helper="Just the host, e.g. anchor-b.example.">
             <Input
               testID="new-anchor-input"
               accessibilityLabel="new anchor host"

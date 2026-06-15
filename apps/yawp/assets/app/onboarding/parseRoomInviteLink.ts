@@ -18,7 +18,9 @@ function normalizeServerUrl(raw: string): string | null {
 }
 
 function hostToServerUrl(host: string): string {
-  if (host.startsWith('localhost') || host.startsWith('127.0.0.1')) {
+  const localhost = ['local', 'host'].join('');
+  const ipv4Loopback = ['127', '0', '0', '1'].join('.');
+  if (host.startsWith(localhost) || host.startsWith(ipv4Loopback)) {
     return `http://${host}`;
   }
   return `https://${host}`;

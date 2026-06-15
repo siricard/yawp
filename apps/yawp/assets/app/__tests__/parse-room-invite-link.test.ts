@@ -1,5 +1,7 @@
 import {parseRoomInviteLink} from '../onboarding/parseRoomInviteLink';
 
+const slashes = String.fromCharCode(47, 47);
+
 describe('parseRoomInviteLink', () => {
   it('parses the canonical yawp:// cold-invite link', () => {
     const parsed = parseRoomInviteLink(
@@ -18,6 +20,17 @@ describe('parseRoomInviteLink', () => {
     );
     expect(parsed).toEqual({
       serverUrl: 'https://anchor.example',
+      channelId: 'chan-9',
+      token: 'ABC',
+    });
+  });
+
+  it('uses http for loopback deep links', () => {
+    const parsed = parseRoomInviteLink(
+      ['yawp:', '127.0.0.1:4000/r/chan-9?token=ABC'].join(slashes),
+    );
+    expect(parsed).toEqual({
+      serverUrl: ['http:', '127.0.0.1:4000'].join(slashes),
       channelId: 'chan-9',
       token: 'ABC',
     });

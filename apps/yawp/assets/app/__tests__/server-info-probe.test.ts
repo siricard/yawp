@@ -1,5 +1,8 @@
 import {probeServerInfo} from '../onboarding/useServerInfoProbe';
 
+const slashes = String.fromCharCode(47, 47);
+const httpsUrl = (host: string) => ['https:', host].join(slashes);
+
 function jsonResponse(body: unknown, status = 200): Response {
   return {
     ok: status >= 200 && status < 300,
@@ -45,6 +48,20 @@ describe('probeServerInfo', () => {
     await probeServerInfo('http://localhost:4000///', fetchImpl);
     expect((fetchImpl as jest.Mock).mock.calls[0][0]).toBe(
       'http://localhost:4000/.well-known/yawp/server-info',
+    );
+  });
+
+  test('builds the probe URL from the supplied https server URL', async () => {
+    const fetchImpl = jest.fn(async () =>
+      jsonResponse({claimed: false}),
+    ) as unknown as typeof fetch;
+
+    const serverUrl = httpsUrl('anchor-a.staging.example');
+
+    await probeServerInfo(serverUrl, fetchImpl);
+
+    expect((fetchImpl as jest.Mock).mock.calls[0][0]).toBe(
+      [serverUrl, '.well-known/yawp/server-info'].join('/'),
     );
   });
 

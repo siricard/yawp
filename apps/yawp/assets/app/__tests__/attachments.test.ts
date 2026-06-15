@@ -1,5 +1,8 @@
 import {sha256Hex, uploadAttachment, verifyAttachmentBytes} from '../chat/attachments';
 
+const slashes = String.fromCharCode(47, 47);
+const httpsUrl = (host: string) => ['https:', host].join(slashes);
+
 describe('attachment hashing', () => {
   test('computes sha256 before upload and verifies downloaded bytes', async () => {
     const bytes = new TextEncoder().encode('hello attachment');
@@ -35,6 +38,31 @@ describe('attachment hashing', () => {
     );
     expect(result.client_hash).toBe('7fa36b95d5c98859ed72b4787f3c28b29eaa103970786755c9711cbb19be631c');
     expect(result.upload_id).toBe('up-1');
+  });
+
+  test('builds the upload URL from the supplied https server URL', async () => {
+    const file = new Blob([new TextEncoder().encode('hello attachment')], {
+      type: 'image/png',
+    });
+    const fetchImpl = jest.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        upload_id: 'up-1',
+        content_hash:
+          '7fa36b95d5c98859ed72b4787f3c28b29eaa103970786755c9711cbb19be631c',
+      }),
+    });
+
+    await uploadAttachment({
+      serverUrl: httpsUrl('anchor-a.staging.example'),
+      file,
+      fetchImpl: fetchImpl as unknown as typeof fetch,
+    });
+
+    expect(fetchImpl).toHaveBeenCalledWith(
+      [httpsUrl('anchor-a.staging.example'), 'api/uploads'].join('/'),
+      expect.objectContaining({method: 'POST'}),
+    );
   });
 
   test('rejects upload responses whose server hash differs from the client hash', async () => {

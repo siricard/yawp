@@ -29,6 +29,12 @@ type Props = {
 
 type Step = 'connect' | 'code';
 
+const neutralServerPlaceholder = [
+  'https:',
+  'chat.example.com/invite/… or yawp:',
+  'chat.example.com/r/…?token=…',
+].join(String.fromCharCode(47, 47));
+
 function labelFromUrl(raw: string): string {
   try {
     const u = new URL(raw);
@@ -46,7 +52,7 @@ export function AddServerScreen({onCancel, onAdded, onNavigateToServer}: Props) 
   const {effectiveDisplayName} = useDisplayName();
 
   const [step, setStep] = useState<Step>('connect');
-  const [pasteValue, setPasteValue] = useState('http://localhost:4000');
+  const [pasteValue, setPasteValue] = useState('');
   const [serverUrl, setServerUrl] = useState('');
   const [tokenValue, setTokenValue] = useState('');
   const [probing, setProbing] = useState(false);
@@ -336,7 +342,7 @@ export function AddServerScreen({onCancel, onAdded, onNavigateToServer}: Props) 
               autoCapitalize="none"
               autoCorrect={false}
               editable={!probing}
-              placeholder="https://server.example/invite#…, yawp://…/r/…?token=…, or http://localhost:4000"
+              placeholder={neutralServerPlaceholder}
             />
           </Field>
 

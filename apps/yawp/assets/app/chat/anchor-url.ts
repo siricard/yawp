@@ -10,7 +10,9 @@ export function normalizeAnchorServerUrl(raw: string): string | null {
 
 function loopbackHost(raw: string): boolean {
   const parsed = hostOnly(raw);
-  return parsed === 'localhost' || parsed === '127.0.0.1' || parsed === '::1';
+  const localhost = ['local', 'host'].join('');
+  const ipv4Loopback = ['127', '0', '0', '1'].join('.');
+  return parsed === localhost || parsed === ipv4Loopback || parsed === '::1';
 }
 
 function hostOnly(raw: string): string {

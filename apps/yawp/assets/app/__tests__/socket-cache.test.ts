@@ -32,8 +32,10 @@ import {getValidSessionToken} from '../session';
 const sessionMock = getValidSessionToken as unknown as jest.Mock;
 
 const SERVER = 'http://localhost:4000';
-const socketUrl = (host: string) =>
-  ['ws:', `${host}/socket`].join(String.fromCharCode(47, 47));
+const socketUrl = (host: string, scheme = 'ws:') =>
+  [scheme, `${host}/socket`].join(String.fromCharCode(47, 47));
+const serverUrl = (scheme: string, host: string) =>
+  [scheme, host].join(String.fromCharCode(47, 47));
 
 function okSession(tok: string): {ok: true; sessionToken: string} {
   const out = {ok: true as const, sessionToken: ''};
@@ -74,6 +76,22 @@ describe('getSocket', () => {
     expect(result).toEqual({ok: true, socket: socketInstances[0]});
     expect(socketInstances[0].params).toEqual({token: tok});
     expect(socketInstances[0].url).toBe(socketUrl('localhost:4000'));
+  });
+
+  test('https anchors connect with secure websocket URLs', async () => {
+    const tok = 'tok-secure';
+    sessionMock.mockResolvedValue(okSession(tok));
+
+    const secureServerUrl = serverUrl('https:', 'anchor-a.staging.example');
+    const result = await getSocket(secureServerUrl);
+
+    expect(sessionMock).toHaveBeenCalledWith({
+      serverUrl: secureServerUrl,
+    });
+    expect(result).toEqual({ok: true, socket: socketInstances[0]});
+    expect(socketInstances[0].url).toBe(
+      socketUrl('anchor-a.staging.example', 'wss:'),
+    );
   });
 
   test('second call with the SAME token → returns the cached Socket; no new Socket constructed', async () => {

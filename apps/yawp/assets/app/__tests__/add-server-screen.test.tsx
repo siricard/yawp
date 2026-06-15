@@ -80,7 +80,10 @@ describe('AddServerScreen (paste-first)', () => {
     expect(queryByTestId(tree, 'token-kind-toggle')).toBeNull();
     expect(queryByTestId(tree, 'token-kind-claim')).toBeNull();
     expect(queryByTestId(tree, 'token-kind-invite')).toBeNull();
-    expect(findByTestId(tree, 'server-url-input')).toBeTruthy();
+    const input = findByTestId(tree, 'server-url-input');
+    expect(input.props.value).toBe('');
+    expect(input.props.placeholder).toContain('chat.example.com');
+    expect(input.props.placeholder).not.toContain('localhost');
     expect(findByTestId(tree, 'add-server-next')).toBeTruthy();
   });
 

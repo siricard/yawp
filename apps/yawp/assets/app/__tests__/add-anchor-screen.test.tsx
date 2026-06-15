@@ -155,4 +155,24 @@ describe('AddAnchorScreen', () => {
       }),
     );
   });
+
+  test('uses neutral helper copy for release builds', async () => {
+    setup({});
+
+    let root: ReturnType<typeof create>;
+    await act(async () => {
+      root = create(<AddAnchorScreen onCancel={jest.fn()} onAdded={jest.fn()} />);
+    });
+
+    const fieldText = root!.root
+      .findAll(
+        node =>
+          (node.type as unknown) === 'Text' ||
+          (node.type as Function)?.name === 'Text',
+      )
+      .flatMap(node => node.props.children)
+      .join(' ');
+    expect(fieldText).toContain('Just the host, e.g. anchor-b.example.');
+    expect(fieldText).not.toContain(':4100');
+  });
 });
