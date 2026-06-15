@@ -1,0 +1,13 @@
+{
+  "tasks": {
+    "sync": "deno run -A scripts/sync-docs.mjs",
+    "dev": "deno task sync && deno run -A npm:astro dev",
+    "build": "deno task sync && deno run -A npm:astro build",
+    "preview": "deno run -A npm:astro preview",
+    "check": "deno task sync && deno run -A npm:astro check",
+    "astro": "deno run -A npm:astro"
+  },
+  "nodeModulesDir": "auto",
+  "allowScripts": ["npm:sharp"],
+  "unstable": ["bare-node-builtins"]
+}

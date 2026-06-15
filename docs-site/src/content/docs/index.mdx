@@ -1,0 +1,39 @@
+---
+title: Yawp Documentation
+description: Self-hosting guides and concept documentation for Yawp — a decentralized, end-to-end encrypted communication platform.
+template: splash
+hero:
+  tagline: Run your own corner of the network, and understand exactly how it works.
+  actions:
+    - text: Deploy Yawp
+      link: /self-hosting/
+      icon: right-arrow
+      variant: primary
+    - text: How Yawp works
+      link: /how-it-works/
+      icon: open-book
+      variant: minimal
+---
+
+import { Card, CardGrid } from '@astrojs/starlight/components';
+
+<CardGrid stagger>
+  <Card title="Self-hosting" icon="rocket">
+    Deploy and operate your own Yawp server on a VPS — install, configure
+    federation and voice, back up, and upgrade.
+    [Start here →](/self-hosting/)
+  </Card>
+  <Card title="How Yawp works" icon="approve-check">
+    Plain-English explanations of identity, anchors, federation, and
+    encryption — with links into the architecture decisions behind each.
+    [Read the concepts →](/how-it-works/)
+  </Card>
+  <Card title="Reference" icon="open-book">
+    The glossary, wire formats, federation API, configuration, and the full
+    set of ADRs. [Look it up →](/reference/)
+  </Card>
+  <Card title="Contributing" icon="pencil">
+    Architecture overview, local dev setup, and how we record decisions.
+    [Get involved →](/contributing/)
+  </Card>
+</CardGrid>

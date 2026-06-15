@@ -1,5 +1,17 @@
-# Yawp — Context Glossary
+---
+title: "Glossary"
+description: "Canonical product and federation vocabulary for Yawp, generated from CONTEXT.md."
+slug: reference/glossary
+editUrl: false
+tableOfContents:
+  maxHeadingLevel: 2
+sidebar:
+  order: 1
+---
 
+:::note[Source of truth]
+This page is generated from `CONTEXT.md` in the code repo. When a term here disagrees with a term elsewhere, this file wins. Edit it there.
+:::
 Canonical vocabulary for Yawp. When a term in this file disagrees with a term elsewhere, this file wins. Keep this glossary free of implementation details — it defines _what_ things are, not _how_ they're built. Implementation choices live in [`docs/adr/`](docs/adr/).
 
 Cryptography-specific terms have their own document at [`docs/cryptography-glossary.md`](docs/cryptography-glossary.md) (DID, Ed25519, BIP-39, etc.). This file covers product- and federation-level vocabulary.

@@ -13,6 +13,8 @@ nix develop -c <cmd> # one-off command
 
 **Rule for AI agents:** always prefix shell commands with `nix develop -c` unless you are sure direnv has already loaded the environment. If Elixir/Mix/Node are not available, the Nix setup is wrong — do not work around it, fix it.
 
+**Never create giant Nix store snapshots.** Only invoke the dev shell as `nix develop -c <cmd>` (or bare `nix develop`) from the repository root — a real git checkout where `.git` is a directory. NEVER use `nix develop path:.`, `nix build path:.`, `nix print-dev-env path:.`, and never run Nix inside a copied, rsync'd, or tarball-extracted tree that lacks `.git`. A git-aware `nix develop` copies only tracked files (tens of MB) and strips `.git`; a non-git-aware eval copies the *entire* working tree — including the gitignored `node_modules` (~4.5 GB) and `_build` — into `/nix/store` as an `-source` path that is never cleaned up. Each one is ~11 GB. Tell-tale of a bad copy: the store `-source` path contains a `.git` directory.
+
 ## Bootstrap (already done)
 
 The application was scaffolded with:
