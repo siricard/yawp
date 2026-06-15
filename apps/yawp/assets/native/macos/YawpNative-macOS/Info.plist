@@ -24,8 +24,7 @@
 	<string>$(MACOSX_DEPLOYMENT_TARGET)</string>
 	<key>NSAppTransportSecurity</key>
 	<dict>
-		<key>NSAllowsArbitraryLoads</key>
-		<true/>
+#if DEBUG
 		<key>NSExceptionDomains</key>
 		<dict>
 			<key>localhost</key>
@@ -34,6 +33,7 @@
 				<true/>
 			</dict>
 		</dict>
+#endif
 	</dict>
 	<key>NSMainStoryboardFile</key>
 	<string>Main</string>

@@ -28,8 +28,10 @@
 	<dict>
 		<key>NSAllowsArbitraryLoads</key>
 		<false/>
+#if DEBUG
 		<key>NSAllowsLocalNetworking</key>
 		<true/>
+#endif
 	</dict>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string/>
