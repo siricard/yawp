@@ -13,6 +13,7 @@ defmodule Yawp.TestSupport.TwoAnchor do
 
   @migration_timeout 120_000
   @boot_timeout 120_000
+  @template_db "yawp_two_anchor_template"
 
   @spec start_pair!(keyword()) :: %{a: anchor(), b: anchor()}
   def start_pair!(_opts \\ []) do
@@ -143,13 +144,31 @@ defmodule Yawp.TestSupport.TwoAnchor do
   end
 
   defp migrate_database!(database) do
-    config =
-      Application.get_env(:yawp, Yawp.Repo)
-      |> Keyword.delete(:pool)
-      |> Keyword.put(:database, database)
-      |> Keyword.put(:pool_size, 2)
-      |> Keyword.put(:name, nil)
+    ensure_template!()
 
+    config = repo_config(database)
+    _ = Ecto.Adapters.Postgres.storage_down(config)
+    :ok = Ecto.Adapters.Postgres.storage_up(Keyword.put(config, :template, @template_db))
+    :ok
+  end
+
+  # Migrate one reference DB per VM run, then CREATE DATABASE ... TEMPLATE off it
+  # so each anchor skips replaying all migrations. async: false serialises callers,
+  # so the persistent_term flag needs no lock.
+  defp ensure_template! do
+    case :persistent_term.get({__MODULE__, :template}, nil) do
+      :ready ->
+        :ok
+
+      nil ->
+        build_template!()
+        :persistent_term.put({__MODULE__, :template}, :ready)
+        :ok
+    end
+  end
+
+  defp build_template! do
+    config = repo_config(@template_db)
     _ = Ecto.Adapters.Postgres.storage_down(config)
     :ok = Ecto.Adapters.Postgres.storage_up(config)
 
@@ -166,6 +185,14 @@ defmodule Yawp.TestSupport.TwoAnchor do
     end
 
     :ok
+  end
+
+  defp repo_config(database) do
+    Application.get_env(:yawp, Yawp.Repo)
+    |> Keyword.delete(:pool)
+    |> Keyword.put(:database, database)
+    |> Keyword.put(:pool_size, 2)
+    |> Keyword.put(:name, nil)
   end
 
   defp stop_anchor(%{peer: peer, database: database}) do
