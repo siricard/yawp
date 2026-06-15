@@ -1,4 +1,3 @@
-# List recipes
 default:
     @just --list
 
@@ -20,50 +19,43 @@ dm-fixtures:
     nix develop -c bash -c 'cd apps/yawp && mix ecto.migrate && mix yawp.dm_fixtures --anchor a --anchor-url http://localhost:4000 --peer-anchor-url http://localhost:4100'
     nix develop -c bash -c 'cd apps/yawp && DATABASE=yawp_anchor_b_dev mix ecto.migrate && DATABASE=yawp_anchor_b_dev PORT=4100 mix yawp.dm_fixtures --anchor b --anchor-url http://localhost:4100 --peer-anchor-url http://localhost:4000'
 
-# Open IEx shell with the app loaded
 iex:
     nix develop -c bash -c 'cd apps/yawp && iex -S mix phx.server'
 
-# One-time setup: install deps, create DB, run migrations
 setup:
     nix develop -c mix setup
 
-# Fetch and compile deps
 deps:
     nix develop -c mix deps.get
     nix develop -c mix deps.compile
 
-# Compile the project
 compile:
     nix develop -c mix compile
 
-# Run tests
 test *ARGS:
     nix develop -c mix test {{ARGS}}
 
-# Format Elixir code
 fmt:
     nix develop -c mix format
 
-# Lint / static checks
 check:
     nix develop -c mix compile --warnings-as-errors
 
-# Full local CI-parity gate: same steps GitHub Actions runs, plus mix format
-# check. Run this before `git push`; the pre-push hook runs it for you.
+# Fast pre-push gate (one dev shell). Heavy jobs — verify-singletons, release-smoke — run in GitHub CI.
 ci:
-    nix develop -c mix format --check-formatted
-    nix develop -c mix compile --warnings-as-errors
-    nix develop -c bash -c 'cd apps/yawp && mix ash.setup --quiet'
-    nix develop -c mix test
-    nix develop -c node --test scripts/staging-seed.test.mjs
-    just deploy-test
-    nix develop -c bash -c 'cd apps/yawp/assets && npx tsc --noEmit'
-    nix develop -c bash -c 'cd apps/yawp/assets/native && npx tsc --noEmit'
-    nix develop -c bash -c 'cd apps/yawp/assets/native && npm test --silent'
-    just verify-singletons
+    #!/usr/bin/env bash
+    nix develop -c bash -c '
+        set -euo pipefail
+        mix format --check-formatted
+        (cd apps/yawp && mix ash.setup --quiet)
+        mix test --warnings-as-errors
+        node --test scripts/staging-seed.test.mjs
+        bash scripts/deploy.test.sh
+        (cd apps/yawp/assets && npx tsc --noEmit)
+        (cd apps/yawp/assets/native && npx tsc --noEmit)
+        (cd apps/yawp/assets/native && npm test --silent)
+    '
 
-# Reset dev DB (drop, create, migrate, seed)
 db-reset:
     nix develop -c mix ecto.reset
 
@@ -78,11 +70,9 @@ demo:
     @echo ""
     nix develop -c bash -c 'cd apps/yawp && mix phx.server'
 
-# Generate Ash migrations
 ash-migrate:
     nix develop -c mix ash.codegen
 
-# Regenerate TypeScript types from Ash resources
 gen-types:
     nix develop -c mix ash_typescript.codegen
 
@@ -96,19 +86,15 @@ gen-types:
 codegen:
     nix develop -c bash -c 'cd apps/yawp && mix ash_typescript.codegen --output "assets/app/ash_generated.ts"'
 
-# Run the React Native app on iOS
 rn-ios:
     nix develop -c bash -c 'cd apps/yawp/assets/native && npx react-native run-ios'
 
-# Run the React Native app on Android
 rn-android:
     nix develop -c bash -c 'cd apps/yawp/assets/native && npx react-native run-android'
 
-# Run the React Native app on macOS
 rn-macos:
     nix develop -c bash -c 'export DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer; export PATH="/usr/bin:/bin:/usr/sbin:/sbin:$PATH"; cd apps/yawp/assets/native && npx react-native run-macos'
 
-# Start the React Native Metro bundler
 rn-metro:
     nix develop -c bash -c 'cd apps/yawp/assets/native && npx react-native start --port 8081'
 
@@ -145,6 +131,5 @@ deploy-test:
 verify-deploy-workflow:
     nix develop -c bash scripts/verify-deploy-workflow.sh
 
-# Open Phoenix routes
 routes:
     nix develop -c mix phx.routes
