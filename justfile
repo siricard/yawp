@@ -142,6 +142,9 @@ staging-seed-test:
 deploy-test:
     nix develop -c bash scripts/deploy.test.sh
 
+verify-deploy-workflow:
+    nix develop -c bash scripts/verify-deploy-workflow.sh
+
 # Open Phoenix routes
 routes:
     nix develop -c mix phx.routes

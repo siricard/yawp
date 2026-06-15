@@ -1,11 +1,5 @@
 name: Release
 
-# Tag-driven release: pushing a `v*` tag (e.g. `v0.1.0`) builds the Dockerfile
-# and publishes the resulting image to GHCR under both the tag version and
-# `:latest`. Authentication uses only the workflow's built-in `GITHUB_TOKEN`
-# (scoped `packages: write` below) — no extra secrets required to self-host
-# the release pipeline.
-
 on:
   push:
     tags:
@@ -41,16 +35,16 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      # Derive the version string from the tag (strip the leading `v`) so the
-      # /version endpoint reports `0.1.0` rather than `v0.1.0`.
       - name: Resolve build provenance
         id: provenance
         run: |
           version="${GITHUB_REF_NAME#v}"
           built_at="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-          echo "version=${version}" >> "$GITHUB_OUTPUT"
-          echo "commit=${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
-          echo "built_at=${built_at}" >> "$GITHUB_OUTPUT"
+          {
+            echo "version=${version}"
+            echo "commit=${GITHUB_SHA}"
+            echo "built_at=${built_at}"
+          } >> "$GITHUB_OUTPUT"
 
       - name: Build and push image
         uses: docker/build-push-action@v6
@@ -58,13 +52,8 @@ jobs:
           context: .
           file: ./Dockerfile
           push: true
-          # Publish under the literal v-prefixed git tag (e.g. `v0.1.0`) so
-          # the GHCR tag matches the release tag exactly, plus `:latest` for
-          # the rolling pointer. The stripped, semver-only `version` is still
-          # threaded through as a build-arg so `/version` reports `0.1.0`.
           tags: |
             ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.ref_name }}
-            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
           build-args: |
             YAWP_VERSION=${{ steps.provenance.outputs.version }}
             YAWP_COMMIT=${{ steps.provenance.outputs.commit }}
