@@ -6,6 +6,10 @@ end
 
 config :yawp, YawpWeb.Endpoint, http: [port: String.to_integer(System.get_env("PORT", "4000"))]
 
+if anchor_id = System.get_env("YAWP_FEDERATION_ANCHOR_ID") do
+  config :yawp, Yawp.Federation.Client, anchor_id: anchor_id
+end
+
 if config_env() == :dev do
   cond do
     url = System.get_env("DATABASE_URL") ->

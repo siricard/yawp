@@ -4,6 +4,7 @@ defmodule YawpWeb.DmController do
   use YawpWeb, :controller
 
   alias Yawp.Federation
+  require Logger
 
   def immutable_roster(conn, _params) do
     conn
@@ -31,7 +32,9 @@ defmodule YawpWeb.DmController do
         |> put_status(422)
         |> json(%{"error" => "unresolvable_sender"})
 
-      {:error, _} ->
+      {:error, reason} ->
+        Logger.warning("DM submit rejected: #{inspect(reason)}")
+
         conn
         |> put_status(422)
         |> json(%{"error" => "invalid_envelope"})

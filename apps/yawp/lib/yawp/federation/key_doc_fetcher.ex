@@ -159,7 +159,8 @@ defmodule Yawp.Federation.KeyDocFetcher do
         _ -> host
       end
 
-    parsed_host in ["localhost", "127.0.0.1", "::1"]
+    parsed_host in ["localhost", "127.0.0.1", "::1", "host.docker.internal"] or
+      String.starts_with?(parsed_host, "anchor-")
   end
 
   defp req_options do

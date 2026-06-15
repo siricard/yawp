@@ -105,7 +105,9 @@ defmodule Yawp.Federation.Client do
 
   defp scheme(peer_host) do
     if String.starts_with?(peer_host, "localhost") or
-         String.starts_with?(peer_host, "127.0.0.1") do
+         String.starts_with?(peer_host, "127.0.0.1") or
+         String.starts_with?(peer_host, "host.docker.internal") or
+         String.starts_with?(peer_host, "anchor-") do
       "http"
     else
       "https"

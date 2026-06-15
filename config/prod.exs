@@ -6,7 +6,7 @@ config :yawp, YawpWeb.Endpoint,
   force_ssl: [
     rewrite_on: [:x_forwarded_proto],
     exclude: [
-      hosts: ["localhost", "127.0.0.1"]
+      hosts: ["localhost", "127.0.0.1", "host.docker.internal"]
     ]
   ]
 
