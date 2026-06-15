@@ -24,6 +24,8 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      args:
+        YAWP_FEDERATION_INSECURE_PEER_HOSTS: ${YAWP_FEDERATION_INSECURE_PEER_HOSTS:-}
     restart: unless-stopped
     depends_on:
       postgres:
@@ -46,6 +48,7 @@ services:
       ATTACHMENT_SIGNING_SECRET: ${ATTACHMENT_SIGNING_SECRET}
       UPLOADS_DIR: ${UPLOADS_DIR:-/data/uploads}
       YAWP_FEDERATION_ANCHOR_ID: ${YAWP_FEDERATION_ANCHOR_ID:-}
+      YAWP_FEDERATION_INSECURE_PEER_HOSTS: ${YAWP_FEDERATION_INSECURE_PEER_HOSTS:-}
     ports:
       - "${PHX_BIND_HOST:-127.0.0.1}:${PHX_PORT:-4000}:4000"
     volumes:

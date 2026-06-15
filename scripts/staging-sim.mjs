@@ -123,6 +123,7 @@ async function submitDm(baseUrl, advertisedHost, sender, sessionToken, recipient
     sender_did: sender.did,
     signed_by: sender.deviceId,
     sender_anchors: [advertisedHost],
+    recipient_did: recipientDids[0],
     recipient_dids: recipientDids,
     conversation_id: conversationId(sender.did, recipientDids),
     timestamp: now().toISOString(),

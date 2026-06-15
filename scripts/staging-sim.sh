@@ -64,6 +64,7 @@ POSTGRES_PASSWORD=${pg_secret}
 POSTGRES_DB=${db_name}
 YAWP_IMAGE=${image_tag}
 YAWP_FEDERATION_ANCHOR_ID=${host}
+YAWP_FEDERATION_INSECURE_PEER_HOSTS=${anchor_a_host},${anchor_b_host}
 ENV
 }
 
@@ -193,9 +194,15 @@ YAML
 printf 'staging sim projects: %s %s\n' "$project_a" "$project_b"
 export STAGING_SIM_ALIAS=anchor-a
 compose_a build phoenix
-compose_a up -d --wait
+compose_a up -d --wait || {
+  compose_a logs --no-color phoenix
+  exit 1
+}
 export STAGING_SIM_ALIAS=anchor-b
-compose_b up -d --wait
+compose_b up -d --wait || {
+  compose_b logs --no-color phoenix
+  exit 1
+}
 docker compose -p "$project_a" exec -T phoenix curl -fsS "http://${anchor_b_host}/health" >/dev/null
 docker compose -p "$project_b" exec -T phoenix curl -fsS "http://${anchor_a_host}/health" >/dev/null
 set_anchor_id "$project_a" "$anchor_a_host"
@@ -236,7 +243,11 @@ NODE_TLS_REJECT_UNAUTHORIZED=0 node "$repo_root/scripts/staging-sim.mjs" \
   --anchor-b "$anchor_b_url" \
   --advertised-a "$anchor_a_host" \
   --advertised-b "$anchor_b_host" \
-  --input "$result_json" >"$result_json.tmp"
+  --input "$result_json" >"$result_json.tmp" || {
+  compose_a logs --no-color phoenix
+  compose_b logs --no-color phoenix
+  exit 1
+}
 mv "$result_json.tmp" "$result_json"
 envelope_id="$(extract_json "$result_json" "dm.envelopeId")"
 

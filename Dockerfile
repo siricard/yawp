@@ -13,6 +13,7 @@ FROM hexpm/elixir:${ELIXIR_VERSION}-erlang-${ERLANG_VERSION}-debian-${DEBIAN_REL
 
 ARG NODE_MAJOR
 ARG MIX_ENV=prod
+ARG YAWP_FEDERATION_INSECURE_PEER_HOSTS=""
 # Build provenance — pass via `--build-arg` from CI (release.yml fills these
 # from the git tag, the resolved commit SHA, and the build start time). They
 # are baked into the runtime stage as ENV so the OTP release sees them at
@@ -21,6 +22,7 @@ ARG YAWP_VERSION=unknown
 ARG YAWP_COMMIT=unknown
 ARG YAWP_BUILT_AT=unknown
 ENV MIX_ENV=${MIX_ENV} \
+    YAWP_FEDERATION_INSECURE_PEER_HOSTS=${YAWP_FEDERATION_INSECURE_PEER_HOSTS} \
     LANG=C.UTF-8 \
     LC_ALL=C.UTF-8
 

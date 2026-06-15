@@ -10,6 +10,15 @@ if anchor_id = System.get_env("YAWP_FEDERATION_ANCHOR_ID") do
   config :yawp, Yawp.Federation.Client, anchor_id: anchor_id
 end
 
+insecure_peer_hosts =
+  "YAWP_FEDERATION_INSECURE_PEER_HOSTS"
+  |> System.get_env("")
+  |> String.split(",", trim: true)
+  |> Enum.map(&String.trim/1)
+  |> Enum.reject(&(&1 == ""))
+
+config :yawp, :federation_insecure_peer_hosts, insecure_peer_hosts
+
 if config_env() == :dev do
   cond do
     url = System.get_env("DATABASE_URL") ->

@@ -2,6 +2,7 @@ defmodule Yawp.Federation.KeyDocFetcher do
   @moduledoc false
 
   alias Yawp.Federation.KeyDocCache
+  alias Yawp.Federation.InsecurePeerHosts
 
   require Logger
 
@@ -145,22 +146,11 @@ defmodule Yawp.Federation.KeyDocFetcher do
   end
 
   defp scheme(host) do
-    if loopback_host?(host) do
+    if InsecurePeerHosts.insecure?(host) do
       "http"
     else
       "https"
     end
-  end
-
-  defp loopback_host?(host) do
-    parsed_host =
-      case URI.parse("//#{host}") do
-        %URI{host: parsed} when is_binary(parsed) -> parsed
-        _ -> host
-      end
-
-    parsed_host in ["localhost", "127.0.0.1", "::1", "host.docker.internal"] or
-      String.starts_with?(parsed_host, "anchor-")
   end
 
   defp req_options do

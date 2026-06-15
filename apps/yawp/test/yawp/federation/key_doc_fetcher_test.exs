@@ -156,6 +156,33 @@ defmodule Yawp.Federation.KeyDocFetcherTest do
       assert_receive {:scheme, :https}
     end
 
+    test "fetches an anchor-prefixed staging host over https by default", %{doc: doc} do
+      parent = self()
+
+      Req.Test.stub(@stub, fn conn ->
+        send(parent, {:scheme, conn.scheme})
+        Req.Test.json(conn, doc)
+      end)
+
+      KeyDocFetcher.get!("anchor-a.staging.example")
+      assert_receive {:scheme, :https}
+    end
+
+    test "fetches an explicitly insecure peer host over http", %{doc: doc} do
+      previous = Application.get_env(:yawp, :federation_insecure_peer_hosts, [])
+      Application.put_env(:yawp, :federation_insecure_peer_hosts, ["anchor-a.staging.example"])
+      on_exit(fn -> Application.put_env(:yawp, :federation_insecure_peer_hosts, previous) end)
+      parent = self()
+
+      Req.Test.stub(@stub, fn conn ->
+        send(parent, {:scheme, conn.scheme})
+        Req.Test.json(conn, doc)
+      end)
+
+      KeyDocFetcher.get!("anchor-a.staging.example")
+      assert_receive {:scheme, :http}
+    end
+
     test "fetches a 127.0.0.1 host over http", %{doc: doc} do
       parent = self()
 

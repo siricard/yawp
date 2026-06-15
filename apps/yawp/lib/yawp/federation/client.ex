@@ -2,6 +2,7 @@ defmodule Yawp.Federation.Client do
   @moduledoc false
 
   alias Yawp.Federation.AnchorHost
+  alias Yawp.Federation.InsecurePeerHosts
   alias Yawp.Federation.Wrapper
 
   @default_timeout 10_000
@@ -104,10 +105,7 @@ defmodule Yawp.Federation.Client do
   end
 
   defp scheme(peer_host) do
-    if String.starts_with?(peer_host, "localhost") or
-         String.starts_with?(peer_host, "127.0.0.1") or
-         String.starts_with?(peer_host, "host.docker.internal") or
-         String.starts_with?(peer_host, "anchor-") do
+    if InsecurePeerHosts.insecure?(peer_host) do
       "http"
     else
       "https"
