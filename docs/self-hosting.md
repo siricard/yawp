@@ -29,15 +29,23 @@ dig +short chat.example.com AAAA
 
 For local testing on your Mac, use `localhost` instead of your domain.
 
-### Install Docker Engine and Compose v2
+### One-command bring-up
 
-The repository includes an idempotent provisioning script that installs Docker
-Engine with Compose v2 when needed. Run it after cloning the repository in the
-next step.
+Paste this on the VPS, replacing the hostname:
 
-The provisioning script installs Docker Engine with Compose v2 only when needed, creates the application directory only when missing, and leaves an existing `.env` unchanged. Re-running it on a prepared host is a no-op aside from ownership and permission checks.
+```bash
+curl -fsSL https://raw.githubusercontent.com/siricard/yawp/main/scripts/bootstrap-staging.sh | sudo bash -s -- --hostname chat.example.com
+```
 
-After provisioning, verify Docker:
+The bootstrap script installs missing prerequisites, clones or updates the repository in `/opt/yawp`, runs the provisioning script, pulls the published image, and starts the stack. If the image is not public or not published yet, it prints a clear message and builds locally instead. Re-running the command updates the checkout, keeps the existing `.env`, and restarts the stack.
+
+If you already cloned the repository, run the same script from the checkout:
+
+```bash
+sudo bash scripts/bootstrap-staging.sh --app-dir "$PWD" --app-user "${SUDO_USER:-$(id -un)}" --hostname chat.example.com
+```
+
+After provisioning, verify Docker if you need to debug the host:
 
 ```bash
 docker version
@@ -45,24 +53,6 @@ docker compose version
 ```
 
 `docker compose version` must print Compose v2. Use the space form, `docker compose`, not the old `docker-compose` binary.
-
-### Get the compose files
-
-Clone the repository or copy the release bundle onto the VPS:
-
-```bash
-git clone https://github.com/siricard/yawp.git
-cd yawp
-```
-
-The directory must contain `docker-compose.yml`, `docker-compose.staging.yml`, `Caddyfile`, and `.env.example`.
-
-Prepare the host and this checkout:
-
-```bash
-sudo bash scripts/provision-staging.sh --dry-run --app-dir "$PWD" --app-user "$USER" --hostname chat.example.com
-sudo bash scripts/provision-staging.sh --app-dir "$PWD" --app-user "$USER" --hostname chat.example.com
-```
 
 ## Configuration
 
@@ -210,20 +200,19 @@ Leave `YAWP_IMAGE` unset to use the default published image.
 
 ## Bring-up
 
-Build or pull the image, then start the stack:
+The bootstrap script already starts the stack. To do the last step yourself, pull the published image and start:
 
 ```bash
-docker compose pull
-docker compose up -d --wait
-docker compose ps
+docker compose -f docker-compose.yml -f docker-compose.staging.yml pull
+docker compose -f docker-compose.yml -f docker-compose.staging.yml up -d --wait
+docker compose -f docker-compose.yml -f docker-compose.staging.yml ps
 ```
 
-If you are testing a local checkout instead of a published image, build first:
+If the pull is denied or the image is unavailable, build on the VPS:
 
 ```bash
-docker compose build phoenix
-docker compose up -d --wait
-docker compose ps
+docker compose -f docker-compose.yml -f docker-compose.staging.yml up -d --build --wait
+docker compose -f docker-compose.yml -f docker-compose.staging.yml ps
 ```
 
 Check the health and version endpoints. On a public VPS:
@@ -238,6 +227,30 @@ On a local Mac test:
 ```bash
 curl -fsSk https://localhost:8443/health
 curl -fsSk https://localhost:8443/version
+```
+
+## Publishing the image
+
+Repository maintainers can publish `ghcr.io/siricard/yawp:latest` from GitHub:
+
+1. Open the repository on GitHub.
+2. Go to **Actions**.
+3. Select **Publish image**.
+4. Click **Run workflow**.
+
+The workflow builds the Docker image and pushes both `latest` and the commit SHA tag. It does not deploy to any server.
+
+GitHub Container Registry packages start private, even for public repositories. After the first publish, make the package public once so servers can pull anonymously:
+
+1. Open the GitHub package page for `yawp`.
+2. Go to **Package settings**.
+3. Under visibility, choose **Change visibility**.
+4. Select **Public** and confirm.
+
+If you keep the package private, log in to GHCR on each server before `docker compose pull`:
+
+```bash
+printf '%s\n' "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USER" --password-stdin
 ```
 
 Find the first-boot setup URL in the Phoenix logs:

@@ -2,7 +2,7 @@
 set -euo pipefail
 
 APP_DIR="/opt/yawp"
-APP_USER="yawp"
+APP_USER=""
 HOSTNAME_VALUE="anchor-a.staging.example"
 HTTP_PORT_VALUE="80"
 HTTPS_PORT_VALUE="443"
@@ -20,7 +20,7 @@ Prepares a Debian or Ubuntu host for a Yawp staging anchor.
 Options:
   --dry-run            Print the full plan without changing the host.
   --app-dir PATH       Application directory to create. Default: /opt/yawp
-  --app-user USER      Unix user that owns the application directory. Default: yawp
+  --app-user USER      Unix user that owns the application directory. Default: sudo user or current user
   --hostname HOSTNAME  PHX_HOST value written to a new .env. Default: anchor-a.staging.example
   --http-port PORT     Host HTTP port for Caddy. Default: 80
   --https-port PORT    Host HTTPS port for Caddy. Default: 443
@@ -80,6 +80,10 @@ while [ "$#" -gt 0 ]; do
       ;;
   esac
 done
+
+if [ -z "$APP_USER" ]; then
+  APP_USER="${SUDO_USER:-$(id -un)}"
+fi
 
 run() {
   if [ "$DRY_RUN" -eq 1 ]; then

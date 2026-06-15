@@ -4,6 +4,7 @@ set -euo pipefail
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 deploy_workflow="${repo_root}/.github/workflows/deploy.yml"
 release_workflow="${repo_root}/.github/workflows/release.yml"
+publish_workflow="${repo_root}/.github/workflows/publish-image.yml"
 deploy_script="${repo_root}/scripts/deploy.sh"
 workflow_ssh_key_file="\${{ runner.temp }}/staging_ssh_key"
 
@@ -70,6 +71,14 @@ assert_yq '.jobs."deploy-staging-a".steps[] | select(.id == "health-check") | .e
 assert_yq '.jobs."deploy-staging-b".steps[] | select(.run | type == "!!str") | select(.run | contains("scripts/deploy.sh")) | .env.SSH_KEY_FILE == "'"$workflow_ssh_key_file"'"' "$deploy_workflow" "deploy-staging-b must pass an absolute runner temp SSH key file to deploy.sh"
 assert_no_latest_in_dispatch_deploy
 assert_yq '.jobs."build-and-push".steps[] | select(.uses == "docker/build-push-action@v6") | .with.tags | (contains("github.ref_name") and (contains(":latest") | not))' "$release_workflow" "release workflow must publish only the literal v* tag"
+assert_yq '."on" | has("workflow_dispatch")' "$publish_workflow" "publish workflow must have a manual dispatch trigger"
+assert_yq '.jobs."publish-image".steps[] | select(.uses == "docker/build-push-action@v6") | .with.tags | (contains("github.sha") and contains(":latest"))' "$publish_workflow" "publish workflow must push sha and latest tags"
+assert_yq '[.jobs | keys[] | select(test("deploy-staging"))] | length == 0' "$publish_workflow" "publish workflow must not contain staging deploy jobs"
+
+if grep -Eq 'STAGING_(A_HOST|B_HOST|SSH_KEY)|scripts/deploy\.sh' "$publish_workflow"; then
+  printf 'publish workflow must not reference staging hosts, ssh keys, or deploy script\n' >&2
+  exit 1
+fi
 
 secrets="$(
   grep -Rho 'secrets\.[A-Z_]*' "${repo_root}/.github/workflows"/*.yml | sort -u
