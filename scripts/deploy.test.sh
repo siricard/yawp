@@ -66,7 +66,7 @@ assert_contains "$dry_run_output" "ssh target: deploy@fakehost"
 assert_contains "$dry_run_output" "cd /opt/yawp"
 assert_contains "$dry_run_output" "printf 'YAWP_IMAGE=%s\n' 'ghcr.io/example/yawp:abc123'"
 assert_contains "$dry_run_output" "docker compose pull && docker compose up -d"
-assert_contains "$dry_run_output" "scripts/deploy.sh --health-check 'https://anchor-a.staging.example/health'"
+assert_contains "$dry_run_output" "local health check: https://anchor-a.staging.example/health"
 
 healthy_port="$(find_port)"
 python3 - "$healthy_port" <<'PY' &

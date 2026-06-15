@@ -15,6 +15,7 @@ Usage:
 
 Environment:
   DRY_RUN=1                 Print the remote deployment sequence without network access.
+  SSH_KEY_FILE=<path>       Private key path for ssh; deploy uses IdentitiesOnly and accept-new host keys.
   REMOTE_DIR=/opt/yawp      Directory on the remote host containing docker-compose.yml and .env.
   HEALTH_CHECK_URL=<url>    Public health URL to poll after deploy.
   HEALTH_INSECURE=1         Allow self-signed TLS for local release smoke checks.
@@ -76,8 +77,21 @@ printf 'YAWP_IMAGE=%s\n' '${image}' >>"\$tmp_env"
 install -m 600 "\$tmp_env" .env
 rm -f "\$tmp_env"
 docker compose pull && docker compose up -d
-HEALTH_RETRIES=${HEALTH_RETRIES} HEALTH_INTERVAL_SECONDS=${HEALTH_INTERVAL_SECONDS} HEALTH_TIMEOUT_SECONDS=${HEALTH_TIMEOUT_SECONDS} scripts/deploy.sh --health-check '${health_url}'
 EOF
+}
+
+ssh_command() {
+  key_file="${SSH_KEY_FILE:-}"
+
+  if [ -z "$key_file" ]; then
+    die "SSH_KEY_FILE is required for remote deploy"
+  fi
+
+  if [ ! -f "$key_file" ]; then
+    die "SSH_KEY_FILE does not exist: $key_file"
+  fi
+
+  ssh -i "$key_file" -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new "$@"
 }
 
 run_remote_deploy() {
@@ -88,11 +102,16 @@ run_remote_deploy() {
 
   if [ "${DRY_RUN:-0}" = "1" ]; then
     printf 'ssh target: %s\n' "$target"
+    if [ -n "${SSH_KEY_FILE:-}" ]; then
+      printf 'ssh identity: configured via SSH_KEY_FILE\n'
+    fi
     printf '%s\n' "$remote_sequence"
+    printf 'local health check: %s\n' "$health_url"
     return 0
   fi
 
-  printf '%s\n' "$remote_sequence" | ssh "$target" "bash -se"
+  printf '%s\n' "$remote_sequence" | ssh_command "$target" "bash -se"
+  health_check "$health_url"
 }
 
 if [ "$#" -eq 0 ]; then

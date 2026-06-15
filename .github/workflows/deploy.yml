@@ -44,6 +44,15 @@ jobs:
       - name: Install Nix
         uses: cachix/install-nix-action@v27
 
+      - name: Fetch Elixir dependencies
+        run: nix develop -c mix deps.get
+
+      - name: Install web asset dependencies
+        run: nix develop -c bash -c 'cd apps/yawp/assets && npm ci --legacy-peer-deps --no-audit --no-fund'
+
+      - name: Install RN dependencies
+        run: nix develop -c bash -c 'cd apps/yawp/assets/native && npm ci --legacy-peer-deps --no-audit --no-fund'
+
       - name: Run CI gate
         run: nix develop -c just ci
 
@@ -126,7 +135,7 @@ jobs:
       - name: Deploy and health-check staging A
         id: health-check
         env:
-          GIT_SSH_COMMAND: ssh -i ~/.ssh/staging -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new
+          SSH_KEY_FILE: ~/.ssh/staging
         run: scripts/deploy.sh "${{ steps.image.outputs.ref }}" "deploy@${{ secrets.STAGING_A_HOST }}"
 
   deploy-staging-b:
@@ -155,5 +164,5 @@ jobs:
 
       - name: Deploy and health-check staging B
         env:
-          GIT_SSH_COMMAND: ssh -i ~/.ssh/staging -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new
+          SSH_KEY_FILE: ~/.ssh/staging
         run: scripts/deploy.sh "${{ steps.image.outputs.ref }}" "deploy@${{ secrets.STAGING_B_HOST }}"
