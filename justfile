@@ -57,6 +57,7 @@ ci:
     nix develop -c bash -c 'cd apps/yawp && mix ash.setup --quiet'
     nix develop -c mix test
     nix develop -c node --test scripts/staging-seed.test.mjs
+    just deploy-test
     nix develop -c bash -c 'cd apps/yawp/assets && npx tsc --noEmit'
     nix develop -c bash -c 'cd apps/yawp/assets/native && npx tsc --noEmit'
     nix develop -c bash -c 'cd apps/yawp/assets/native && npm test --silent'
@@ -137,6 +138,9 @@ staging-sim-down:
 
 staging-seed-test:
     nix develop -c node --test scripts/staging-seed.test.mjs
+
+deploy-test:
+    nix develop -c bash scripts/deploy.test.sh
 
 # Open Phoenix routes
 routes:

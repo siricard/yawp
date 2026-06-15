@@ -79,7 +79,8 @@ compose up -d --wait
 base_url="https://localhost:${https_port}"
 curl_flags=(-fsSk)
 
-curl "${curl_flags[@]}" "${base_url}/health" >/dev/null
+HEALTH_RETRIES=12 HEALTH_INTERVAL_SECONDS=1 HEALTH_TIMEOUT_SECONDS=5 HEALTH_INSECURE=1 \
+  "$repo_root/scripts/deploy.sh" --health-check "${base_url}/health"
 curl "${curl_flags[@]}" "${base_url}/version" >/dev/null
 curl "${curl_flags[@]}" "${base_url}/.well-known/yawp/server-key.json" >/dev/null
 
