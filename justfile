@@ -49,6 +49,7 @@ ci:
         mix format --check-formatted
         (cd apps/yawp && mix ash.setup --quiet)
         mix test --warnings-as-errors
+        (cd apps/yawp/assets && npm ci --legacy-peer-deps --no-audit --no-fund)
         node --test scripts/staging-seed.test.mjs
         bash scripts/deploy.test.sh
         (cd apps/yawp/assets && npx tsc --noEmit)

@@ -1,11 +1,15 @@
 #!/usr/bin/env node
 
 import {randomUUID, webcrypto} from 'node:crypto';
+import {createRequire} from 'node:module';
 import fs from 'node:fs/promises';
 import process from 'node:process';
-import * as ed from '../apps/yawp/assets/node_modules/@noble/ed25519/index.js';
-import {sha256, sha512} from '../apps/yawp/assets/node_modules/@noble/hashes/sha2.js';
-import bs58 from '../apps/yawp/assets/node_modules/bs58/src/esm/index.js';
+
+const assetsRequire = createRequire(new URL('../apps/yawp/assets/package.json', import.meta.url));
+const ed = await import(assetsRequire.resolve('@noble/ed25519'));
+const {sha256, sha512} = await import(assetsRequire.resolve('@noble/hashes/sha2.js'));
+const bs58Module = await import(assetsRequire.resolve('bs58'));
+const bs58 = bs58Module.default?.default ?? bs58Module.default;
 
 ed.hashes.sha512 = sha512;
 

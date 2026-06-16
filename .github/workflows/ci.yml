@@ -49,14 +49,14 @@ jobs:
       - name: Run Elixir tests
         run: nix develop -c mix test
 
+      - name: Install web asset dependencies
+        run: nix develop -c bash -c 'cd apps/yawp/assets && npm ci --legacy-peer-deps --no-audit --no-fund'
+
       - name: Staging seed test
         run: nix develop -c node --test scripts/staging-seed.test.mjs
 
       - name: Deploy script test
         run: nix develop -c bash scripts/deploy.test.sh
-
-      - name: Install web asset dependencies
-        run: nix develop -c bash -c 'cd apps/yawp/assets && npm ci --legacy-peer-deps --no-audit --no-fund'
 
       - name: Typecheck web assets
         run: nix develop -c bash -c 'cd apps/yawp/assets && npx tsc --noEmit'
