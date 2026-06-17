@@ -37,7 +37,7 @@ Paste this on the VPS, replacing the hostname:
 curl -fsSL https://raw.githubusercontent.com/siricard/yawp/main/scripts/bootstrap-staging.sh | sudo bash -s -- --hostname chat.example.com
 ```
 
-The bootstrap script installs missing prerequisites, clones or updates the repository in `/opt/yawp`, runs the provisioning script, pulls the published image, and starts the stack. If the image is not public or not published yet, it prints a clear message and builds locally instead. Re-running the command updates the checkout, keeps the existing `.env`, and restarts the stack.
+The bootstrap script installs missing prerequisites, clones or updates the repository in `/opt/yawp`, runs the provisioning script, pulls the published image, starts the stack, and prints the first-boot setup URL. If the image is not public or not published yet, it prints a clear message and builds locally instead. Re-running the command updates the checkout, keeps the existing `.env`, and restarts the stack.
 
 If you already cloned the repository, run the same script from the checkout:
 
@@ -253,13 +253,19 @@ If you keep the package private, log in to GHCR on each server before `docker co
 printf '%s\n' "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USER" --password-stdin
 ```
 
-Find the first-boot setup URL in the Phoenix logs:
+Print the first-boot setup URL:
 
 ```bash
-docker compose logs phoenix | grep -E '/admin/setup\?token='
+just setup-url
 ```
 
-Open that URL in your browser. Create the first operator account with your email and a strong password. After the account exists, the setup URL cannot be reused.
+If you are not in the checkout directory, pass it explicitly:
+
+```bash
+scripts/setup-url.sh --app-dir /opt/yawp
+```
+
+Open that URL in your browser. Create the first operator account with your email and a strong password. After the account exists, the setup URL cannot be reused. If the server is already claimed, the command prints a clear message instead.
 
 To claim the server as the chat owner:
 
@@ -318,7 +324,7 @@ sudo bash scripts/provision-staging.sh --dry-run --app-dir "$PWD" --app-user roo
 sudo bash scripts/provision-staging.sh --app-dir "$PWD" --app-user root --hostname anchor-a.staging.example
 docker compose -f docker-compose.yml -f docker-compose.staging.yml pull
 docker compose -f docker-compose.yml -f docker-compose.staging.yml up -d --wait
-docker compose logs phoenix | grep -E '/admin/setup\?token='
+just setup-url --app-dir "$PWD"
 ```
 
 On the second VPS, use a separate `.env` whose `PHX_HOST` is `anchor-b.staging.example` and separate generated secrets:
@@ -328,7 +334,7 @@ sudo bash scripts/provision-staging.sh --dry-run --app-dir "$PWD" --app-user roo
 sudo bash scripts/provision-staging.sh --app-dir "$PWD" --app-user root --hostname anchor-b.staging.example
 docker compose -f docker-compose.yml -f docker-compose.staging.yml pull
 docker compose -f docker-compose.yml -f docker-compose.staging.yml up -d --wait
-docker compose logs phoenix | grep -E '/admin/setup\?token='
+just setup-url --app-dir "$PWD"
 ```
 
 Claim each server from its own setup URL and operator account. Keep the `.env` files separate. Do not copy secrets from one anchor to the other.
@@ -354,7 +360,7 @@ To reset a staging anchor to a clean state, destroy only that host's compose vol
 docker compose down -v
 docker compose -f docker-compose.yml -f docker-compose.staging.yml pull
 docker compose -f docker-compose.yml -f docker-compose.staging.yml up -d --wait
-docker compose logs phoenix | grep -E '/admin/setup\?token='
+just setup-url --app-dir "$PWD"
 ```
 
 Then create the operator account again, generate a new chat-owner claim token, and re-run `node scripts/staging-seed.mjs --base-url https://anchor-a.staging.example --claim-token paste-claim-token-here --output anchor-a-seed.json`. The old seed artifact is no longer valid after `down -v`.
@@ -449,7 +455,7 @@ This destroys the database, uploads, and Caddy data for the current compose proj
 ```bash
 docker compose down -v
 docker compose up -d --wait
-docker compose logs phoenix | grep -E '/admin/setup\?token='
+just setup-url
 ```
 
 Use reset only for a new test server or a recovery drill where you have verified backups.

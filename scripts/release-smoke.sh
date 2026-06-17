@@ -84,6 +84,15 @@ HEALTH_RETRIES=12 HEALTH_INTERVAL_SECONDS=1 HEALTH_TIMEOUT_SECONDS=5 HEALTH_INSE
 curl "${curl_flags[@]}" "${base_url}/version" >/dev/null
 curl "${curl_flags[@]}" "${base_url}/.well-known/yawp/server-key.json" >/dev/null
 
+setup_url="$(COMPOSE_PROJECT_NAME="$project_name" "$repo_root/scripts/setup-url.sh" --app-dir "$repo_root")"
+case "$setup_url" in
+  http://localhost:4000/admin/setup\?token=* | https://localhost:443/admin/setup\?token=*) ;;
+  *)
+    printf 'unexpected setup URL: %s\n' "$setup_url" >&2
+    exit 1
+    ;;
+esac
+
 python3 - "$upload_file" <<'PY'
 import hashlib
 import sys

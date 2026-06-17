@@ -122,3 +122,4 @@ else
 fi
 
 compose ps
+bash "${APP_DIR}/scripts/setup-url.sh" --app-dir "$APP_DIR" || true

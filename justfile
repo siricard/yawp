@@ -119,6 +119,9 @@ check-compose-env:
 release-smoke:
     nix develop -c bash scripts/release-smoke.sh
 
+setup-url *ARGS:
+    nix develop -c bash scripts/setup-url.sh {{ARGS}}
+
 staging-sim:
     nix develop -c bash scripts/staging-sim.sh
 
