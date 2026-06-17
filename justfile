@@ -46,6 +46,7 @@ ci:
     #!/usr/bin/env bash
     nix develop -c bash -c '
         set -euo pipefail
+        export MIX_ENV=test
         mix format --check-formatted
         (cd apps/yawp && mix ash.setup --quiet)
         mix test --warnings-as-errors
@@ -55,6 +56,7 @@ ci:
         (cd apps/yawp/assets && npx tsc --noEmit)
         (cd apps/yawp/assets/native && npx tsc --noEmit)
         (cd apps/yawp/assets/native && npm test --silent)
+        just verify-singletons
     '
 
 db-reset:
