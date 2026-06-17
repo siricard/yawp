@@ -59,7 +59,7 @@ docker compose version
 For a VPS, let the provisioning script create `.env` with generated secrets:
 
 ```bash
-sudo bash scripts/provision-staging.sh --app-dir "$PWD" --app-user "$USER" --hostname chat.example.com
+sudo bash scripts/provision-staging.sh --app-dir "$PWD" --app-user root --hostname chat.example.com
 ```
 
 For a local Mac smoke file, print a generated `.env` and redirect it:
@@ -314,8 +314,8 @@ dig +short anchor-b.staging.example A
 On the first VPS, repeat the same setup with a `.env` whose `PHX_HOST` is `anchor-a.staging.example`:
 
 ```bash
-sudo bash scripts/provision-staging.sh --dry-run --app-dir "$PWD" --app-user "$USER" --hostname anchor-a.staging.example
-sudo bash scripts/provision-staging.sh --app-dir "$PWD" --app-user "$USER" --hostname anchor-a.staging.example
+sudo bash scripts/provision-staging.sh --dry-run --app-dir "$PWD" --app-user root --hostname anchor-a.staging.example
+sudo bash scripts/provision-staging.sh --app-dir "$PWD" --app-user root --hostname anchor-a.staging.example
 docker compose -f docker-compose.yml -f docker-compose.staging.yml pull
 docker compose -f docker-compose.yml -f docker-compose.staging.yml up -d --wait
 docker compose logs phoenix | grep -E '/admin/setup\?token='
@@ -324,8 +324,8 @@ docker compose logs phoenix | grep -E '/admin/setup\?token='
 On the second VPS, use a separate `.env` whose `PHX_HOST` is `anchor-b.staging.example` and separate generated secrets:
 
 ```bash
-sudo bash scripts/provision-staging.sh --dry-run --app-dir "$PWD" --app-user "$USER" --hostname anchor-b.staging.example
-sudo bash scripts/provision-staging.sh --app-dir "$PWD" --app-user "$USER" --hostname anchor-b.staging.example
+sudo bash scripts/provision-staging.sh --dry-run --app-dir "$PWD" --app-user root --hostname anchor-b.staging.example
+sudo bash scripts/provision-staging.sh --app-dir "$PWD" --app-user root --hostname anchor-b.staging.example
 docker compose -f docker-compose.yml -f docker-compose.staging.yml pull
 docker compose -f docker-compose.yml -f docker-compose.staging.yml up -d --wait
 docker compose logs phoenix | grep -E '/admin/setup\?token='
