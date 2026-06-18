@@ -440,7 +440,7 @@
 				DEVELOPMENT_TEAM = 5V3LQJXXTW;
 				INFOPLIST_FILE = "YawpNative-macos/Info.plist";
 				INFOPLIST_PREPROCESS = YES;
-				INFOPLIST_PREPROCESSOR_DEFINITIONS = DEBUG=1;
+				INFOPLIST_PREPROCESSOR_DEFINITIONS = "DEBUG=1";
 				LD = clang;
 				LDPLUSPLUS = "clang++";
 				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks";

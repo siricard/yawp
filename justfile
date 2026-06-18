@@ -56,6 +56,7 @@ ci:
         (cd apps/yawp/assets && npx tsc --noEmit)
         (cd apps/yawp/assets/native && npx tsc --noEmit)
         (cd apps/yawp/assets/native && npm test --silent)
+        just verify-native-projects
         just verify-singletons
     '
 
@@ -112,6 +113,9 @@ ladle:
 # Metro `resolveRequest` dedup rules in apps/yawp/assets/native/metro.config.js.
 verify-singletons:
     nix develop -c node apps/yawp/assets/native/scripts/verify-singletons.mjs
+
+verify-native-projects:
+    nix develop -c bash -c 'cd apps/yawp/assets/native && bundle exec ruby -e "require \"xcodeproj\"; %w[ios/YawpNative.xcodeproj macos/YawpNative.xcodeproj].each { |path| Xcodeproj::Project.open(path); puts \"#{path}: ok\" }"'
 
 check-compose-env:
     nix develop -c bash scripts/check-compose-env.sh
