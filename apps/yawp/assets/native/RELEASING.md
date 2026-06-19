@@ -53,6 +53,16 @@ The server-info probe, RPC calls, attachments, and WebSocket connections must de
 
 Run these from the repository root after installing dependencies with `just setup` and keeping native CocoaPods current.
 
+`just setup` also writes the local Xcode environment files that point React Native's bundle phase at the current Nix-provided Node binary. If you only need to refresh that hookup, run:
+
+```bash
+just setup-xcode-env
+```
+
+Run it again after `nix flake update` or any nixpkgs bump, because the generated files contain a machine-local Nix store path. The files are intentionally not committed.
+
+For iOS and macOS, open the `.xcworkspace` files, not the `.xcodeproj` files. Opening the project directly skips CocoaPods integration and can show errors such as `DoubleConversion` not found.
+
 ### iOS archive for TestFlight
 
 ```bash

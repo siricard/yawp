@@ -24,6 +24,10 @@ iex:
 
 setup:
     nix develop -c mix setup
+    just setup-xcode-env
+
+setup-xcode-env:
+    nix develop -c bash -c 'set -euo pipefail; node_binary="$(command -v node)"; test -x "$node_binary"; for dir in apps/yawp/assets/native/ios apps/yawp/assets/native/macos; do printf "export NODE_BINARY=%q\n" "$node_binary" > "$dir/.xcode.env.local"; echo "$dir/.xcode.env.local -> $node_binary"; done; "$node_binary" --version'
 
 deps:
     nix develop -c mix deps.get
