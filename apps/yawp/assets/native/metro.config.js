@@ -31,6 +31,7 @@ const SINGLETON_DEDUPE = new Set([
   'react-native-css-interop',
   'react-native-css-interop/jsx-runtime',
   'react-native-css-interop/jsx-dev-runtime',
+  'react-native-safe-area-context',
   'nativewind',
   'phoenix',
 ]);
