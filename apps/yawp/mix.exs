@@ -112,6 +112,7 @@ defmodule Yawp.MixProject do
       ],
       "assets.build": ["compile", "tailwind yawp", "esbuild yawp"],
       "assets.deploy": [
+        "compile",
         "tailwind yawp --minify",
         "esbuild yawp --minify",
         "phx.digest"

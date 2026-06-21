@@ -74,6 +74,18 @@ printf 'release smoke project=%s phx_port=%s http_port=%s https_port=%s\n' \
   "$project_name" "$phx_port" "$http_port" "$https_port"
 
 compose build phoenix
+docker run --rm --entrypoint sh "$image_tag" -c '
+  for bundle in /app/lib/yawp-*/priv/static/assets/app-*.js /app/lib/yawp-*/priv/static/assets/app.js; do
+    [ -f "$bundle" ] || continue
+    grep -q RevealToken "$bundle" &&
+      grep -q Countdown "$bundle" &&
+      grep -q CopyLink "$bundle" &&
+      grep -q CopyToClipboard "$bundle" &&
+      exit 0
+  done
+  printf "%s\n" "admin colocated hooks missing from release app.js" >&2
+  exit 1
+'
 compose up -d --wait
 
 base_url="https://localhost:${https_port}"
